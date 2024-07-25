@@ -35,7 +35,7 @@ class LiveKitExampleApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'LiveKit Flutter Example',
+        title: 'POC Live kit',
         theme: LiveKitTheme().buildThemeData(context),
         home: const ConnectPage(),
       );

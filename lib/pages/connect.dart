@@ -194,6 +194,10 @@ class _ConnectPageState extends State<ConnectPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text('POC Health Care Monitoring'),
+       backgroundColor: Colors.white,
+    ),
         body: Container(
           alignment: Alignment.center,
           child: SingleChildScrollView(
