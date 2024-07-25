@@ -15,7 +15,7 @@ extension LKColors on Colors {
 
 class LiveKitTheme {
   //
-  final bgColor = Colors.black;
+  final bgColor = Color.fromARGB(255, 100, 59, 59);
   final textColor = Colors.white;
   final cardColor = LKColors.lkDarkBlue;
   final accentColor = LKColors.lkBlue;
