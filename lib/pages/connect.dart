@@ -231,14 +231,19 @@ class _ConnectPageState extends State<ConnectPage> {
                       ctrl: _tokenCtrl,
                     ),
                   ),
-                  Padding(
+                  Visibility(
+                  visible: false,
+                  child : Padding(
                     padding: const EdgeInsets.only(bottom: 25),
                     child: LKTextField(
                       label: 'Shared Key',
                       ctrl: _sharedKeyCtrl,
                     ),
                   ),
-                  Padding(
+                 ),
+                   Visibility(
+                  visible: false,
+                  child :Padding(
                     padding: const EdgeInsets.only(bottom: 5),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -251,7 +256,10 @@ class _ConnectPageState extends State<ConnectPage> {
                       ],
                     ),
                   ),
-                  Padding(
+                ),
+                 Visibility(
+                  visible: false,
+                  child :Padding(
                     padding: const EdgeInsets.only(bottom: 5),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -264,7 +272,10 @@ class _ConnectPageState extends State<ConnectPage> {
                       ],
                     ),
                   ),
-                  Padding(
+                  ),
+                  Visibility(
+                  visible: false,
+                  child : Padding(
                     padding: const EdgeInsets.only(bottom: 5),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -277,7 +288,10 @@ class _ConnectPageState extends State<ConnectPage> {
                       ],
                     ),
                   ),
-                  Padding(
+                 ),
+                   Visibility(
+                  visible: false,
+                  child :Padding(
                     padding: const EdgeInsets.only(bottom: 5),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -290,7 +304,10 @@ class _ConnectPageState extends State<ConnectPage> {
                       ],
                     ),
                   ),
-                  Padding(
+                 ),
+                  Visibility(
+                  visible: false,
+                  child : Padding(
                     padding: EdgeInsets.only(bottom: _multiCodec ? 5 : 25),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -303,8 +320,11 @@ class _ConnectPageState extends State<ConnectPage> {
                       ],
                     ),
                   ),
+                  ),
                   if (_multiCodec)
-                    Padding(
+                    Visibility(
+                  visible: false,
+                  child : Padding(
                         padding: const EdgeInsets.only(bottom: 5),
                         child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -342,6 +362,7 @@ class _ConnectPageState extends State<ConnectPage> {
                                 }).toList(),
                               )
                             ])),
+                ),
                   ElevatedButton(
                     onPressed: _busy ? null : () => _connect(context),
                     child: Row(

@@ -297,41 +297,104 @@ class _ControlsWidgetState extends State<ControlsWidget> {
         spacing: 5,
         runSpacing: 5,
         children: [
-          IconButton(
-            onPressed: _unpublishAll,
-            icon: const Icon(Icons.cancel),
-            tooltip: 'Unpublish all',
+          Visibility(
+            visible: false, // Change to true to make it visible
+
+            child: IconButton(
+              onPressed: _unpublishAll,
+              icon: const Icon(Icons.cancel),
+              tooltip: 'Unpublish all',
+            ),
           ),
           if (participant.isMicrophoneEnabled())
             if (lkPlatformIs(PlatformType.android))
-              IconButton(
-                onPressed: _disableAudio,
-                icon: const Icon(Icons.mic),
-                tooltip: 'mute audio',
+              Visibility(
+                visible: false, // Change to true to make it visible
+
+                child: IconButton(
+                  onPressed: _disableAudio,
+                  icon: const Icon(Icons.mic),
+                  tooltip: 'mute audio',
+                ),
               )
             else
-              PopupMenuButton<MediaDevice>(
-                icon: const Icon(Icons.settings_voice),
+              Visibility(
+                visible: false, // Change to true to make it visible
+
+                child: PopupMenuButton<MediaDevice>(
+                  icon: const Icon(Icons.settings_voice),
+                  itemBuilder: (BuildContext context) {
+                    return [
+                      PopupMenuItem<MediaDevice>(
+                        value: null,
+                        onTap: isMuted ? _enableAudio : _disableAudio,
+                        child: const ListTile(
+                          leading: Icon(
+                            Icons.mic_off,
+                            color: Colors.white,
+                          ),
+                          title: Text('Mute Microphone'),
+                        ),
+                      ),
+                      if (_audioInputs != null)
+                        ..._audioInputs!.map((device) {
+                          return PopupMenuItem<MediaDevice>(
+                            value: device,
+                            child: ListTile(
+                              leading: (device.deviceId ==
+                                      widget.room.selectedAudioInputDeviceId)
+                                  ? const Icon(
+                                      Icons.check_box_outlined,
+                                      color: Colors.white,
+                                    )
+                                  : const Icon(
+                                      Icons.check_box_outline_blank,
+                                      color: Colors.white,
+                                    ),
+                              title: Text(device.label),
+                            ),
+                            onTap: () => _selectAudioInput(device),
+                          );
+                        })
+                    ];
+                  },
+                ),
+              )
+          else
+            Visibility(
+              visible: true, // Change to true to make it visible
+
+              child: IconButton(
+                onPressed: _enableAudio,
+                icon: const Icon(Icons.mic_off),
+                tooltip: 'un-mute audio',
+              ),
+            ),
+          if (!lkPlatformIs(PlatformType.iOS))
+            Visibility(
+              visible: true, // Change to true to make it visible
+
+              child: PopupMenuButton<MediaDevice>(
+                icon: const Icon(Icons.volume_up),
                 itemBuilder: (BuildContext context) {
                   return [
-                    PopupMenuItem<MediaDevice>(
+                    const PopupMenuItem<MediaDevice>(
                       value: null,
-                      onTap: isMuted ? _enableAudio : _disableAudio,
-                      child: const ListTile(
+                      child: ListTile(
                         leading: Icon(
-                          Icons.mic_off,
+                          Icons.speaker,
                           color: Colors.white,
                         ),
-                        title: Text('Mute Microphone'),
+                        title: Text('Select Audio Output'),
                       ),
                     ),
-                    if (_audioInputs != null)
-                      ..._audioInputs!.map((device) {
+                    if (_audioOutputs != null)
+                      ..._audioOutputs!.map((device) {
                         return PopupMenuItem<MediaDevice>(
                           value: device,
                           child: ListTile(
                             leading: (device.deviceId ==
-                                    widget.room.selectedAudioInputDeviceId)
+                                    widget.room.selectedAudioOutputDeviceId)
                                 ? const Icon(
                                     Icons.check_box_outlined,
                                     color: Colors.white,
@@ -342,149 +405,147 @@ class _ControlsWidgetState extends State<ControlsWidget> {
                                   ),
                             title: Text(device.label),
                           ),
-                          onTap: () => _selectAudioInput(device),
+                          onTap: () => _selectAudioOutput(device),
                         );
                       })
                   ];
                 },
-              )
-          else
-            IconButton(
-              onPressed: _enableAudio,
-              icon: const Icon(Icons.mic_off),
-              tooltip: 'un-mute audio',
-            ),
-          if (!lkPlatformIs(PlatformType.iOS))
-            PopupMenuButton<MediaDevice>(
-              icon: const Icon(Icons.volume_up),
-              itemBuilder: (BuildContext context) {
-                return [
-                  const PopupMenuItem<MediaDevice>(
-                    value: null,
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.speaker,
-                        color: Colors.white,
-                      ),
-                      title: Text('Select Audio Output'),
-                    ),
-                  ),
-                  if (_audioOutputs != null)
-                    ..._audioOutputs!.map((device) {
-                      return PopupMenuItem<MediaDevice>(
-                        value: device,
-                        child: ListTile(
-                          leading: (device.deviceId ==
-                                  widget.room.selectedAudioOutputDeviceId)
-                              ? const Icon(
-                                  Icons.check_box_outlined,
-                                  color: Colors.white,
-                                )
-                              : const Icon(
-                                  Icons.check_box_outline_blank,
-                                  color: Colors.white,
-                                ),
-                          title: Text(device.label),
-                        ),
-                        onTap: () => _selectAudioOutput(device),
-                      );
-                    })
-                ];
-              },
+              ),
             ),
           if (!kIsWeb && lkPlatformIs(PlatformType.iOS))
-            IconButton(
-              disabledColor: Colors.grey,
-              onPressed: Hardware.instance.canSwitchSpeakerphone
-                  ? _setSpeakerphoneOn
-                  : null,
-              icon: Icon(
-                  _speakerphoneOn ? Icons.speaker_phone : Icons.phone_android),
-              tooltip: 'Switch SpeakerPhone',
+            Visibility(
+              visible: false, // Change to true to make it visible
+
+              child: IconButton(
+                disabledColor: Colors.grey,
+                onPressed: Hardware.instance.canSwitchSpeakerphone
+                    ? _setSpeakerphoneOn
+                    : null,
+                icon: Icon(_speakerphoneOn
+                    ? Icons.speaker_phone
+                    : Icons.phone_android),
+                tooltip: 'Switch SpeakerPhone',
+              ),
             ),
           if (participant.isCameraEnabled())
-            PopupMenuButton<MediaDevice>(
-              icon: const Icon(Icons.videocam_sharp),
-              itemBuilder: (BuildContext context) {
-                return [
-                  PopupMenuItem<MediaDevice>(
-                    value: null,
-                    onTap: _disableVideo,
-                    child: const ListTile(
-                      leading: Icon(
-                        Icons.videocam_off,
-                        color: Colors.white,
-                      ),
-                      title: Text('Disable Camera'),
-                    ),
-                  ),
-                  if (_videoInputs != null)
-                    ..._videoInputs!.map((device) {
-                      return PopupMenuItem<MediaDevice>(
-                        value: device,
-                        child: ListTile(
-                          leading: (device.deviceId ==
-                                  widget.room.selectedVideoInputDeviceId)
-                              ? const Icon(
-                                  Icons.check_box_outlined,
-                                  color: Colors.white,
-                                )
-                              : const Icon(
-                                  Icons.check_box_outline_blank,
-                                  color: Colors.white,
-                                ),
-                          title: Text(device.label),
+            Visibility(
+              visible: true, // Change to true to make it visible
+
+              child: PopupMenuButton<MediaDevice>(
+                icon: const Icon(Icons.videocam_sharp),
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<MediaDevice>(
+                      value: null,
+                      onTap: _disableVideo,
+                      child: const ListTile(
+                        leading: Icon(
+                          Icons.videocam_off,
+                          color: Colors.white,
                         ),
-                        onTap: () => _selectVideoInput(device),
-                      );
-                    })
-                ];
-              },
+                        title: Text('Disable Camera'),
+                      ),
+                    ),
+                    if (_videoInputs != null)
+                      ..._videoInputs!.map((device) {
+                        return PopupMenuItem<MediaDevice>(
+                          value: device,
+                          child: ListTile(
+                            leading: (device.deviceId ==
+                                    widget.room.selectedVideoInputDeviceId)
+                                ? const Icon(
+                                    Icons.check_box_outlined,
+                                    color: Colors.white,
+                                  )
+                                : const Icon(
+                                    Icons.check_box_outline_blank,
+                                    color: Colors.white,
+                                  ),
+                            title: Text(device.label),
+                          ),
+                          onTap: () => _selectVideoInput(device),
+                        );
+                      })
+                  ];
+                },
+              ),
             )
           else
-            IconButton(
-              onPressed: _enableVideo,
-              icon: const Icon(Icons.videocam_off),
-              tooltip: 'un-mute video',
+            Visibility(
+              visible: true, // Change to true to make it visible
+
+              child: IconButton(
+                onPressed: _enableVideo,
+                icon: const Icon(Icons.videocam_off),
+                tooltip: 'un-mute video',
+              ),
             ),
-          IconButton(
-            icon: Icon(position == CameraPosition.back
-                ? Icons.video_camera_back
-                : Icons.video_camera_front),
-            onPressed: () => _toggleCamera(),
-            tooltip: 'toggle camera',
+          Visibility(
+            visible: false, // Change to true to make it visible
+
+            child: IconButton(
+              icon: Icon(position == CameraPosition.back
+                  ? Icons.video_camera_back
+                  : Icons.video_camera_front),
+              onPressed: () => _toggleCamera(),
+              tooltip: 'toggle camera',
+            ),
           ),
           if (participant.isScreenShareEnabled())
-            IconButton(
-              icon: const Icon(Icons.monitor_outlined),
-              onPressed: () => _disableScreenShare(),
-              tooltip: 'unshare screen (experimental)',
+            Visibility(
+              visible: false, // Change to true to make it visible
+
+              child: IconButton(
+                icon: const Icon(Icons.monitor_outlined),
+                onPressed: () => _disableScreenShare(),
+                tooltip: 'unshare screen (experimental)',
+              ),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.monitor),
-              onPressed: () => _enableScreenShare(),
-              tooltip: 'share screen (experimental)',
+            Visibility(
+              visible: false, // Change to true to make it visible
+
+              child: IconButton(
+                icon: const Icon(Icons.monitor),
+                onPressed: () => _enableScreenShare(),
+                tooltip: 'share screen (experimental)',
+              ),
             ),
-          IconButton(
-            onPressed: _onTapDisconnect,
-            icon: const Icon(Icons.close_sharp),
-            tooltip: 'disconnect',
+          Visibility(
+            visible: false, // Change to true to make it visible
+
+            child: IconButton(
+              onPressed: _onTapDisconnect,
+              icon: const Icon(Icons.close_sharp),
+              tooltip: 'disconnect',
+            ),
           ),
-          IconButton(
-            onPressed: _onTapSendData,
-            icon: const Icon(Icons.message),
-            tooltip: 'send demo data',
+          Visibility(
+            visible: false, // Change to true to make it visible
+
+            child: IconButton(
+              onPressed: _onTapSendData,
+              icon: const Icon(Icons.message),
+              tooltip: 'send demo data',
+            ),
           ),
-          IconButton(
-            onPressed: _onTapUpdateSubscribePermission,
-            icon: const Icon(Icons.settings),
-            tooltip: 'Subscribe permission',
+          Visibility(
+            visible: false, // Change to true to make it visible
+
+            child: IconButton(
+              onPressed: _onTapUpdateSubscribePermission,
+              icon: const Icon(Icons.settings),
+              tooltip: 'Subscribe permission',
+            ),
           ),
-          IconButton(
-            onPressed: _onTapSimulateScenario,
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'Simulate scenario',
+          Visibility(
+            visible: false, // Change to true to make it visible
+
+            child: IconButton(
+              onPressed: _onTapSimulateScenario,
+              icon: const Icon(Icons.bug_report),
+              tooltip: 'Simulate scenario',
+            ),
           ),
         ],
       ),

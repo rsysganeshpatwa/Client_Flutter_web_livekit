@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:js_interop';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -161,9 +162,35 @@ class _RoomPageState extends State<RoomPage> {
     print('e2ee state: $e2eeState');
   }
 
+  void onTrackPublished(Track track){
+    print("my track event");
+    
+  }
+
+  void _manageAudioSubscriptions() {
+  final localParticipant = widget.room.localParticipant;
+  bool isHost = localParticipant != null && localParticipant.identity == "Host";
+ 
+  for (var participant in widget.room.remoteParticipants.values) {
+    for (var track in participant.trackPublications.values) {
+     if ( isHost || participant.identity == "Host") {
+        // Participants should hear only the host
+        track.subscribe();
+      } else {
+        // Participants should not hear each other
+       track.unsubscribe();
+      }
+    }
+  }
+}
+
   void _sortParticipants() {
     List<ParticipantTrack> userMediaTracks = [];
     List<ParticipantTrack> screenTracks = [];
+    final localParticipant = widget.room.localParticipant;
+ 
+    // Check if the local participant is the host
+    bool isHost = localParticipant != null && localParticipant.identity == "Host";
     for (var participant in widget.room.remoteParticipants.values) {
       for (var t in participant.videoTrackPublications) {
         if (t.isScreenShare) {
@@ -171,11 +198,14 @@ class _RoomPageState extends State<RoomPage> {
             participant: participant,
             type: ParticipantTrackType.kScreenShare,
           ));
-        } else {
+        } else if(isHost || participant.identity == "Host") {
           userMediaTracks.add(ParticipantTrack(participant: participant));
         }
       }
     }
+
+
+    _manageAudioSubscriptions();
     // sort speakers for the grid
     userMediaTracks.sort((a, b) {
       // loudest speaker first
@@ -249,7 +279,7 @@ class _RoomPageState extends State<RoomPage> {
                 Expanded(
                     child: participantTracks.isNotEmpty
                         ? ParticipantWidget.widgetFor(participantTracks.first,
-                            showStatsLayer: true)
+                            showStatsLayer: false)
                         : Container()),
                 if (widget.room.localParticipant != null)
                   SafeArea(
