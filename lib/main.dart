@@ -7,7 +7,10 @@ import 'package:video_meeting_room/theme.dart';
 import 'pages/connect.dart';
 import 'utils.dart';
 
+
 void main() async {
+
+  
   final format = DateFormat('HH:mm:ss');
   // configure logs for debugging
   Logger.root.level = Level.FINE;

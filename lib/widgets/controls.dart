@@ -319,7 +319,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               )
             else
               Visibility(
-                visible: false, // Change to true to make it visible
+                visible: true, // Change to true to make it visible
 
                 child: PopupMenuButton<MediaDevice>(
                   icon: const Icon(Icons.settings_voice),
@@ -372,7 +372,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           if (!lkPlatformIs(PlatformType.iOS))
             Visibility(
-              visible: true, // Change to true to make it visible
+              visible: false, // Change to true to make it visible
 
               child: PopupMenuButton<MediaDevice>(
                 icon: const Icon(Icons.volume_up),
@@ -512,7 +512,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               ),
             ),
           Visibility(
-            visible: false, // Change to true to make it visible
+            visible: true, // Change to true to make it visible
 
             child: IconButton(
               onPressed: _onTapDisconnect,

@@ -162,35 +162,36 @@ class _RoomPageState extends State<RoomPage> {
     print('e2ee state: $e2eeState');
   }
 
-  void onTrackPublished(Track track){
+  void onTrackPublished(Track track) {
     print("my track event");
-    
   }
 
   void _manageAudioSubscriptions() {
-  final localParticipant = widget.room.localParticipant;
-  bool isHost = localParticipant != null && localParticipant.identity == "Host";
- 
-  for (var participant in widget.room.remoteParticipants.values) {
-    for (var track in participant.trackPublications.values) {
-     if ( isHost || participant.identity == "Host") {
-        // Participants should hear only the host
-        track.subscribe();
-      } else {
-        // Participants should not hear each other
-       track.unsubscribe();
+    final localParticipant = widget.room.localParticipant;
+    bool isHost =
+        localParticipant != null && localParticipant.identity == "Host";
+
+    for (var participant in widget.room.remoteParticipants.values) {
+      for (var track in participant.trackPublications.values) {
+        if (isHost || participant.identity == "Host") {
+          // Participants should hear only the host
+          track.subscribe();
+        } else {
+          // Participants should not hear each other
+          track.unsubscribe();
+        }
       }
     }
   }
-}
 
   void _sortParticipants() {
     List<ParticipantTrack> userMediaTracks = [];
     List<ParticipantTrack> screenTracks = [];
     final localParticipant = widget.room.localParticipant;
- 
+
     // Check if the local participant is the host
-    bool isHost = localParticipant != null && localParticipant.identity == "Host";
+    bool isHost =
+        localParticipant != null && localParticipant.identity == "Host";
     for (var participant in widget.room.remoteParticipants.values) {
       for (var t in participant.videoTrackPublications) {
         if (t.isScreenShare) {
@@ -198,14 +199,14 @@ class _RoomPageState extends State<RoomPage> {
             participant: participant,
             type: ParticipantTrackType.kScreenShare,
           ));
-        } else if(isHost || participant.identity == "Host") {
+        } else //if(isHost || participant.identity == "Host")
+        {
           userMediaTracks.add(ParticipantTrack(participant: participant));
         }
       }
     }
 
-
-    _manageAudioSubscriptions();
+    // _manageAudioSubscriptions();
     // sort speakers for the grid
     userMediaTracks.sort((a, b) {
       // loudest speaker first
@@ -271,42 +272,59 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                    child: participantTracks.isNotEmpty
-                        ? ParticipantWidget.widgetFor(participantTracks.first,
-                            showStatsLayer: false)
-                        : Container()),
-                if (widget.room.localParticipant != null)
-                  SafeArea(
-                    top: false,
-                    child: ControlsWidget(
-                        widget.room, widget.room.localParticipant!),
-                  )
-              ],
-            ),
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final int numParticipants = participantTracks.length;
+
+    final int crossAxisCount = (numParticipants > 1)
+        ? (screenWidth / (screenWidth / math.sqrt(numParticipants))).ceil()
+        : 1;
+
+    final int rowCount = (numParticipants / crossAxisCount).ceil();
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              Expanded(
+                child: participantTracks.isNotEmpty
+                    ? GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 4.0,
+                          mainAxisSpacing: 4.0,
+                          childAspectRatio: (screenWidth / crossAxisCount) /
+                              (screenHeight / rowCount),
+                        ),
+                        itemCount: numParticipants,
+                        itemBuilder: (context, index) {
+                          return ParticipantWidget.widgetFor(
+                            participantTracks[index],
+                            showStatsLayer: false,
+                          );
+                        },
+                      )
+                    : Container(),
+              ),
+            ],
+          ),
+          if (widget.room.localParticipant != null)
             Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: SizedBox(
-                  height: 120,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: math.max(0, participantTracks.length - 1),
-                    itemBuilder: (BuildContext context, int index) => SizedBox(
-                      width: 180,
-                      height: 120,
-                      child: ParticipantWidget.widgetFor(
-                          participantTracks[index + 1]),
-                    ),
-                  ),
-                )),
-          ],
-        ),
-      );
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child:
+                    ControlsWidget(widget.room, widget.room.localParticipant!),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
