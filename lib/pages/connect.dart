@@ -29,7 +29,7 @@ class ConnectPage extends StatefulWidget {
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
 
-  final  tokenServiceUrl = 'https://token-livekit-service.onrender.com';
+  final tokenServiceUrl = 'https://token-livekit-service.onrender.com';
 
   final _identityCtrl = TextEditingController();
 
@@ -254,68 +254,69 @@ class _ConnectPageState extends State<ConnectPage> {
                 ),
               ),
             ),
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Container(
-                width: 200,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
+            if (!_isRoomNameInUrl)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
+                    ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        'Active Rooms',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          'Active Rooms',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                        child: StreamBuilder<List<String>>(
-                      stream: getRoomList(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return Text('Error: ${snapshot.error}');
-                        } else if (snapshot.connectionState ==
-                            asyncstate.ConnectionState.waiting) {
-                          return CircularProgressIndicator();
-                        } else {
-                          final roomList = snapshot.data;
-                          return ListView.builder(
-                            itemCount: roomList?.length,
-                            itemBuilder: (context, index) {
-                              return ListTile(
-                                title: Text(
-                                  roomList![index],
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                                onTap: () {
-                                  setState(() {
-                                    _roomCtrl.text = roomList![index];
+                      Expanded(
+                          child: StreamBuilder<List<String>>(
+                        stream: getRoomList(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return Text('');
+                          } else if (snapshot.connectionState ==
+                              asyncstate.ConnectionState.waiting) {
+                            return CircularProgressIndicator();
+                          } else {
+                            final roomList = snapshot.data;
+                            return ListView.builder(
+                              itemCount: roomList?.length,
+                              itemBuilder: (context, index) {
+                                return ListTile(
+                                  title: Text(
+                                    roomList![index],
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  onTap: () {
+                                    setState(() {
+                                      _roomCtrl.text = roomList![index];
 
-                                    _isRoomNameInUrl = false;
-                                  });
-                                },
-                              );
-                            },
-                          );
-                        }
-                      },
-                    )),
-                  ],
+                                      _isRoomNameInUrl = false;
+                                    });
+                                  },
+                                );
+                              },
+                            );
+                          }
+                        },
+                      )),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       );

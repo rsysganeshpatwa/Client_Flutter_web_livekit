@@ -4,6 +4,7 @@ import 'dart:js_interop';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 
@@ -269,8 +270,19 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       participantTracks = [...screenTracks, ...userMediaTracks];
     });
+    
   }
+  
+ Future<void> _copyInviteLinkToClipboard() async {
+    final roomName= widget.room.name;
 
+    final inviteLink = '${Uri.base}?room=$roomName'; // Replace with your actual invite link generation logic
+    await Clipboard.setData(ClipboardData(text: inviteLink));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Invite link copied to clipboard')),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -324,6 +336,11 @@ class _RoomPageState extends State<RoomPage> {
               ),
             ),
         ],
+      ),
+       floatingActionButton: FloatingActionButton(
+        onPressed: _copyInviteLinkToClipboard,
+        child: Icon(Icons.link),
+        tooltip: 'Copy invite link',
       ),
     );
   }
