@@ -210,7 +210,7 @@ class _RoomPageState extends State<RoomPage> {
     // sort speakers for the grid
     userMediaTracks.sort((a, b) {
       // loudest speaker first
-      if (a.participant.isSpeaking && b.participant.isSpeaking) {
+      /*if (a.participant.isSpeaking && b.participant.isSpeaking) {
         if (a.participant.audioLevel > b.participant.audioLevel) {
           return -1;
         } else {
@@ -230,7 +230,7 @@ class _RoomPageState extends State<RoomPage> {
       if (a.participant.hasVideo != b.participant.hasVideo) {
         return a.participant.hasVideo ? -1 : 1;
       }
-
+*/
       // joinedAt
       return a.participant.joinedAt.millisecondsSinceEpoch -
           b.participant.joinedAt.millisecondsSinceEpoch;
