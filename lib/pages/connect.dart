@@ -29,7 +29,7 @@ class ConnectPage extends StatefulWidget {
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
 
-  final  tokenServiceUrl = 'https://token-livekit-service.onrender.com/token';
+  final  tokenServiceUrl = 'https://token-livekit-service.onrender.com';
 
   final _identityCtrl = TextEditingController();
 
@@ -111,7 +111,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
   Stream<List<String>> getRoomList() async* {
     while (true) {
-      final response = await http.get(Uri.parse(tokenServiceUrl));
+      final response = await http.get(Uri.parse('$tokenServiceUrl/rooms'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List;
@@ -145,7 +145,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
       final response = await http.post(
         //https://token-livekit-service.onrender.com/token
-        Uri.parse(tokenServiceUrl),
+        Uri.parse('$tokenServiceUrl/token'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'identity': identity, 'roomName': roomName}),
       );
