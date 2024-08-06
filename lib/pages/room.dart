@@ -275,8 +275,8 @@ class _RoomPageState extends State<RoomPage> {
   
  Future<void> _copyInviteLinkToClipboard() async {
     final roomName= widget.room.name;
-
-    final inviteLink = '${Uri.base}?room=$roomName'; // Replace with your actual invite link generation logic
+ String encodedRoomName = Uri.encodeComponent(roomName!);
+    final inviteLink = 'https://${Uri.base.host}?room=$encodedRoomName'; 
     await Clipboard.setData(ClipboardData(text: inviteLink));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Invite link copied to clipboard')),
