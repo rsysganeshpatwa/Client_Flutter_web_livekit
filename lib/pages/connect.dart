@@ -29,7 +29,7 @@ class ConnectPage extends StatefulWidget {
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
 
-  final tokenServiceUrl = 'http://ec2-13-49-49-187.eu-north-1.compute.amazonaws.com:3000';//'http://localhost:3000' ; //'https://livekit-token-server.glitch.me';
+  final tokenServiceUrl = 'http://ec2-13-60-74-153.eu-north-1.compute.amazonaws.com:3000';//'http://localhost:3000' ; //'https://livekit-token-server.glitch.me';
 
   //'https://token-livekit-service.onrender.com';
 
@@ -159,7 +159,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
         print('Connecting with identity: $identity, token: $token...');
 
-        var url = 'http://ec2-13-49-49-187.eu-north-1.compute.amazonaws.com:7880';//'http://localhost:7880';//'wss://poc-test-7otdfht1.livekit.cloud';
+        var url = 'http://ec2-13-60-74-153.eu-north-1.compute.amazonaws.com:7880';//'http://localhost:7880';//'wss://poc-test-7otdfht1.livekit.cloud';
 
         await Navigator.push<void>(
           ctx,
