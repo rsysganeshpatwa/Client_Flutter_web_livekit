@@ -33,6 +33,10 @@ class _RoomPageState extends State<RoomPage> {
   EventsListener<RoomEvent> get _listener => widget.listener;
   bool get fastConnection => widget.room.engine.fastConnectOptions != null;
   bool _flagStartedReplayKit = false;
+  // Track the participant currently being listened to
+  Participant? _activeParticipant;
+  // Track if all participants are muted
+  bool _muteAll = false;
   @override
   void initState() {
     super.initState();
@@ -282,6 +286,24 @@ class _RoomPageState extends State<RoomPage> {
       SnackBar(content: Text('Invite link copied to clipboard')),
     );
   }
+  void _setActiveParticipant(Participant participant) {
+    setState(() {
+      _activeParticipant = participant;
+      _muteAll = false;
+    });
+
+    // Mute all participants first
+    participantTracks.forEach((track) {
+      track.participant.audioTrackPublications.forEach((pub) {
+        pub.track?.disable();
+      });
+    });
+
+    // Unmute only the selected participant
+    participant.audioTrackPublications.forEach((pub) {
+      pub.track?.enable();
+    });
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -291,12 +313,16 @@ class _RoomPageState extends State<RoomPage> {
 
     final int numParticipants = participantTracks.length;
 
-    final int crossAxisCount = (numParticipants > 1)
-        ? (screenWidth / (screenWidth / math.sqrt(numParticipants))).ceil()
-        : 1;
+    final bool isMobile = screenWidth < 600; // Adjust screen size threshold if needed
 
-    final int rowCount = (numParticipants / crossAxisCount).ceil();
 
+    final int crossAxisCount = (isMobile && numParticipants == 2) ? 1 : (numParticipants > 1)
+    ? (screenWidth / (screenWidth / math.sqrt(numParticipants))).ceil()
+    : 1;
+
+final int rowCount = (isMobile && numParticipants == 2)
+    ? 2
+    : (numParticipants / crossAxisCount).ceil();
     return Scaffold(
       body: Stack(
         children: [
@@ -314,9 +340,12 @@ class _RoomPageState extends State<RoomPage> {
                         ),
                         itemCount: numParticipants,
                         itemBuilder: (context, index) {
-                          return ParticipantWidget.widgetFor(
-                            participantTracks[index],
-                            showStatsLayer: false,
+                          return  GestureDetector(
+                            onTap: () => _setActiveParticipant(participantTracks[index].participant),
+                            child: ParticipantWidget.widgetFor(
+                              participantTracks[index],
+                              showStatsLayer: false,
+                            ),
                           );
                         },
                       )

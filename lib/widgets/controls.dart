@@ -11,7 +11,6 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../exts.dart';
 
 class ControlsWidget extends StatefulWidget {
-  //
   final Room room;
   final LocalParticipant participant;
 
@@ -26,7 +25,6 @@ class ControlsWidget extends StatefulWidget {
 }
 
 class _ControlsWidgetState extends State<ControlsWidget> {
-  //
   CameraPosition position = CameraPosition.front;
 
   List<MediaDevice>? _audioInputs;
@@ -36,11 +34,12 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   StreamSubscription? _subscription;
 
   bool _speakerphoneOn = Hardware.instance.preferSpeakerOutput;
+  bool _allMuted = false; // Track mute state for all participants
 
   @override
   void initState() {
     super.initState();
-    participant.addListener(_onChange);
+    widget.participant.addListener(_onChange);
     _subscription = Hardware.instance.onDeviceChange.stream
         .listen((List<MediaDevice> devices) {
       _loadDevices(devices);
@@ -51,7 +50,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   @override
   void dispose() {
     _subscription?.cancel();
-    participant.removeListener(_onChange);
+    widget.participant.removeListener(_onChange);
     super.dispose();
   }
 
@@ -75,6 +74,28 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   bool get isMuted => participant.isMuted;
+
+  void _toggleMuteAll() async {
+    final participants = widget.room.remoteParticipants; // List of all participants
+    if (_allMuted) {
+      // Unmute all participants
+      participants.forEach((id, p) {
+         p.audioTrackPublications.forEach((pub) {
+          pub.track?.enable();
+        });
+      });
+    } else {
+      // Mute all participants
+      for (var p in participants.values) {
+         p.audioTrackPublications.forEach((pub) {
+          pub.track?.disable();
+        });
+      }
+    }
+    setState(() {
+      _allMuted = !_allMuted;
+    });
+  }
 
   void _disableAudio() async {
     await participant.setMicrophoneEnabled(false);
@@ -114,7 +135,6 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   void _toggleCamera() async {
-    //
     final track = participant.videoTrackPublications.firstOrNull?.track;
     if (track == null) return;
 
@@ -155,14 +175,12 @@ class _ControlsWidgetState extends State<ControlsWidget> {
       return;
     }
     if (lkPlatformIs(PlatformType.android)) {
-      // Android specific
       bool hasCapturePermission = await Helper.requestCapturePermission();
       if (!hasCapturePermission) {
         return;
       }
 
       requestBackgroundPermission([bool isRetry = false]) async {
-        // Required for android screenshare.
         try {
           bool hasPermissions = await FlutterBackground.hasPermissions;
           if (!isRetry) {
@@ -214,9 +232,8 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   void _disableScreenShare() async {
     await participant.setScreenShareEnabled(false);
     if (lkPlatformIs(PlatformType.android)) {
-      // Android specific
       try {
-        //   await FlutterBackground.disableBackgroundExecution();
+        // await FlutterBackground.disableBackgroundExecution();
       } catch (error) {
         print('error disabling screen share: $error');
       }
@@ -298,19 +315,27 @@ class _ControlsWidgetState extends State<ControlsWidget> {
         runSpacing: 5,
         children: [
           Visibility(
-            visible: false, // Change to true to make it visible
-
+            visible: false,
             child: IconButton(
               onPressed: _unpublishAll,
               icon: const Icon(Icons.cancel),
               tooltip: 'Unpublish all',
             ),
           ),
+          Visibility(
+            visible: true,
+            child: IconButton(
+              onPressed: _toggleMuteAll,
+              icon: Icon(
+                _allMuted ? Icons.volume_off : Icons.volume_up,
+              ),
+              tooltip: _allMuted ? 'Unmute all' : 'Mute all',
+            ),
+          ),
           if (participant.isMicrophoneEnabled())
             if (lkPlatformIs(PlatformType.android))
               Visibility(
-                visible: false, // Change to true to make it visible
-
+                visible: false,
                 child: IconButton(
                   onPressed: _disableAudio,
                   icon: const Icon(Icons.mic),
@@ -319,8 +344,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               )
             else
               Visibility(
-                visible: true, // Change to true to make it visible
-
+                visible: true,
                 child: PopupMenuButton<MediaDevice>(
                   icon: const Icon(Icons.settings_voice),
                   itemBuilder: (BuildContext context) {
@@ -362,8 +386,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               )
           else
             Visibility(
-              visible: true, // Change to true to make it visible
-
+              visible: true,
               child: IconButton(
                 onPressed: _enableAudio,
                 icon: const Icon(Icons.mic_off),
@@ -372,8 +395,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           if (!lkPlatformIs(PlatformType.iOS))
             Visibility(
-              visible: false, // Change to true to make it visible
-
+              visible: false,
               child: PopupMenuButton<MediaDevice>(
                 icon: const Icon(Icons.volume_up),
                 itemBuilder: (BuildContext context) {
@@ -414,8 +436,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           if (!kIsWeb && lkPlatformIs(PlatformType.iOS))
             Visibility(
-              visible: false, // Change to true to make it visible
-
+              visible: false,
               child: IconButton(
                 disabledColor: Colors.grey,
                 onPressed: Hardware.instance.canSwitchSpeakerphone
@@ -429,8 +450,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           if (participant.isCameraEnabled())
             Visibility(
-              visible: true, // Change to true to make it visible
-
+              visible: true,
               child: PopupMenuButton<MediaDevice>(
                 icon: const Icon(Icons.videocam_sharp),
                 itemBuilder: (BuildContext context) {
@@ -472,8 +492,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             )
           else
             Visibility(
-              visible: true, // Change to true to make it visible
-
+              visible: true,
               child: IconButton(
                 onPressed: _enableVideo,
                 icon: const Icon(Icons.videocam_off),
@@ -481,8 +500,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               ),
             ),
           Visibility(
-            visible: false, // Change to true to make it visible
-
+            visible: false,
             child: IconButton(
               icon: Icon(position == CameraPosition.back
                   ? Icons.video_camera_back
@@ -493,8 +511,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           ),
           if (participant.isScreenShareEnabled())
             Visibility(
-              visible: false, // Change to true to make it visible
-
+              visible: false,
               child: IconButton(
                 icon: const Icon(Icons.monitor_outlined),
                 onPressed: () => _disableScreenShare(),
@@ -503,8 +520,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             )
           else
             Visibility(
-              visible: false, // Change to true to make it visible
-
+              visible: false,
               child: IconButton(
                 icon: const Icon(Icons.monitor),
                 onPressed: () => _enableScreenShare(),
@@ -512,8 +528,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               ),
             ),
           Visibility(
-            visible: true, // Change to true to make it visible
-
+            visible: true,
             child: IconButton(
               onPressed: _onTapDisconnect,
               icon: const Icon(Icons.close_sharp),
@@ -521,8 +536,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           ),
           Visibility(
-            visible: false, // Change to true to make it visible
-
+            visible: false,
             child: IconButton(
               onPressed: _onTapSendData,
               icon: const Icon(Icons.message),
@@ -530,8 +544,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           ),
           Visibility(
-            visible: false, // Change to true to make it visible
-
+            visible: false,
             child: IconButton(
               onPressed: _onTapUpdateSubscribePermission,
               icon: const Icon(Icons.settings),
@@ -539,8 +552,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           ),
           Visibility(
-            visible: false, // Change to true to make it visible
-
+            visible: false,
             child: IconButton(
               onPressed: _onTapSimulateScenario,
               icon: const Icon(Icons.bug_report),

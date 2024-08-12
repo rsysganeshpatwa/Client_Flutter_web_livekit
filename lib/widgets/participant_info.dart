@@ -28,6 +28,7 @@ class ParticipantTrack {
 class ParticipantInfoWidget extends StatelessWidget {
   final String? title;
   final bool audioAvailable;
+  final bool publicAudioDisabled;
   final ConnectionQuality connectionQuality;
   final bool isScreenShare;
   final bool enabledE2EE;
@@ -35,6 +36,7 @@ class ParticipantInfoWidget extends StatelessWidget {
   const ParticipantInfoWidget({
     this.title,
     this.audioAvailable = true,
+    this.publicAudioDisabled = false,
     this.connectionQuality = ConnectionQuality.unknown,
     this.isScreenShare = false,
     this.enabledE2EE = false,
@@ -76,6 +78,15 @@ class ParticipantInfoWidget extends StatelessWidget {
                       size: 16,
                     ),
                   ),
+            if (publicAudioDisabled)
+              Padding(
+                padding: const EdgeInsets.only(left: 5),
+                child: Icon(
+                  Icons.volume_off,
+                  color: Colors.red,
+                  size: 16,
+                ),
+              ),
             if (connectionQuality != ConnectionQuality.unknown)
               Padding(
                 padding: const EdgeInsets.only(left: 5),
