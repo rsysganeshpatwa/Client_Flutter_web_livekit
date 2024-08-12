@@ -143,7 +143,9 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               child: activeVideoTrack != null && !activeVideoTrack!.muted
                   ? VideoTrackRenderer(
                       activeVideoTrack!,
-                      fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                      fit: (MediaQuery.of(ctx).size.width < 600
+                          ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
                     )
                   : const NoVideoWidget(),
             ),
@@ -161,7 +163,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-               //   ...extraWidgets(isScreenShare),
+                  //   ...extraWidgets(isScreenShare),
                   ParticipantInfoWidget(
                     title: widget.participant.name.isNotEmpty
                         ? '${widget.participant.name} (${widget.participant.identity})'
