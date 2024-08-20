@@ -7,14 +7,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:video_meeting_room/pages/room.dart';
 
 import '../exts.dart';
 
 class ControlsWidget extends StatefulWidget {
   final Room room;
   final LocalParticipant participant;
+  final void Function(bool) onToggleParticipants;
+  final  String? role;
 
   const ControlsWidget(
+    this.onToggleParticipants,
+    this.role,
     this.room,
     this.participant, {
     super.key,
@@ -76,22 +81,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   bool get isMuted => participant.isMuted;
 
   void _toggleMuteAll() async {
-    final participants = widget.room.remoteParticipants; // List of all participants
-    if (_allMuted) {
-      // Unmute all participants
-      participants.forEach((id, p) {
-         p.audioTrackPublications.forEach((pub) {
-          pub.track?.enable();
-        });
-      });
-    } else {
-      // Mute all participants
-      for (var p in participants.values) {
-         p.audioTrackPublications.forEach((pub) {
-          pub.track?.disable();
-        });
-      }
-    }
+      widget.onToggleParticipants(!_allMuted );
     setState(() {
       _allMuted = !_allMuted;
     });
@@ -323,7 +313,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           ),
           Visibility(
-            visible: true,
+            visible: widget.role == Role.admin.toString() ? true : false,
             child: IconButton(
               onPressed: _toggleMuteAll,
               icon: Icon(

@@ -125,7 +125,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   @override
   Widget build(BuildContext ctx) => Container(
         foregroundDecoration: BoxDecoration(
-          border: widget.participant.isSpeaking && audioPublication?.track?.mediaStreamTrack.enabled == true && !isScreenShare
+          border: widget.participant.isSpeaking && audioPublication?.subscribed == false && !isScreenShare
               ? Border.all(
                   width: 5,
                   color: LKColors.lkBlue,
@@ -168,9 +168,8 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                     title: widget.participant.name.isNotEmpty
                         ? '${widget.participant.name} (${widget.participant.identity})'
                         : widget.participant.identity,
-                    audioAvailable: audioPublication?.muted == false  &&
-                        audioPublication?.subscribed == true,
-                      publicAudioDisabled: audioPublication?.track?.mediaStreamTrack.enabled == false,
+                    audioAvailable: audioPublication?.muted == false ,
+                      publicAudioDisabled: audioPublication?.subscribed == false,
                     connectionQuality: widget.participant.connectionQuality,
                     isScreenShare: isScreenShare,
                     enabledE2EE: widget.participant.isEncrypted,

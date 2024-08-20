@@ -21,9 +21,11 @@ class JoinArgs {
     this.dynacast = true,
     this.preferredCodec = 'VP8',
     this.enableBackupVideoCodec = true,
+    this.role = Role.participant,
   });
   final String url;
   final String token;
+  final Role role;
   final bool e2ee;
   final String? e2eeKey;
   final bool simulcast;
@@ -183,8 +185,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
         args.url,
         args.token,
         roomOptions: RoomOptions(
+          
           adaptiveStream: args.adaptiveStream,
           dynacast: args.dynacast,
+          
           defaultAudioPublishOptions: const AudioPublishOptions(
             name: 'custom_audio_track_name',
           ),
@@ -206,11 +210,13 @@ class _PreJoinPageState extends State<PreJoinPage> {
           defaultCameraCaptureOptions: CameraCaptureOptions(
               maxFrameRate: 30, params: _selectedVideoParameters),
           e2eeOptions: e2eeOptions,
+        
         ),
         fastConnectOptions: FastConnectOptions(
           microphone: TrackOption(track: _audioTrack),
           camera: TrackOption(track: _videoTrack),
         ),
+       
       );
 
       await Navigator.push<void>(
