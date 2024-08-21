@@ -32,8 +32,8 @@ class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
   Role _selectedRole = Role.participant; // Default role is Participant
 
-  final tokenServiceUrl = dotenv.env['API_NODE_URL'] ?? '';
-  final url = dotenv.env['API_LIVEKIT_HTTPS_URL'] ?? '';
+  final tokenServiceUrl = dotenv.env['API_NODE_LOCAL_URL'] ?? '';
+  final url = dotenv.env['API_LIVEKIT_LOCAL_URL'] ?? '';
 
   final _identityCtrl = TextEditingController();
 

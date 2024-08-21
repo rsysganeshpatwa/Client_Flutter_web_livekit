@@ -299,6 +299,7 @@ class _RoomPageState extends State<RoomPage> {
         }
       }
     }
+    _updateAudioSubscriptions();
     setState(() {
       participantTracks = [...screenTracks, ...userMediaTracks];
     });
