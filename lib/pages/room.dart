@@ -214,9 +214,9 @@ class _RoomPageState extends State<RoomPage> {
           _allowedToTalk = widget.room.remoteParticipants.values
               .where((p) => allowedIdentities.contains(p.identity))
               .toSet();
-         
+            _updateAudioSubscriptions();
         });
-         _updateAudioSubscriptions();
+      
       }
     } catch (e) {
       print('Failed to parse metadata: $e');
@@ -247,15 +247,18 @@ class _RoomPageState extends State<RoomPage> {
     final localParticipant = widget.room.localParticipant;
 
     bool isHost =
-        localParticipant != null && localParticipant.identity == "Host";
+        localParticipant != null &&  localParticipantRole == Role.admin.toString();
     for (var participant in widget.room.remoteParticipants.values) {
+        final metadata = participant.metadata;
+      final remoteParticipantRole = metadata != null ? jsonDecode(metadata)['role'] : null;
       for (var t in participant.videoTrackPublications) {
         if (t.isScreenShare) {
           screenTracks.add(ParticipantTrack(
             participant: participant,
             type: ParticipantTrackType.kScreenShare,
           ));
-        } else {
+        } else if (isHost || remoteParticipantRole == Role.admin.toString()) {
+
           userMediaTracks.add(ParticipantTrack(participant: participant));
         }
       }
@@ -342,13 +345,6 @@ class _RoomPageState extends State<RoomPage> {
       // Add remote participants based on their role or track subscription status
       for (var participant in widget.room.remoteParticipants.values) {
 
-        if(participant.identity !=localParticipant?.identity){
-          participant.audioTrackPublications.forEach((track) {
-            if (track.subscribed) {
-                track.unsubscribe();
-            }
-          });
-        }
         if (localParticipantRole == Role.admin.toString()) {
           // Always add admin to _allowedToTalk
           _allowedToTalk.add(participant);
@@ -425,10 +421,15 @@ class _RoomPageState extends State<RoomPage> {
     if(localParticipantRole == Role.admin.toString() && !_allowedToTalk.contains(widget.room.localParticipant!)){
       _allowedToTalk.add(widget.room.localParticipant!);
     }
-    print('Allowed to talk: $_allowedToTalk');
+
+    final remote = widget.room.remoteParticipants.values;
+    print('Allowed to talk meta: $_allowedToTalk');
+   print('Remote participants meta: $remote');
     for (var participant in widget.room.remoteParticipants.values) {
+       final metadata = participant.metadata;
+      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
       for (var track in participant.audioTrackPublications) {
-        if (_allowedToTalk.contains(participant)) {
+        if (_allowedToTalk.contains(participant) && localParticipantRole ==Role.admin.toString() || role == Role.admin.toString()) {
           track.subscribe();
         } else {
           track.unsubscribe();
@@ -558,25 +559,15 @@ class _RoomPageState extends State<RoomPage> {
                           itemBuilder: (context, index) {
                             final participant =
                                 participantTracks[index].participant;
-                            final isAllowedToTalk =
-                                _allowedToTalk.contains(participant);
-
+                          
                             return GestureDetector(
                               onTap: () => _setActiveParticipant(participant),
                               child: Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isAllowedToTalk
-                                        ? Colors.green
-                                        : Colors.transparent,
-                                    width: 3.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(
-                                      8.0), // Optional: round the corners
-                                ),
+                      
                                 child: ParticipantWidget.widgetFor(
                                   participantTracks[index],
                                   showStatsLayer: false,
+                                  
                                 ),
                               ),
                             );
