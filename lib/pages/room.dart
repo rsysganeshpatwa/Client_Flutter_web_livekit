@@ -214,9 +214,8 @@ class _RoomPageState extends State<RoomPage> {
           _allowedToTalk = widget.room.remoteParticipants.values
               .where((p) => allowedIdentities.contains(p.identity))
               .toSet();
-            _updateAudioSubscriptions();
+          _updateAudioSubscriptions();
         });
-      
       }
     } catch (e) {
       print('Failed to parse metadata: $e');
@@ -246,11 +245,12 @@ class _RoomPageState extends State<RoomPage> {
     List<ParticipantTrack> screenTracks = [];
     final localParticipant = widget.room.localParticipant;
 
-    bool isHost =
-        localParticipant != null &&  localParticipantRole == Role.admin.toString();
+    bool isHost = localParticipant != null &&
+        localParticipantRole == Role.admin.toString();
     for (var participant in widget.room.remoteParticipants.values) {
-        final metadata = participant.metadata;
-      final remoteParticipantRole = metadata != null ? jsonDecode(metadata)['role'] : null;
+      final metadata = participant.metadata;
+      final remoteParticipantRole =
+          metadata != null ? jsonDecode(metadata)['role'] : null;
       for (var t in participant.videoTrackPublications) {
         if (t.isScreenShare) {
           screenTracks.add(ParticipantTrack(
@@ -258,7 +258,6 @@ class _RoomPageState extends State<RoomPage> {
             type: ParticipantTrackType.kScreenShare,
           ));
         } else if (isHost || remoteParticipantRole == Role.admin.toString()) {
-
           userMediaTracks.add(ParticipantTrack(participant: participant));
         }
       }
@@ -299,20 +298,52 @@ class _RoomPageState extends State<RoomPage> {
         }
       }
     }
-    _updateAudioSubscriptions();
+    // _updateAudioSubscriptions();
     setState(() {
       participantTracks = [...screenTracks, ...userMediaTracks];
     });
   }
 
-  Future<void> _copyInviteLinkToClipboard() async {
+  Future<void> _copyInviteLinkToClipboard(BuildContext context) async {
     final roomName = widget.room.name;
     String encodedRoomName = Uri.encodeComponent(roomName!);
-    final inviteLink = 'https://${Uri.base.host}?room=$encodedRoomName';
-    await Clipboard.setData(ClipboardData(text: inviteLink));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Invite link copied to clipboard')),
+
+    // Generate the invite links
+    final hostInviteLink =
+        'https://${Uri.base.host}?room=$encodedRoomName&role=admin';
+    final participantInviteLink =
+        'https://${Uri.base.host}?room=$encodedRoomName&role=participant';
+
+    // Show a dialog to choose which link to copy
+    final selectedLink = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return SimpleDialog(
+          title: Text('Copy Invite Link'),
+          children: <Widget>[
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(context, hostInviteLink);
+              },
+              child: Text('Copy Host Link'),
+            ),
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(context, participantInviteLink);
+              },
+              child: Text('Copy Participant Link'),
+            ),
+          ],
+        );
+      },
     );
+
+    if (selectedLink != null) {
+      await Clipboard.setData(ClipboardData(text: selectedLink));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invite link copied to clipboard')),
+      );
+    }
   }
 
   void _setActiveParticipant(Participant participant) {
@@ -341,25 +372,24 @@ class _RoomPageState extends State<RoomPage> {
       if (localParticipantRole == Role.admin.toString()) {
         _allowedToTalk.add(localParticipant as Participant);
       }
-    
 
       // Add remote participants based on their role or track subscription status
       for (var participant in widget.room.remoteParticipants.values) {
-
         if (localParticipantRole == Role.admin.toString()) {
           // Always add admin to _allowedToTalk
           _allowedToTalk.add(participant);
         } else {
           // Add only if any audio track is subscribed
-          
+
           for (var track in participant.audioTrackPublications) {
-            if (track.subscribed ) {
+            if (track.subscribed) {
               _allowedToTalk.add(participant);
               break; // Add participant only once, no need to check other tracks
             }
           }
         }
       }
+      _updateAudioSubscriptions();
     });
   }
 
@@ -379,7 +409,7 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       _muteAll = muteAll;
       _allowedToTalk.clear(); // Clear the current set
-      print( 'meta Mute all: $muteAll');
+      print('meta Mute all: $muteAll');
       if (muteAll) {
         final localParticipant = widget.room.localParticipant;
 
@@ -419,18 +449,21 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _updateAudioSubscriptions() {
-    if(localParticipantRole == Role.admin.toString() && !_allowedToTalk.contains(widget.room.localParticipant!)){
+    if (localParticipantRole == Role.admin.toString() &&
+        !_allowedToTalk.contains(widget.room.localParticipant!)) {
       _allowedToTalk.add(widget.room.localParticipant!);
     }
 
     final remote = widget.room.remoteParticipants.values;
     print('Allowed to talk meta: $_allowedToTalk');
-   print('Remote participants meta: $remote');
+    print('Remote participants meta: $remote');
     for (var participant in widget.room.remoteParticipants.values) {
-       final metadata = participant.metadata;
+      final metadata = participant.metadata;
       final role = metadata != null ? jsonDecode(metadata)['role'] : null;
       for (var track in participant.audioTrackPublications) {
-        if (_allowedToTalk.contains(participant) && localParticipantRole ==Role.admin.toString() || role == Role.admin.toString()) {
+        if (_allowedToTalk.contains(participant) &&
+                localParticipantRole == Role.admin.toString() ||
+            role == Role.admin.toString()) {
           track.subscribe();
         } else {
           track.unsubscribe();
@@ -439,23 +472,49 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  Future<void> _showParticipantSelectionDialog() async {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+Future<void> _showParticipantSelectionDialog() async {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isMobile = screenWidth < 600;
 
-    if (isMobile) {
-      //  _initializeAllowedToTalk();
-      await showDialog(
-        context: context,
-        builder: (context) {
-          // Use StatefulBuilder to rebuild the dialog when state changes
-          return StatefulBuilder(
-            builder: (context, setState) {
-              return AlertDialog(
-                title: Text('Select Participants'),
-                content: SingleChildScrollView(
-                  child: ListBody(
-                    children: participantTracks.map((track) {
+  if (isMobile) {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Separate participants into admins and non-admins
+            final adminTracks = participantTracks.where((track) {
+              final metadata = track.participant.metadata;
+              final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+              return role == Role.admin.toString();
+            }).toList();
+
+            final nonAdminTracks = participantTracks.where((track) {
+              final metadata = track.participant.metadata;
+              final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+              return role != Role.admin.toString();
+            }).toList();
+
+            return AlertDialog(
+              title: Text('Select Participants'),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: [
+                    // Displaying admins first (without checkbox and with (host))
+                    ...adminTracks.map((track) {
+                      final participantName = track.participant.identity ?? 'Unknown';
+                      return ListTile(
+                        title: Text(
+                          '$participantName (host)',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        trailing: null, // No checkbox for admins
+                        onTap: null, // No tap action for admins
+                      );
+                    }).toList(),
+
+                    // Displaying non-admin participants
+                    ...nonAdminTracks.map((track) {
                       return ListTile(
                         title: Text(
                           track.participant.identity ?? 'Unknown',
@@ -476,25 +535,26 @@ class _RoomPageState extends State<RoomPage> {
                         },
                       );
                     }).toList(),
-                  ),
+                  ],
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Close the dialog
-                    },
-                    child: Text('Close'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-    } else {
-      // Implement side panel for larger screens if needed
-    }
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close the dialog
+                  },
+                  child: Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  } else {
+    // Implement side panel for larger screens if needed
   }
+}
 
   List<ParticipantTrack> _filterParticipants(String searchQuery) {
     final localParticipant = widget.room.localParticipant;
@@ -560,15 +620,13 @@ class _RoomPageState extends State<RoomPage> {
                           itemBuilder: (context, index) {
                             final participant =
                                 participantTracks[index].participant;
-                          
+
                             return GestureDetector(
                               onTap: () => _setActiveParticipant(participant),
                               child: Container(
-                      
                                 child: ParticipantWidget.widgetFor(
                                   participantTracks[index],
                                   showStatsLayer: false,
-                                  
                                 ),
                               ),
                             );
@@ -599,13 +657,14 @@ class _RoomPageState extends State<RoomPage> {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+           if (localParticipantRole == Role.admin.toString())
           FloatingActionButton(
-            onPressed: _copyInviteLinkToClipboard,
+            onPressed: () => _copyInviteLinkToClipboard(context),
             child: Icon(Icons.link),
             tooltip: 'Copy invite link',
           ),
           SizedBox(height: 16),
-          if (localParticipantRole == Role.admin.toString())
+           if (localParticipantRole == Role.admin.toString())
             FloatingActionButton(
               onPressed: () {
                 if (isMobile) {
@@ -626,6 +685,7 @@ class _RoomPageState extends State<RoomPage> {
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: TextField(
+                style: TextStyle(color: Colors.black),
                 decoration: InputDecoration(
                   hintText: 'Search participants',
                   prefixIcon: Icon(Icons.search),
@@ -640,32 +700,62 @@ class _RoomPageState extends State<RoomPage> {
             ),
             Expanded(
               child: ListView(
-                children: _filterParticipants(searchQuery).map((track) {
-                  final isLocal =
-                      track.participant == widget.room.localParticipant;
-                  final participantName = track.participant.name ?? 'Unknown';
-                  final displayName =
-                      isLocal ? '$participantName (you)' : participantName;
+                children: [
+                  // Displaying the host first
+                  ..._filterParticipants(searchQuery).where((track) {
+                    final metadata = track.participant.metadata;
+                    final role =
+                        metadata != null ? jsonDecode(metadata)['role'] : null;
+                    print('role arun: $role');
+                    return role == Role.admin.toString();
+                  }).map((track) {
+                    final isLocal = track.participant.identity ==
+                        widget.room.localParticipant?.identity;
+                    final participantName = track.participant.name ?? 'Unknown';
+                    final displayName = isLocal
+                        ? '$participantName (you) (host)'
+                        : '$participantName (host)';
 
-                  return ListTile(
-                    title: Text(displayName),
-                    trailing: isLocal
-                        ? null
-                        : Checkbox(
-                            value: _allowedToTalk.contains(track.participant),
-                            onChanged: (value) {
+                    return ListTile(
+                      title: Text(displayName),
+                      trailing: null, // No checkbox for the host
+                      onTap: null, // No action for the host
+                    );
+                  }).toList(),
+
+                  // Displaying non-admin and non-host participants
+                  ..._filterParticipants(searchQuery).where((track) {
+                    final metadata = track.participant.metadata;
+                    final role =
+                        metadata != null ? jsonDecode(metadata)['role'] : null;
+                    return role !=Role.admin.toString();
+                  }).map((track) {
+                    final isLocal = track.participant.identity ==
+                        widget.room.localParticipant?.identity;
+                    final participantName = track.participant.name ?? 'Unknown';
+                    final displayName =
+                        isLocal ? '$participantName (you)' : participantName;
+
+                    return ListTile(
+                      title: Text(displayName),
+                      trailing: isLocal
+                          ? null
+                          : Checkbox(
+                              value: _allowedToTalk.contains(track.participant),
+                              onChanged: (value) {
+                                _toggleParticipantForTalk(track.participant);
+                              },
+                            ),
+                      onTap: isLocal
+                          ? null
+                          : () {
                               _toggleParticipantForTalk(track.participant);
                             },
-                          ),
-                    onTap: isLocal
-                        ? null
-                        : () {
-                            _toggleParticipantForTalk(track.participant);
-                          },
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ],
               ),
-            ),
+            )
           ],
         ),
       ),
