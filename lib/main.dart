@@ -4,6 +4,7 @@ import 'package:flutter_window_close/flutter_window_close.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:logging/logging.dart';
 import 'package:intl/intl.dart';
+import 'package:video_meeting_room/service_locator.dart';
 import 'package:video_meeting_room/theme.dart';
 import 'pages/connect.dart';
 import 'utils.dart';
@@ -12,6 +13,7 @@ import 'utils.dart';
 void main() async {
 
   
+ 
   final format = DateFormat('HH:mm:ss');
   // configure logs for debugging
   Logger.root.level = Level.FINE;
@@ -28,6 +30,7 @@ void main() async {
     });
   }
   await dotenv.load();
+   setup();
   runApp(const LiveKitExampleApp());
 }
 

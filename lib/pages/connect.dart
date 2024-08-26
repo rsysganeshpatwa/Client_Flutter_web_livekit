@@ -1,25 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-import 'package:flutter_svg/flutter_svg.dart';
-
-import 'package:livekit_client/livekit_client.dart';
-
+import 'package:get_it/get_it.dart';
+import 'package:livekit_client/livekit_client.dart' as livekit;
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:permission_handler/permission_handler.dart';
-
-import 'package:http/http.dart' as http;
-
-import 'dart:convert';
-
+import 'package:video_meeting_room/exts.dart';
 import 'package:video_meeting_room/pages/prejoin.dart';
-import 'package:video_meeting_room/pages/room.dart';
-
-import 'package:video_meeting_room/widgets/text_field.dart';
-
-import '../exts.dart';
-import 'package:flutter/src/widgets/async.dart' as asyncstate;
+import '../services/api_service.dart';
+import '../services/permission_service.dart';
+import '../widgets/text_field.dart';
+import '../models/role.dart';
 
 class ConnectPage extends StatefulWidget {
   const ConnectPage({super.key});
@@ -30,29 +19,25 @@ class ConnectPage extends StatefulWidget {
 
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
-  Role _selectedRole = Role.participant; // Default role is Participant
+  Role _selectedRole = Role.participant;
 
-  final tokenServiceUrl = dotenv.env['API_NODE_URL'] ?? '';
-  final url = dotenv.env['API_LIVEKIT_HTTPS_URL'] ?? '';
+  final ApiService _apiService = GetIt.I<ApiService>();
+  final PermissionService _permissionService = GetIt.I<PermissionService>();
 
   final _identityCtrl = TextEditingController();
-
   final _roomCtrl = TextEditingController();
 
   bool _busy = false;
-
   String? roomNameFromUrl;
-   String? roomRoleFromUrl;
-
+  String? roomRoleFromUrl;
   bool _isRoomNameInUrl = false;
-  late final activeRoomNames;
+
   @override
   void initState() {
     super.initState();
-
     _readPrefs();
-
-    if (lkPlatformIs(PlatformType.android)) {
+    
+    if (livekit.lkPlatformIs(livekit.PlatformType.android)) {
       _checkPermissions();
     }
   }
@@ -60,85 +45,35 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   void dispose() {
     _identityCtrl.dispose();
-
     _roomCtrl.dispose();
-
     super.dispose();
   }
 
   Future<void> _checkPermissions() async {
-    var status = await Permission.bluetooth.request();
-
-    if (status.isPermanentlyDenied) {
-      print('Bluetooth Permission disabled');
-    }
-
-    status = await Permission.bluetoothConnect.request();
-
-    if (status.isPermanentlyDenied) {
-      print('Bluetooth Connect Permission disabled');
-    }
-
-    status = await Permission.camera.request();
-
-    if (status.isPermanentlyDenied) {
-      print('Camera Permission disabled');
-    }
-
-    status = await Permission.microphone.request();
-
-    if (status.isPermanentlyDenied) {
-      print('Microphone Permission disabled');
-    }
+    await _permissionService.checkPermissions();
   }
 
   Future<void> _readPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
 
     setState(() {
-      roomNameFromUrl = Uri.base.queryParameters[
-          'room']; // Replace with logic to get room name from URL if applicable
-  roomRoleFromUrl = Uri.base.queryParameters[
-          'role']; // Replace with logic to get room name from URL if applicable
+      roomNameFromUrl = Uri.base.queryParameters['room'];
+      roomRoleFromUrl = Uri.base.queryParameters['role'];
 
       if (roomNameFromUrl != null) {
         _roomCtrl.text = roomNameFromUrl!;
         _isRoomNameInUrl = true;
       }
-      print('roomRoleFromUrl arjun $roomRoleFromUrl');
-      if(roomRoleFromUrl !=null)
-      {
-        _selectedRole =  roomRoleFromUrl == Role.admin.name ? Role.admin : Role.participant;
-
+      if (roomRoleFromUrl != null) {
+        _selectedRole = roomRoleFromUrl == Role.admin.name ? Role.admin : Role.participant;
       }
-      print('selectedRole arjun $_selectedRole');
-
-
-
     });
   }
 
   Future<void> _writePrefs() async {
     final prefs = await SharedPreferences.getInstance();
-
     await prefs.setString(_storeKeyIdentity, _identityCtrl.text);
-  }
-
-  Stream<List<String>> getRoomList() async* {
-    while (true) {
-      final response = await http.get(Uri.parse('$tokenServiceUrl/rooms'));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List;
-        final roomList = data.map((room) => room['name'].toString()).toList();
-        yield roomList;
-      }
-
-      // Wait for a while before the next request
-      await Future.delayed(Duration(seconds: 30));
-    }
   }
 
   Future<void> _connect(BuildContext ctx) async {
@@ -147,60 +82,33 @@ class _ConnectPageState extends State<ConnectPage> {
         _busy = true;
       });
 
-      // Save Identity for convenience
-
       await _writePrefs();
 
-      // Load the .env file
-
       final identity = _identityCtrl.text;
-
       final roomName = _roomCtrl.text;
       final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 
-      // Call the Node.js API to get the token
+      final token = await _apiService.getToken(identity, roomName, _role.toString());
 
-      final response = await http.post(
-        Uri.parse('$tokenServiceUrl/token'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'identity': identity,
-          'roomName': roomName,
-          'role': _role.toString()
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        final token = data['token'];
-
-        print('Connecting with identity: $identity, token: $token...');
-
-        await Navigator.push<void>(
-          ctx,
-          MaterialPageRoute(
-            builder: (_) => PreJoinPage(
-              args: JoinArgs(
-                url: url ?? '',
-                token: token,
-                simulcast: true,
-                adaptiveStream: true,
-                dynacast: true,
-                preferredCodec: 'Preferred Codec',
-                enableBackupVideoCodec:
-                    ['VP9', 'AV1'].contains('Preferred Codec'),
-                role: _role,
-              ),
+      await Navigator.push<void>(
+        ctx,
+        MaterialPageRoute(
+          builder: (_) => PreJoinPage(
+            args: JoinArgs(
+              url: dotenv.env['API_LIVEKIT_HTTPS_URL'] ?? '',
+              token: token,
+              simulcast: true,
+              adaptiveStream: true,
+              dynacast: true,
+              preferredCodec: 'Preferred Codec',
+              enableBackupVideoCodec: ['VP9', 'AV1'].contains('Preferred Codec'),
+              role: _role,
             ),
           ),
-        );
-      } else {
-        throw Exception('Failed to generate token');
-      }
+        ),
+      );
     } catch (error) {
       print('Could not connect $error');
-
       await ctx.showErrorDialog(error);
     } finally {
       setState(() {
@@ -214,18 +122,18 @@ class _ConnectPageState extends State<ConnectPage> {
       context: context,
       builder: (context) {
         return Container(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.5),
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
+              const Padding(
+                padding: EdgeInsets.all(16.0),
                 child: Text(
                   'Active Rooms',
                   style: TextStyle(
@@ -237,13 +145,12 @@ class _ConnectPageState extends State<ConnectPage> {
               ),
               Expanded(
                 child: StreamBuilder<List<String>>(
-                  stream: getRoomList(),
+                  stream: _apiService.getRoomList(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return Text('');
-                    } else if (snapshot.connectionState ==
-                        asyncstate.ConnectionState.waiting) {
-                      return CircularProgressIndicator();
+                      return const Center(child: Text('Error loading rooms', style: TextStyle(color: Colors.white)));
+                    } else if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
                     } else {
                       final roomList = snapshot.data;
                       return ListView.builder(
@@ -252,7 +159,7 @@ class _ConnectPageState extends State<ConnectPage> {
                           return ListTile(
                             title: Text(
                               roomList![index],
-                              style: TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Colors.white),
                             ),
                             onTap: () {
                               setState(() {
@@ -281,7 +188,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('POC Health Care Monitoring'),
+        title: const Text('POC Health Care Monitoring'),
         backgroundColor: Colors.white,
       ),
       body: Stack(
@@ -306,12 +213,12 @@ class _ConnectPageState extends State<ConnectPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (!_isRoomNameInUrl) buildRoleSelection(),
-              if (_isRoomNameInUrl) // Conditionally show the room name
+              if (_isRoomNameInUrl)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 25),
                   child: Text(
                     'Room Name: ${_roomCtrl.text}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -335,15 +242,14 @@ class _ConnectPageState extends State<ConnectPage> {
 
   Widget buildRoleSelection() {
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.center, // Align items to start vertically
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 25),
           child: ListTile(
             title: const Text(
               'Host',
-              style: TextStyle(color: Colors.white), // Set text color to white
+              style: TextStyle(color: Colors.white),
             ),
             leading: Radio<Role>(
               value: Role.admin,
@@ -361,7 +267,7 @@ class _ConnectPageState extends State<ConnectPage> {
           child: ListTile(
             title: const Text(
               'Participant',
-              style: TextStyle(color: Colors.white), // Set text color to white
+              style: TextStyle(color: Colors.white),
             ),
             leading: Radio<Role>(
               value: Role.participant,
@@ -410,7 +316,7 @@ class _ConnectPageState extends State<ConnectPage> {
   }
 
   Widget buildSidebar() {
-    if (!_isRoomNameInUrl)
+    if (!_isRoomNameInUrl) {
       return Positioned(
         right: 0,
         top: 0,
@@ -419,15 +325,15 @@ class _ConnectPageState extends State<ConnectPage> {
           width: 200,
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.5),
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               bottomLeft: Radius.circular(20),
             ),
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
+              const Padding(
+                padding: EdgeInsets.all(16.0),
                 child: Text(
                   'Active Rooms',
                   style: TextStyle(
@@ -439,13 +345,12 @@ class _ConnectPageState extends State<ConnectPage> {
               ),
               Expanded(
                 child: StreamBuilder<List<String>>(
-                  stream: getRoomList(),
+                  stream: _apiService.getRoomList(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return Text('');
-                    } else if (snapshot.connectionState ==
-                        asyncstate.ConnectionState.waiting) {
-                      return CircularProgressIndicator();
+                      return const Center(child: Text('Error loading rooms', style: TextStyle(color: Colors.white)));
+                    } else if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
                     } else {
                       final roomList = snapshot.data;
                       return ListView.builder(
@@ -454,7 +359,7 @@ class _ConnectPageState extends State<ConnectPage> {
                           return ListTile(
                             title: Text(
                               roomList![index],
-                              style: TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Colors.white),
                             ),
                             onTap: () {
                               setState(() {
@@ -473,6 +378,7 @@ class _ConnectPageState extends State<ConnectPage> {
           ),
         ),
       );
+    }
     return Container();
   }
 
@@ -483,7 +389,7 @@ class _ConnectPageState extends State<ConnectPage> {
         top: 16,
         child: FloatingActionButton(
           onPressed: () => _showRoomListModal(context),
-          child: Icon(Icons.list),
+          child: const Icon(Icons.list),
         ),
       );
     return Container();

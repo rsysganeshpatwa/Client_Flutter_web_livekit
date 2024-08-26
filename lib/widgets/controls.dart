@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:video_meeting_room/pages/room.dart';
+import 'package:video_meeting_room/models/role.dart';
 
 import '../exts.dart';
 

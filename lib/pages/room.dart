@@ -1,24 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:js_interop';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
-import 'package:video_meeting_room/pages/connect.dart';
+import 'package:video_meeting_room/models/role.dart';
 
 import '../exts.dart';
 import '../utils.dart';
 import '../widgets/controls.dart';
 import '../widgets/participant.dart';
 import '../widgets/participant_info.dart';
-
-enum Role {
-  admin,
-  participant,
-}
 
 class RoomPage extends StatefulWidget {
   final Room room;
@@ -270,6 +264,8 @@ class _RoomPageState extends State<RoomPage> {
 
     final localParticipantTracks =
         widget.room.localParticipant?.videoTrackPublications;
+      
+
     if (localParticipantTracks != null) {
       for (var t in localParticipantTracks) {
         if (t.isScreenShare) {
@@ -293,12 +289,12 @@ class _RoomPageState extends State<RoomPage> {
             }
           }
 
-          userMediaTracks.add(
-              ParticipantTrack(participant: widget.room.localParticipant!));
+        
         }
       }
     }
-    // _updateAudioSubscriptions();
+      userMediaTracks.add(
+              ParticipantTrack(participant: widget.room.localParticipant!));
     setState(() {
       participantTracks = [...screenTracks, ...userMediaTracks];
     });
@@ -485,9 +481,6 @@ class _RoomPageState extends State<RoomPage> {
       _allowedToTalk.add(widget.room.localParticipant!);
     }
 
-    final remote = widget.room.remoteParticipants.values;
-    print('Allowed to talk meta: $_allowedToTalk');
-    print('Remote participants meta: $remote');
     for (var participant in widget.room.remoteParticipants.values) {
       final metadata = participant.metadata;
       final role = metadata != null ? jsonDecode(metadata)['role'] : null;

@@ -102,14 +102,14 @@ class ParticipantInfoWidget extends StatelessWidget {
                   size: 16,
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.only(left: 5),
-              child: Icon(
-                enabledE2EE ? Icons.lock : Icons.lock_open,
-                color: enabledE2EE ? Colors.green : Colors.red,
-                size: 16,
-              ),
-            ),
+            // Padding(
+            //   padding: const EdgeInsets.only(left: 5),
+            //   child: Icon(
+            //     enabledE2EE ? Icons.lock : Icons.lock_open,
+            //     color: enabledE2EE ? Colors.green : Colors.red,
+            //     size: 16,
+            //   ),
+            // ),
           ],
         ),
       );

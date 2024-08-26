@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/exts.dart';
+import 'package:video_meeting_room/models/role.dart';
 
 import '../theme.dart';
 import 'room.dart';
