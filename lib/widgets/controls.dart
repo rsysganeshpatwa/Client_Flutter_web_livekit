@@ -39,7 +39,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   StreamSubscription? _subscription;
 
   bool _speakerphoneOn = Hardware.instance.preferSpeakerOutput;
-  bool _allMuted = false; // Track mute state for all participants
+  bool _allMuted = true; // Track mute state for all participants
 
   @override
   void initState() {

@@ -39,7 +39,7 @@ class _RoomPageState extends State<RoomPage> {
   EventsListener<RoomEvent> get _listener => widget.listener;
   bool get fastConnection => widget.room.engine.fastConnectOptions != null;
   bool _flagStartedReplayKit = false;
-  bool _muteAll = false;
+  bool _muteAll = true;
   Set<Participant> _allowedToTalk = {}; // Track participants allowed to talk
   Participant? _activeParticipant;
   String searchQuery = '';
@@ -356,7 +356,7 @@ class _RoomPageState extends State<RoomPage> {
       }
 
       _activeParticipant = participant;
-      _muteAll = false;
+      _muteAll = true;
 
       // Call update functions to reflect changes
       _updateAudioSubscriptions();
@@ -364,7 +364,7 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
-  void _initializeAllowedToTalk() {
+  /*void _initializeAllowedToTalk() {
     setState(() {
       _allowedToTalk.clear(); // Clear the current set
 
@@ -391,7 +391,33 @@ class _RoomPageState extends State<RoomPage> {
       }
       _updateAudioSubscriptions();
     });
-  }
+  }*/
+
+  void _initializeAllowedToTalk() {
+  setState(() {
+    _allowedToTalk.clear();
+
+    final localParticipant = widget.room.localParticipant;
+    if (localParticipantRole == Role.admin.toString()) {
+      // New admin joins: Mute all participants
+      _muteAll = true;
+      for (var participant in widget.room.remoteParticipants.values) {
+        _allowedToTalk.remove(participant);
+      }
+    } else {
+      // Participant joins: Check if they should be allowed to talk
+      for (var participant in widget.room.remoteParticipants.values) {
+        if (_allowedToTalk.contains(participant)) {
+          _allowedToTalk.add(participant);
+        } else {
+          _allowedToTalk.remove(participant);
+        }
+      }
+    }
+    _updateAudioSubscriptions();
+  });
+}
+
 
   void _toggleParticipantForTalk(Participant participant) {
     setState(() {
@@ -428,9 +454,14 @@ class _RoomPageState extends State<RoomPage> {
   void _trackSubscribed(TrackSubscribedEvent event) {
     final participant = event.participant;
     setState(() {
+		// If mute all is active, mute the new participant
+    if (_muteAll) {
+      _allowedToTalk.remove(participant);
+    } else {
       if (!_allowedToTalk.contains(participant)) {
         _allowedToTalk.add(participant);
       }
+    }
       _updateAudioSubscriptions(); // Update audio subscriptions
     });
   }
