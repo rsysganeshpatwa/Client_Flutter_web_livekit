@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:collection/collection.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
@@ -15,10 +15,14 @@ class ControlsWidget extends StatefulWidget {
   final Room room;
   final LocalParticipant participant;
   final void Function(bool) onToggleParticipants;
+  final void Function(bool) onToggleRaiseHand;
   final  String? role;
+  final bool isHandleRaiseHand;
 
   const ControlsWidget(
     this.onToggleParticipants,
+    this.onToggleRaiseHand,
+    this.isHandleRaiseHand,
     this.role,
     this.room,
     this.participant, {
@@ -40,6 +44,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
 
   bool _speakerphoneOn = Hardware.instance.preferSpeakerOutput;
   bool _allMuted = true; // Track mute state for all participants
+  bool _isHandRaised = false; // Track the "Raise Hand" state
 
   @override
   void initState() {
@@ -50,6 +55,18 @@ class _ControlsWidgetState extends State<ControlsWidget> {
       _loadDevices(devices);
     });
     Hardware.instance.enumerateDevices().then(_loadDevices);
+  }
+
+   @override
+  void didUpdateWidget(ControlsWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isHandleRaiseHand != oldWidget.isHandleRaiseHand) {
+      if (!widget.isHandleRaiseHand) {
+        setState(() {
+          _isHandRaised = false; // Reset local state if isHandleRaiseHand is false
+        });
+      }
+    }
   }
 
   @override
@@ -71,7 +88,17 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   void _onChange() {
     // trigger refresh
     setState(() {});
+    
   }
+
+   void _toggleRaiseHand() {
+    setState(() {
+      _isHandRaised = !_isHandRaised;
+    });
+
+   widget.onToggleRaiseHand(_isHandRaised); // Call the parent function
+  }
+
 
   void _unpublishAll() async {
     final result = await context.showUnPublishDialog();
@@ -549,6 +576,16 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               tooltip: 'Simulate scenario',
             ),
           ),
+         Visibility(
+          visible: widget.role == Role.admin.toString() ? false : true,
+          child: // New Raise Hand Button
+          IconButton(
+            icon: Icon(
+              _isHandRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
+              color: _isHandRaised ? Colors.amber : Colors.white,
+            ),
+            onPressed: _toggleRaiseHand,
+          ),)
         ],
       ),
     );
