@@ -36,7 +36,6 @@ class _RoomPageState extends State<RoomPage> {
   bool _muteAll = true;
   bool _isHandleRaiseHand = false;
   Set<Participant> _allowedToTalk = {}; // Track participants allowed to talk
-  Participant? _activeParticipant;
   String searchQuery = '';
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? localParticipantRole;
@@ -130,34 +129,18 @@ class _RoomPageState extends State<RoomPage> {
       _sortParticipants();
       _trackUnsubscribed(event);
     })
-    ..on<TrackE2EEStateEvent>(_onE2EEStateEvent)
     ..on<ParticipantNameUpdatedEvent>((event) {
-      // print(
-      //     'Participant name updated: ${event.participant.identity}, name => ${event.name}');
       _sortParticipants();
     })
-    ..on<ParticipantAttributesChanged>((event) {
-      print(
-          'Participant metadata updated: ${event.participant.identity}, metadata => ${event.attributes}');
-    })
-    ..on<RoomMetadataChangedEvent>((event) {
-      print('Room metadata changed: ${event.metadata}');
-    })
     ..on<DataReceivedEvent>((event) {
-      String decoded = 'Failed to decode';
       try {
-        decoded = utf8.decode(event.data);
-        print('Data received: $decoded');
-        _receviedMetadata(event);
+        _receivedMetadata(event);
       } catch (_) {
         print('Failed to decode: $_');
       }
-
-      // context.showDataReceivedDialog(decoded);
     })
     ..on<AudioPlaybackStatusChanged>((event) async {
       if (!widget.room.canPlaybackAudio) {
-        print('Audio playback failed for iOS Safari ..........');
         bool? yesno = await context.showPlayAudioManuallyDialog();
         if (yesno == true) {
           await widget.room.startAudio();
@@ -186,10 +169,7 @@ class _RoomPageState extends State<RoomPage> {
     _sortParticipants();
   }
 
-  void _onE2EEStateEvent(TrackE2EEStateEvent e2eeState) {
-    // print('e2ee state: $e2eeState');
-  }
-  Future<void> _updateMetadata() async {
+  Future<void> _updateAllowedToTalkMetadata() async {
     // Broadcast the updated list to all participants
     final allowedToTalkIdentities =
         _allowedToTalk.map((p) => p.identity).toList();
@@ -197,7 +177,7 @@ class _RoomPageState extends State<RoomPage> {
     await widget.room.localParticipant?.publishData(utf8.encode(dataMessage));
   }
 
-  void _receviedMetadata(DataReceivedEvent event) {
+  void _receivedMetadata(DataReceivedEvent event) {
     try {
       final decodedData = utf8.decode(event.data);
       final data = jsonDecode(decodedData) as Map<String, dynamic>;
@@ -351,37 +331,16 @@ class _RoomPageState extends State<RoomPage> {
     if (selectedLink != null) {
       await Clipboard.setData(ClipboardData(text: selectedLink));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invite link copied to clipboard')),
+        const SnackBar(content: Text('Invite link copied to clipboard')),
       );
     }
-  }
-
-  void _setActiveParticipant(Participant participant) {
-    setState(() {
-      // Toggle selection of the participant
-      if (_allowedToTalk.contains(participant)) {
-        _allowedToTalk.remove(participant); // Remove if already in the list
-      } else {
-        _allowedToTalk.add(participant); // Add if not in the list
-      }
-
-      _activeParticipant = participant;
-      _muteAll = true;
-
-      // Call update functions to reflect changes
-      _updateAudioSubscriptions();
-      _updateMetadata();
-    });
   }
 
   void _initializeAllowedToTalk() {
     setState(() {
       _allowedToTalk.clear();
-
-      final localParticipant = widget.room.localParticipant;
       if (localParticipantRole == Role.admin.toString()) {
         // New admin joins: Mute all participants
-        _muteAll = true;
         for (var participant in widget.room.remoteParticipants.values) {
           _allowedToTalk.remove(participant);
         }
@@ -398,24 +357,38 @@ class _RoomPageState extends State<RoomPage> {
       _updateAudioSubscriptions();
     });
   }
+void _toggleParticipantForTalk(Participant participant) {
+  setState(() {
+    final isAllowedToTalk = _allowedToTalk.contains(participant);
 
-  void _toggleParticipantForTalk(Participant participant) {
-    setState(() {
-      if (_allowedToTalk.contains(participant)) {
-        _allowedToTalk.remove(participant);
-      } else {
-        _allowedToTalk.add(participant);
-      }
+    // Toggle the participant's allowed to talk status
+    if (isAllowedToTalk) {
+      // If the participant is currently allowed to talk, remove them
+      _allowedToTalk.remove(participant);
+    } else {
+      // If the participant is currently not allowed to talk, add them
+      _allowedToTalk.add(participant);
+      // Also set _muteAll to false when toggling individual participants
+      _muteAll = false;
+    }
+
+    // Update audio subscriptions only if there's a change in allowedToTalk
+    if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
       _updateAudioSubscriptions();
-      _updateMetadata();
-    });
-  }
+    }
+
+    // Ensure metadata is consistent with allowedToTalk state
+    _updateAllowedToTalkMetadata();
+    _toggleRaiseHand(participant, false);
+  });
+}
+
 
   void _toggleMuteAll(bool muteAll) {
     setState(() {
       _muteAll = muteAll;
       _allowedToTalk.clear(); // Clear the current set
-      print('meta Mute all: $muteAll');
+
       if (muteAll) {
         final localParticipant = widget.room.localParticipant;
 
@@ -427,162 +400,181 @@ class _RoomPageState extends State<RoomPage> {
         _allowedToTalk.addAll(widget.room.remoteParticipants.values);
       }
       _updateAudioSubscriptions();
-      _updateMetadata();
+      _updateAllowedToTalkMetadata();
     });
   }
 
-  void _trackSubscribed(TrackSubscribedEvent event) {
-    final participant = event.participant;
-    setState(() {
-      // If mute all is active, mute the new participant
-      if (_muteAll) {
-        _allowedToTalk.remove(participant);
-      } else {
-        if (!_allowedToTalk.contains(participant)) {
-          _allowedToTalk.add(participant);
-        }
-      }
-      _updateAudioSubscriptions(); // Update audio subscriptions
-    });
-  }
+ void _trackSubscribed(TrackSubscribedEvent event) {
+  final participant = event.participant;
+  print('Track subscribed ganesh: ${participant.identity}');
+  print('Track _allowedToTalk ganesh: ${_allowedToTalk}');
+  print('_muteAll ganesh: $_muteAll');
+  
+  setState(() {
+    if (!_muteAll) {
+      _allowedToTalk.add(participant);
+    } else {
+      _allowedToTalk.remove(participant);
+    }
+    print('Updated _allowedToTalk ganesh: ${_allowedToTalk}');
+    _updateAudioSubscriptions();
+  });
+}
+
 
   void _trackUnsubscribed(TrackUnsubscribedEvent event) {
     final participant = event.participant;
-
+    print('Track unsubscribed ganesh: ${participant.identity}');
+    print('Track _allowedToTalk ganesh: ${_allowedToTalk}');
     setState(() {
       if (_allowedToTalk.contains(participant) &&
           localParticipantRole != Role.admin.toString()) {
         _allowedToTalk.remove(participant);
       }
-
-      _updateAudioSubscriptions(); // Update audio subscriptions
+      _updateAudioSubscriptions();
     });
   }
 
-  void _updateAudioSubscriptions() {
-    if (localParticipantRole == Role.admin.toString() &&
-        !_allowedToTalk.contains(widget.room.localParticipant!)) {
-      _allowedToTalk.add(widget.room.localParticipant!);
-    }
+ void _updateAudioSubscriptions() {
+  print('Starting _updateAudioSubscriptions ganesh');
+  print('Current _allowedToTalk ganesh: ${_allowedToTalk}');
 
-    for (var participant in widget.room.remoteParticipants.values) {
-      final metadata = participant.metadata;
-      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-      for (var track in participant.audioTrackPublications) {
-        if (_allowedToTalk.contains(participant) &&
-                localParticipantRole == Role.admin.toString() ||
-            role == Role.admin.toString()) {
-          track.subscribe();
-        } else {
-          track.unsubscribe();
-        }
+  if (localParticipantRole == Role.admin.toString() &&
+      !_allowedToTalk.contains(widget.room.localParticipant!)) {
+    _allowedToTalk.add(widget.room.localParticipant!);
+  }
+
+  for (var participant in widget.room.remoteParticipants.values) {
+    final metadata = participant.metadata;
+    final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+    for (var track in participant.audioTrackPublications) {
+      if ((_allowedToTalk.contains(participant) &&
+              localParticipantRole == Role.admin.toString()) ||
+          role == Role.admin.toString()) {
+        track.subscribe();
+      } else {
+        track.unsubscribe();
       }
     }
   }
+}
 
- Future<void> _showParticipantSelectionDialog() async {
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isMobile = screenWidth < 600;
+  Future<void> _showParticipantSelectionDialog() async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
-  if (isMobile) {
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            // Separate participants into admins and non-admins
-            final adminTracks = participantTracks.where((track) {
-              final metadata = track.participant.metadata;
-              final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-              return role == Role.admin.toString();
-            }).toList();
+    if (isMobile) {
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              // Separate participants into admins and non-admins
+              final adminTracks = participantTracks.where((track) {
+                final metadata = track.participant.metadata;
+                final role =
+                    metadata != null ? jsonDecode(metadata)['role'] : null;
+                return role == Role.admin.toString();
+              }).toList();
 
-            final nonAdminTracks = participantTracks.where((track) {
-              final metadata = track.participant.metadata;
-              final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-              return role != Role.admin.toString();
-            }).toList();
+              final nonAdminTracks = participantTracks.where((track) {
+                final metadata = track.participant.metadata;
+                final role =
+                    metadata != null ? jsonDecode(metadata)['role'] : null;
+                return role != Role.admin.toString();
+              }).toList();
 
-            return AlertDialog(
-              title: Text('Select Participants'),
-              content: SingleChildScrollView(
-                child: ListBody(
-                  children: [
-                    // Displaying admins first (without checkbox and with (host))
-                    ...adminTracks.map((track) {
-                      final participantName = track.participant.name ?? 'Unknown';
-                      final isLocal = track.participant.identity ==
-                          widget.room.localParticipant?.identity;
-                      final displayName = isLocal
-                          ? '$participantName (you) (host)'
-                          : '$participantName (host)';
+              return AlertDialog(
+                title: Text('Select Participants'),
+                content: SingleChildScrollView(
+                  child: ListBody(
+                    children: [
+                      // Displaying admins first (without checkbox and with (host))
+                      ...adminTracks.map((track) {
+                        final participantName =
+                            track.participant.name ?? 'Unknown';
+                        final isLocal = track.participant.identity ==
+                            widget.room.localParticipant?.identity;
+                        final displayName = isLocal
+                            ? '$participantName (you) (host)'
+                            : '$participantName (host)';
 
-                      return ListTile(
-                        title: Text(displayName, style: TextStyle(color: Colors.white)),
-                        trailing: null, // No checkbox for admins
-                        onTap: null, // No tap action for admins
-                      );
-                    }).toList(),
+                        return ListTile(
+                          title: Text(displayName,
+                              style: TextStyle(color: Colors.white)),
+                          trailing: null, // No checkbox for admins
+                          onTap: null, // No tap action for admins
+                        );
+                      }).toList(),
 
-                    // Displaying non-admin participants
-                    ...nonAdminTracks.map((track) {
-                      final participantName = track.participant.name ?? 'Unknown';
-                      final isLocal = track.participant.identity ==
-                          widget.room.localParticipant?.identity;
-                      final isHandRaised = track.participant.metadata != null
-                          ? jsonDecode(track.participant.metadata ?? '{}')['handraise'] == true
-                          : false;
+                      // Displaying non-admin participants
+                      ...nonAdminTracks.map((track) {
+                        final participantName =
+                            track.participant.name ?? 'Unknown';
+                        final isLocal = track.participant.identity ==
+                            widget.room.localParticipant?.identity;
+                        final isHandRaised = track.participant.metadata != null
+                            ? jsonDecode(track.participant.metadata ?? '{}')[
+                                    'handraise'] ==
+                                true
+                            : false;
 
-                      return ListTile(
-                        title: Text(
-                          isLocal ? '$participantName (you)' : participantName,
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (isHandRaised)
-                              Icon(Icons.pan_tool, color: Colors.orange), // Hand raised icon
-                            if (!isLocal)
-                              Checkbox(
-                                value: _allowedToTalk.contains(track.participant),
-                                onChanged: (value) {
+                        return ListTile(
+                          title: Text(
+                            isLocal
+                                ? '$participantName (you)'
+                                : participantName,
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isHandRaised)
+                                Icon(Icons.pan_tool,
+                                    color: Colors.orange), // Hand raised icon
+                              if (!isLocal)
+                                Checkbox(
+                                  value: _allowedToTalk
+                                      .contains(track.participant),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _toggleParticipantForTalk(
+                                          track.participant);
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
+                          onTap: isLocal
+                              ? null
+                              : () {
                                   setState(() {
-                                    _toggleParticipantForTalk(track.participant);
+                                    _toggleParticipantForTalk(
+                                        track.participant);
                                   });
                                 },
-                              ),
-                          ],
-                        ),
-                        onTap: isLocal
-                            ? null
-                            : () {
-                                setState(() {
-                                  _toggleParticipantForTalk(track.participant);
-                                });
-                              },
-                      );
-                    }).toList(),
-                  ],
+                        );
+                      }).toList(),
+                    ],
+                  ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Close the dialog
-                  },
-                  child: Text('Close'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  } else {
-    // Implement side panel for larger screens if needed
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close the dialog
+                    },
+                    child: Text('Close'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } else {
+      // Implement side panel for larger screens if needed
+    }
   }
-}
 
   List<ParticipantTrack> _filterParticipants(String searchQuery) {
     final localParticipant = widget.room.localParticipant;
@@ -703,11 +695,7 @@ class _RoomPageState extends State<RoomPage> {
                           ),
                           itemCount: numParticipants,
                           itemBuilder: (context, index) {
-                            final participant =
-                                participantTracks[index].participant;
-
                             return GestureDetector(
-                              onTap: () => _setActiveParticipant(participant),
                               child: Container(
                                 child: ParticipantWidget.widgetFor(
                                   participantTracks[index],
