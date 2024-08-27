@@ -7,6 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 import 'package:video_meeting_room/models/role.dart';
+import 'package:video_meeting_room/pages/room-widget/CopyInviteLinkDialog.dart';
+import 'package:video_meeting_room/pages/room-widget/FloatingActionButtonBar.dart';
+import 'package:video_meeting_room/pages/room-widget/HandRaiseNotification.dart';
+import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
+import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
+import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
 
 import '../exts.dart';
 import '../utils.dart';
@@ -242,15 +248,15 @@ class _RoomPageState extends State<RoomPage> {
       final metadata = participant.metadata;
       final remoteParticipantRole =
           metadata != null ? jsonDecode(metadata)['role'] : null;
-      for (var t in participant.videoTrackPublications) {
-        if (t.isScreenShare) {
-          screenTracks.add(ParticipantTrack(
-            participant: participant,
-            type: ParticipantTrackType.kScreenShare,
-          ));
-        } else if (isHost || remoteParticipantRole == Role.admin.toString()) {
-          userMediaTracks.add(ParticipantTrack(participant: participant));
-        }
+
+      if (participant.isScreenShareEnabled()) {
+        screenTracks.add(ParticipantTrack(
+          participant: participant,
+          type: ParticipantTrackType.kScreenShare,
+        ));
+      } else if (isHost || remoteParticipantRole == Role.admin.toString()) {
+        print(' isHost Participant sonu: ${participant.identity}');
+        userMediaTracks.add(ParticipantTrack(participant: participant));
       }
     }
 
@@ -294,48 +300,6 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
-  Future<void> _copyInviteLinkToClipboard(BuildContext context) async {
-    final roomName = widget.room.name;
-    String encodedRoomName = Uri.encodeComponent(roomName!);
-
-    // Generate the invite links
-    final hostInviteLink =
-        'https://${Uri.base.host}?room=$encodedRoomName&role=admin';
-    final participantInviteLink =
-        'https://${Uri.base.host}?room=$encodedRoomName&role=participant';
-
-    // Show a dialog to choose which link to copy
-    final selectedLink = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) {
-        return SimpleDialog(
-          title: Text('Copy Invite Link'),
-          children: <Widget>[
-            SimpleDialogOption(
-              onPressed: () {
-                Navigator.pop(context, hostInviteLink);
-              },
-              child: Text('Copy Host Link'),
-            ),
-            SimpleDialogOption(
-              onPressed: () {
-                Navigator.pop(context, participantInviteLink);
-              },
-              child: Text('Copy Participant Link'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (selectedLink != null) {
-      await Clipboard.setData(ClipboardData(text: selectedLink));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invite link copied to clipboard')),
-      );
-    }
-  }
-
   void _initializeAllowedToTalk() {
     setState(() {
       _allowedToTalk.clear();
@@ -357,32 +321,32 @@ class _RoomPageState extends State<RoomPage> {
       _updateAudioSubscriptions();
     });
   }
-void _toggleParticipantForTalk(Participant participant) {
-  setState(() {
-    final isAllowedToTalk = _allowedToTalk.contains(participant);
 
-    // Toggle the participant's allowed to talk status
-    if (isAllowedToTalk) {
-      // If the participant is currently allowed to talk, remove them
-      _allowedToTalk.remove(participant);
-    } else {
-      // If the participant is currently not allowed to talk, add them
-      _allowedToTalk.add(participant);
-      // Also set _muteAll to false when toggling individual participants
-      _muteAll = false;
-    }
+  void _toggleParticipantForTalk(Participant participant) {
+    setState(() {
+      final isAllowedToTalk = _allowedToTalk.contains(participant);
 
-    // Update audio subscriptions only if there's a change in allowedToTalk
-    if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
-      _updateAudioSubscriptions();
-    }
+      // Toggle the participant's allowed to talk status
+      if (isAllowedToTalk) {
+        // If the participant is currently allowed to talk, remove them
+        _allowedToTalk.remove(participant);
+      } else {
+        // If the participant is currently not allowed to talk, add them
+        _allowedToTalk.add(participant);
+        // Also set _muteAll to false when toggling individual participants
+        _muteAll = false;
+      }
 
-    // Ensure metadata is consistent with allowedToTalk state
-    _updateAllowedToTalkMetadata();
-    _toggleRaiseHand(participant, false);
-  });
-}
+      // Update audio subscriptions only if there's a change in allowedToTalk
+      if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
+        _updateAudioSubscriptions();
+      }
 
+      // Ensure metadata is consistent with allowedToTalk state
+      _updateAllowedToTalkMetadata();
+      _toggleRaiseHand(participant, false);
+    });
+  }
 
   void _toggleMuteAll(bool muteAll) {
     setState(() {
@@ -404,28 +368,23 @@ void _toggleParticipantForTalk(Participant participant) {
     });
   }
 
- void _trackSubscribed(TrackSubscribedEvent event) {
-  final participant = event.participant;
-  print('Track subscribed ganesh: ${participant.identity}');
-  print('Track _allowedToTalk ganesh: ${_allowedToTalk}');
-  print('_muteAll ganesh: $_muteAll');
-  
-  setState(() {
-    if (!_muteAll) {
-      _allowedToTalk.add(participant);
-    } else {
-      _allowedToTalk.remove(participant);
-    }
-    print('Updated _allowedToTalk ganesh: ${_allowedToTalk}');
-    _updateAudioSubscriptions();
-  });
-}
+  void _trackSubscribed(TrackSubscribedEvent event) {
+    final participant = event.participant;
 
+    setState(() {
+      if (!_muteAll) {
+        _allowedToTalk.add(participant);
+      } else {
+        _allowedToTalk.remove(participant);
+      }
+
+      _updateAudioSubscriptions();
+    });
+  }
 
   void _trackUnsubscribed(TrackUnsubscribedEvent event) {
     final participant = event.participant;
-    print('Track unsubscribed ganesh: ${participant.identity}');
-    print('Track _allowedToTalk ganesh: ${_allowedToTalk}');
+
     setState(() {
       if (_allowedToTalk.contains(participant) &&
           localParticipantRole != Role.admin.toString()) {
@@ -435,144 +394,27 @@ void _toggleParticipantForTalk(Participant participant) {
     });
   }
 
- void _updateAudioSubscriptions() {
-  print('Starting _updateAudioSubscriptions ganesh');
-  print('Current _allowedToTalk ganesh: ${_allowedToTalk}');
+  void _updateAudioSubscriptions() {
+    print('Starting _updateAudioSubscriptions ganesh');
+    print('Current _allowedToTalk ganesh: ${_allowedToTalk}');
 
-  if (localParticipantRole == Role.admin.toString() &&
-      !_allowedToTalk.contains(widget.room.localParticipant!)) {
-    _allowedToTalk.add(widget.room.localParticipant!);
-  }
-
-  for (var participant in widget.room.remoteParticipants.values) {
-    final metadata = participant.metadata;
-    final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-    for (var track in participant.audioTrackPublications) {
-      if ((_allowedToTalk.contains(participant) &&
-              localParticipantRole == Role.admin.toString()) ||
-          role == Role.admin.toString()) {
-        track.subscribe();
-      } else {
-        track.unsubscribe();
-      }
+    if (localParticipantRole == Role.admin.toString() &&
+        !_allowedToTalk.contains(widget.room.localParticipant!)) {
+      _allowedToTalk.add(widget.room.localParticipant!);
     }
-  }
-}
 
-  Future<void> _showParticipantSelectionDialog() async {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-
-    if (isMobile) {
-      await showDialog(
-        context: context,
-        builder: (context) {
-          return StatefulBuilder(
-            builder: (context, setState) {
-              // Separate participants into admins and non-admins
-              final adminTracks = participantTracks.where((track) {
-                final metadata = track.participant.metadata;
-                final role =
-                    metadata != null ? jsonDecode(metadata)['role'] : null;
-                return role == Role.admin.toString();
-              }).toList();
-
-              final nonAdminTracks = participantTracks.where((track) {
-                final metadata = track.participant.metadata;
-                final role =
-                    metadata != null ? jsonDecode(metadata)['role'] : null;
-                return role != Role.admin.toString();
-              }).toList();
-
-              return AlertDialog(
-                title: Text('Select Participants'),
-                content: SingleChildScrollView(
-                  child: ListBody(
-                    children: [
-                      // Displaying admins first (without checkbox and with (host))
-                      ...adminTracks.map((track) {
-                        final participantName =
-                            track.participant.name ?? 'Unknown';
-                        final isLocal = track.participant.identity ==
-                            widget.room.localParticipant?.identity;
-                        final displayName = isLocal
-                            ? '$participantName (you) (host)'
-                            : '$participantName (host)';
-
-                        return ListTile(
-                          title: Text(displayName,
-                              style: TextStyle(color: Colors.white)),
-                          trailing: null, // No checkbox for admins
-                          onTap: null, // No tap action for admins
-                        );
-                      }).toList(),
-
-                      // Displaying non-admin participants
-                      ...nonAdminTracks.map((track) {
-                        final participantName =
-                            track.participant.name ?? 'Unknown';
-                        final isLocal = track.participant.identity ==
-                            widget.room.localParticipant?.identity;
-                        final isHandRaised = track.participant.metadata != null
-                            ? jsonDecode(track.participant.metadata ?? '{}')[
-                                    'handraise'] ==
-                                true
-                            : false;
-
-                        return ListTile(
-                          title: Text(
-                            isLocal
-                                ? '$participantName (you)'
-                                : participantName,
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isHandRaised)
-                                Icon(Icons.pan_tool,
-                                    color: Colors.orange), // Hand raised icon
-                              if (!isLocal)
-                                Checkbox(
-                                  value: _allowedToTalk
-                                      .contains(track.participant),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _toggleParticipantForTalk(
-                                          track.participant);
-                                    });
-                                  },
-                                ),
-                            ],
-                          ),
-                          onTap: isLocal
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _toggleParticipantForTalk(
-                                        track.participant);
-                                  });
-                                },
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Close the dialog
-                    },
-                    child: Text('Close'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-    } else {
-      // Implement side panel for larger screens if needed
+    for (var participant in widget.room.remoteParticipants.values) {
+      final metadata = participant.metadata;
+      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+      for (var track in participant.audioTrackPublications) {
+        if ((_allowedToTalk.contains(participant) &&
+                localParticipantRole == Role.admin.toString()) ||
+            role == Role.admin.toString()) {
+          track.subscribe();
+        } else {
+          track.unsubscribe();
+        }
+      }
     }
   }
 
@@ -596,49 +438,8 @@ void _toggleParticipantForTalk(Participant participant) {
     return filteredParticipants;
   }
 
-  void _showHandRaiseNotification(
-      BuildContext context, Participant participant) {
-    final participantName = participant.name ?? 'Unknown';
-
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-                child:
-                    Text('$participantName has raised their hand to speak.')),
-            TextButton(
-              onPressed: () {
-                // Handle the "Allow Speak" action
-                _allowSpeak(participant);
-                scaffoldMessenger.hideCurrentSnackBar(); // Hide the SnackBar
-              },
-              child: Text('Allow Speak', style: TextStyle(color: Colors.blue)),
-            ),
-            TextButton(
-              onPressed: () {
-                // Handle the "Cancel" action
-                _toggleRaiseHand(participant, false);
-                scaffoldMessenger.hideCurrentSnackBar(); // Hide the SnackBar
-              },
-              child: Text('No', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-        duration: Duration(seconds: 10), // Adjust the duration as needed
-      ),
-    );
-  }
-
   void _allowSpeak(Participant participant) {
     _toggleParticipantForTalk(participant);
-  }
-
-  void _openEndDrawer() {
-    // _initializeAllowedToTalk();
-    _scaffoldKey.currentState?.openEndDrawer();
   }
 
   void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
@@ -656,6 +457,40 @@ void _toggleParticipantForTalk(Participant participant) {
 
   void _handleToggleRaiseHand(bool isHandRaised) async {
     _toggleRaiseHand(widget.room.localParticipant as Participant, isHandRaised);
+  }
+
+  Future<void> _copyInviteLinkToClipboard(BuildContext context) async {
+    CopyInviteLinkDialog.show(context, widget.room.name!);
+  }
+
+  void _showHandRaiseNotification(
+      BuildContext context, Participant participant) {
+    HandRaiseNotification.show(context, participant, _allowSpeak);
+  }
+
+  Future<void> _showParticipantSelectionDialog(context) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    if (isMobile) {
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return ParticipantSelectionDialog(
+            participantTracks: participantTracks,
+            allowedToTalk: _allowedToTalk,
+            onToggleParticipantForTalk: _toggleParticipantForTalk,
+            localParticipantIdentity:
+                widget.room.localParticipant?.identity ?? '',
+          );
+        },
+      );
+    }
+  }
+
+  void _openEndDrawer() {
+    // _initializeAllowedToTalk();
+    _scaffoldKey.currentState?.openEndDrawer();
   }
 
   @override
@@ -680,34 +515,12 @@ void _toggleParticipantForTalk(Participant participant) {
       body: SafeArea(
         child: Stack(
           children: [
-            Column(
-              children: [
-                Expanded(
-                  child: participantTracks.isNotEmpty
-                      ? GridView.builder(
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 4.0,
-                            mainAxisSpacing: 4.0,
-                            childAspectRatio: (screenWidth / crossAxisCount) /
-                                (screenHeight / rowCount),
-                          ),
-                          itemCount: numParticipants,
-                          itemBuilder: (context, index) {
-                            return GestureDetector(
-                              child: Container(
-                                child: ParticipantWidget.widgetFor(
-                                  participantTracks[index],
-                                  showStatsLayer: false,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : Container(),
-                ),
-              ],
+            ParticipantGridView(
+              participantTracks: participantTracks,
+              crossAxisCount: crossAxisCount,
+              rowCount: rowCount,
+              screenWidth: screenWidth,
+              screenHeight: screenHeight,
             ),
             if (widget.room.localParticipant != null)
               Positioned(
@@ -719,6 +532,7 @@ void _toggleParticipantForTalk(Participant participant) {
                   child: ControlsWidget(
                     _toggleMuteAll,
                     _handleToggleRaiseHand,
+                    _muteAll,
                     _isHandleRaiseHand,
                     localParticipantRole,
                     widget.room,
@@ -729,123 +543,26 @@ void _toggleParticipantForTalk(Participant participant) {
           ],
         ),
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (localParticipantRole == Role.admin.toString())
-            FloatingActionButton(
-              onPressed: () => _copyInviteLinkToClipboard(context),
-              child: Icon(Icons.link),
-              tooltip: 'Copy invite link',
-            ),
-          SizedBox(height: 16),
-          if (localParticipantRole == Role.admin.toString())
-            FloatingActionButton(
-              onPressed: () {
-                if (isMobile) {
-                  _showParticipantSelectionDialog(); // Show dialog for mobile devices
-                } else {
-                  _openEndDrawer(); // Open side panel for larger screens
-                }
-              },
-              child: Icon(Icons.people),
-              tooltip: 'Manage Participants',
-            ),
-        ],
+      floatingActionButton: FloatingActionButtonBar(
+        localParticipantRole: localParticipantRole!,
+        isMobile: isMobile,
+        context: context,
+        copyInviteLinkToClipboard: _copyInviteLinkToClipboard,
+        showParticipantSelectionDialog: _showParticipantSelectionDialog,
+        openEndDrawer: _openEndDrawer,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      endDrawer: Drawer(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                style: TextStyle(color: Colors.black),
-                decoration: InputDecoration(
-                  hintText: 'Search participants',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    searchQuery = value;
-                  });
-                },
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                children: [
-                  // Displaying the host first
-                  ..._filterParticipants(searchQuery).where((track) {
-                    final metadata = track.participant.metadata;
-                    final role =
-                        metadata != null ? jsonDecode(metadata)['role'] : null;
-                    return role == Role.admin.toString();
-                  }).map((track) {
-                    final isLocal = track.participant.identity ==
-                        widget.room.localParticipant?.identity;
-                    final participantName = track.participant.name ?? 'Unknown';
-                    final displayName = isLocal
-                        ? '$participantName (you) (host)'
-                        : '$participantName (host)';
-
-                    return ListTile(
-                      title: Text(displayName),
-                      trailing: null, // No checkbox for the host
-                      onTap: null, // No action for the host
-                    );
-                  }).toList(),
-
-                  // Displaying non-admin and non-host participants
-                  ..._filterParticipants(searchQuery).where((track) {
-                    final metadata = track.participant.metadata;
-                    final role =
-                        metadata != null ? jsonDecode(metadata)['role'] : null;
-                    return role != Role.admin.toString();
-                  }).map((track) {
-                    final isLocal = track.participant.identity ==
-                        widget.room.localParticipant?.identity;
-                    final participantName = track.participant.name ?? 'Unknown';
-                    final displayName =
-                        isLocal ? '$participantName (you)' : participantName;
-
-                    // Check if the hand is raised
-                    final metadata = track.participant.metadata;
-                    print('meta  Check if the hand is raised: $metadata');
-                    final isHandRaised = metadata != null
-                        ? jsonDecode(metadata)['handraise'] == true
-                        : false;
-
-                    return ListTile(
-                      title: Text(displayName),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isHandRaised)
-                            Icon(Icons.pan_tool,
-                                color: Colors.orange), // Hand raised icon
-                          if (!isLocal)
-                            Checkbox(
-                              value: _allowedToTalk.contains(track.participant),
-                              onChanged: (value) {
-                                _toggleParticipantForTalk(track.participant);
-                              },
-                            ),
-                        ],
-                      ),
-                      onTap: isLocal
-                          ? null
-                          : () {
-                              _toggleParticipantForTalk(track.participant);
-                            },
-                    );
-                  }).toList(),
-                ],
-              ),
-            )
-          ],
-        ),
+      endDrawer: ParticipantDrawer(
+        searchQuery: searchQuery,
+        onSearchChanged: (value) {
+          setState(() {
+            searchQuery = value;
+          });
+        },
+        filterParticipants: _filterParticipants,
+        localParticipant: widget.room.localParticipant,
+        allowedToTalk: _allowedToTalk,
+        toggleParticipantForTalk: _toggleParticipantForTalk,
       ),
     );
   }

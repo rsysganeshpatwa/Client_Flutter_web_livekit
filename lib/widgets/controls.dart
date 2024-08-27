@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
@@ -16,12 +15,14 @@ class ControlsWidget extends StatefulWidget {
   final LocalParticipant participant;
   final void Function(bool) onToggleParticipants;
   final void Function(bool) onToggleRaiseHand;
-  final  String? role;
+  final String? role;
   final bool isHandleRaiseHand;
+  final bool isHandleMuteAll;
 
   const ControlsWidget(
     this.onToggleParticipants,
     this.onToggleRaiseHand,
+    this.isHandleMuteAll,
     this.isHandleRaiseHand,
     this.role,
     this.room,
@@ -57,15 +58,23 @@ class _ControlsWidgetState extends State<ControlsWidget> {
     Hardware.instance.enumerateDevices().then(_loadDevices);
   }
 
-   @override
+  @override
   void didUpdateWidget(ControlsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isHandleRaiseHand != oldWidget.isHandleRaiseHand) {
       if (!widget.isHandleRaiseHand) {
         setState(() {
-          _isHandRaised = false; // Reset local state if isHandleRaiseHand is false
+          _isHandRaised =
+              false; // Reset local state if isHandleRaiseHand is false
         });
       }
+    }
+    if (widget.isHandleMuteAll != oldWidget.isHandleMuteAll) {
+    
+      setState(() {
+        _allMuted =
+            widget.isHandleMuteAll; // Set local state to match parent state
+      });
     }
   }
 
@@ -88,17 +97,15 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   void _onChange() {
     // trigger refresh
     setState(() {});
-    
   }
 
-   void _toggleRaiseHand() {
+  void _toggleRaiseHand() {
     setState(() {
       _isHandRaised = !_isHandRaised;
     });
 
-   widget.onToggleRaiseHand(_isHandRaised); // Call the parent function
+    widget.onToggleRaiseHand(_isHandRaised); // Call the parent function
   }
-
 
   void _unpublishAll() async {
     final result = await context.showUnPublishDialog();
@@ -108,7 +115,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   bool get isMuted => participant.isMuted;
 
   void _toggleMuteAll() async {
-      widget.onToggleParticipants(!_allMuted );
+    widget.onToggleParticipants(!_allMuted);
     setState(() {
       _allMuted = !_allMuted;
     });
@@ -576,16 +583,17 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               tooltip: 'Simulate scenario',
             ),
           ),
-         Visibility(
-          visible: widget.role == Role.admin.toString() ? false : true,
-          child: // New Raise Hand Button
-          IconButton(
-            icon: Icon(
-              _isHandRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
-              color: _isHandRaised ? Colors.amber : Colors.white,
+          Visibility(
+            visible: widget.role == Role.admin.toString() ? false : true,
+            child: // New Raise Hand Button
+                IconButton(
+              icon: Icon(
+                _isHandRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
+                color: _isHandRaised ? Colors.amber : Colors.white,
+              ),
+              onPressed: _toggleRaiseHand,
             ),
-            onPressed: _toggleRaiseHand,
-          ),)
+          )
         ],
       ),
     );
