@@ -117,13 +117,22 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   // Notify Flutter that UI re-build is required, but we don't set anything here
   // since the updated values are computed properties.
-  void _onParticipantChanged() => setState(() {});
+  void _onParticipantChanged() => setState(() {
+       print('12345 Participant name  ${audioPublication?.participant.identity}');
+       print('12345 Participant audioPublication ganesh ${audioPublication?.subscribed}');
+     
+    widget.participant.audioTrackPublications.forEach((pub) {
+      
+  
+     print('12345 Participant changed each ganesh ${pub.subscribed} ${pub.participant.identity}');
+  });
+  });
 
   // Widgets to show above the info bar
   List<Widget> extraWidgets(bool isScreenShare) => [];
 
   @override
-  Widget build(BuildContext ctx) => Container(
+  Widget build(BuildContext ctx) =>  Container(
         foregroundDecoration: BoxDecoration(
           border: widget.participant.isSpeaking && audioPublication?.subscribed == false && !isScreenShare
               ? Border.all(
@@ -195,6 +204,7 @@ class _LocalParticipantWidgetState
       widget.participant.audioTrackPublications
           .where((element) => element.source == widget.type.lkAudioSourceType)
           .firstOrNull;
+          
 
   @override
   VideoTrack? get activeVideoTrack => videoPublication?.track;

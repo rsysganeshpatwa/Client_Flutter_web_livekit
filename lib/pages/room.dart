@@ -189,14 +189,14 @@ class _RoomPageState extends State<RoomPage> {
       final data = jsonDecode(decodedData) as Map<String, dynamic>;
       print('Received metadata: $data');
 
-      setState(() {
+      setState(()  {
         // Handle allowedToTalk updates
         if (data.containsKey('allowedToTalk')) {
           final allowedIdentities = data['allowedToTalk'] as List<dynamic>;
           _allowedToTalk = widget.room.remoteParticipants.values
               .where((p) => allowedIdentities.contains(p.identity))
               .toSet();
-          _updateAudioSubscriptions();
+           _updateAudioSubscriptions();
         }
 
         // Handle handraise updates
@@ -304,7 +304,7 @@ void _handleHandraiseUpdate(String identity, bool handraise) {
   }
 
   void _initializeAllowedToTalk() {
-    setState(() {
+    setState(()  {
       _allowedToTalk.clear();
       if (localParticipantRole == Role.admin.toString()) {
         // New admin joins: Mute all participants
@@ -319,12 +319,12 @@ void _handleHandraiseUpdate(String identity, bool handraise) {
           }
         }
       }
-      _updateAudioSubscriptions();
+     _updateAudioSubscriptions();
     });
   }
 
   void _toggleParticipantForTalk(Participant participant) {
-    setState(() {
+    setState(()  {
       final isAllowedToTalk = _allowedToTalk.contains(participant);
 
       // Toggle the participant's allowed to talk status
@@ -334,16 +334,16 @@ void _handleHandraiseUpdate(String identity, bool handraise) {
       } else {
         // If the participant is currently not allowed to talk, add them
         _allowedToTalk.add(participant);
-        // Also set _muteAll to false when toggling individual participants
-        _muteAll = false;
+     
       }
-        
-        print('Starting _toggleParticipantForTalk _allowedToTalk ganesh ${_allowedToTalk}');
+           // Also set _muteAll to false when toggling individual participants
+        _muteAll = false;
+        print('Starting _toggleParticipantForTalk _allowedToTalk gane ${_allowedToTalk}');
 
       // Update audio subscriptions only if there's a change in allowedToTalk
-      if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
+    //  if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
         _updateAudioSubscriptions();
-      }
+   //   }
 
       // Ensure metadata is consistent with allowedToTalk state
       _updateAllowedToTalkMetadata();
@@ -352,10 +352,10 @@ void _handleHandraiseUpdate(String identity, bool handraise) {
   }
 
   void _toggleMuteAll(bool muteAll) {
-    setState(() {
+    setState(()  {
       _muteAll = muteAll;
       _allowedToTalk.clear(); // Clear the current set
-
+      print(  '12345 Starting _toggleMuteAll   ${muteAll}');
       if (muteAll) {
         final localParticipant = widget.room.localParticipant;
 
@@ -375,10 +375,10 @@ void _trackSubscribed(TrackSubscribedEvent event) {
   final participant = event.participant;
   final metadata = participant.metadata;
   final role = _getRoleFromMetadata(metadata);
-  print('Track subscribed _allowedToTalk ganesh + ${_allowedToTalk}');
-   print('Track subscribed identity ganesh + ${participant.identity}');
-   print('Track subscribed _muteAll ganesh + ${_muteAll}');
-  setState(() {
+  print('Track subscribed _allowedToTalk gane + ${_allowedToTalk}');
+   print('Track subscribed identity gane + ${participant.identity}');
+   print('Track subscribed _muteAll gane + ${_muteAll}');
+  setState(()  {
     if (role != Role.admin.toString()) {
       if (!_muteAll) {
         _allowedToTalk.add(participant);
@@ -398,7 +398,7 @@ void _trackUnsubscribed(TrackUnsubscribedEvent event) {
   final metadata = participant.metadata;
   final role = _getRoleFromMetadata(metadata);
 
-  setState(() {
+  setState(()  {
     if (role != Role.admin.toString()) {
       if (_allowedToTalk.contains(participant)) {
         _allowedToTalk.remove(participant);
@@ -417,31 +417,40 @@ String _getRoleFromMetadata(String? metadata) {
 }
 
 
-  void _updateAudioSubscriptions() {
-    print('Starting _updateAudioSubscriptions ganesh');
-    print('Current _allowedToTalk ganesh: ${_allowedToTalk}');
+  void _updateAudioSubscriptions()  {
+  print('Starting _updateAudioSubscriptions gane');
+  print('Current _allowedToTalk gane: ${_allowedToTalk}');
 
-    if (localParticipantRole == Role.admin.toString() &&
-        !_allowedToTalk.contains(widget.room.localParticipant!)) {
-      _allowedToTalk.add(widget.room.localParticipant!);
+setState(() {
+  if (localParticipantRole == Role.admin.toString() &&
+      !_allowedToTalk.contains(widget.room.localParticipant!)) {
+    _allowedToTalk.add(widget.room.localParticipant!);
+  }
+
+  for (var track in participantTracks) {
+    if (track.participant is LocalParticipant) {
+      continue;
     }
-
-    for (var participant in widget.room.remoteParticipants.values) {
-      final metadata = participant.metadata;
-      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-      for (var track in participant.audioTrackPublications) {
-        if ((_allowedToTalk.contains(participant) &&
-                localParticipantRole == Role.admin.toString()) ||
-            role == Role.admin.toString()) {
-               print('subscribing from audio track ganesh${participant.identity}');
-          track.subscribe();
-        } else {
-          print('Unsubscribing from audio track ganesh${participant.identity}');
-          track.unsubscribe();
-        }
+  
+    final participant = track.participant as RemoteParticipant;
+    
+    final metadata = participant.metadata;
+    final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+    for (var track in participant.audioTrackPublications) {
+      if ((_allowedToTalk.contains(participant) &&
+              localParticipantRole == Role.admin.toString()) ||
+          role == Role.admin.toString()) {
+        print('Subscribing to audio track gane ${participant.identity}');
+         track.subscribe(); // Awaiting the subscription
+      } else {
+        print('Unsubscribing from audio track gane ${participant.identity}');
+         track.unsubscribe(); // Awaiting the unsubscription
       }
     }
   }
+});
+  
+}
 
   List<ParticipantTrack> _filterParticipants(String searchQuery) {
     final localParticipant = widget.room.localParticipant;
