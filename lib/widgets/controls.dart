@@ -326,6 +326,67 @@ class _ControlsWidgetState extends State<ControlsWidget> {
     }
   }
 
+  Future<void> _showMicrophoneOptions(BuildContext context) async {
+	  showModalBottomSheet(
+		context: context,
+		builder: (BuildContext context) {
+		  return SafeArea(
+			child: Container(
+			  width: MediaQuery.of(context).size.width * 0.2, // 20% of screen width
+			  child: ListView(
+				shrinkWrap: true, // Ensures ListView takes up as much space as it needs
+				children: [
+				  if (_audioInputs != null)
+					..._audioInputs!.map((device) {
+					  return ListTile(
+						leading: (device.deviceId == widget.room.selectedAudioInputDeviceId)
+							? const Icon(Icons.check_box_outlined, color: Colors.black)
+							: const Icon(Icons.check_box_outline_blank, color: Colors.black),
+						title: Text(device.label),
+						onTap: () {
+						  _selectAudioInput(device);
+						  Navigator.pop(context); // Close the bottom sheet after selection
+						},
+					  );
+					}).toList(),
+				],
+			  ),
+			),
+		  );
+		},
+	  );
+	}
+
+  Future<void> _showVideoOptions(BuildContext context) async {
+	  showModalBottomSheet(
+		context: context,
+		builder: (BuildContext context) {
+		  return SafeArea(
+			child: Container(
+			  width: MediaQuery.of(context).size.width * 0.2, // 20% of screen width
+			  child: ListView(
+				shrinkWrap: true, // Ensures ListView takes up as much space as it needs
+				children: [
+				  if (_videoInputs != null)
+					..._videoInputs!.map((device) {
+					  return ListTile(
+						leading: (device.deviceId == widget.room.selectedVideoInputDeviceId)
+							? const Icon(Icons.check_box_outlined, color: Colors.black)
+							: const Icon(Icons.check_box_outline_blank, color: Colors.black),
+						title: Text(device.label),
+						onTap: () {
+						  _selectVideoInput(device);
+						  Navigator.pop(context); // Close the bottom sheet after selection
+						},
+					  );
+					}).toList(),
+				],
+			  ),
+			),
+		  );
+		},
+	  );
+	}
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -357,9 +418,8 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           ),
           if (participant.isMicrophoneEnabled())
-            if (lkPlatformIs(PlatformType.android))
-              Visibility(
-                visible: false,
+            Visibility(
+                visible: true,
                 child: IconButton(
                   onPressed: _disableAudio,
                   icon: const Icon(Icons.mic),
@@ -367,48 +427,6 @@ class _ControlsWidgetState extends State<ControlsWidget> {
                 ),
               )
             else
-              Visibility(
-                visible: true,
-                child: PopupMenuButton<MediaDevice>(
-                  icon: const Icon(Icons.settings_voice),
-                  itemBuilder: (BuildContext context) {
-                    return [
-                      PopupMenuItem<MediaDevice>(
-                        value: null,
-                        onTap: isMuted ? _enableAudio : _disableAudio,
-                        child: const ListTile(
-                          leading: Icon(
-                            Icons.mic_off,
-                            color: Colors.white,
-                          ),
-                          title: Text('Mute Microphone'),
-                        ),
-                      ),
-                      if (_audioInputs != null)
-                        ..._audioInputs!.map((device) {
-                          return PopupMenuItem<MediaDevice>(
-                            value: device,
-                            child: ListTile(
-                              leading: (device.deviceId ==
-                                      widget.room.selectedAudioInputDeviceId)
-                                  ? const Icon(
-                                      Icons.check_box_outlined,
-                                      color: Colors.white,
-                                    )
-                                  : const Icon(
-                                      Icons.check_box_outline_blank,
-                                      color: Colors.white,
-                                    ),
-                              title: Text(device.label),
-                            ),
-                            onTap: () => _selectAudioInput(device),
-                          );
-                        })
-                    ];
-                  },
-                ),
-              )
-          else
             Visibility(
               visible: true,
               child: IconButton(
@@ -475,43 +493,11 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           if (participant.isCameraEnabled())
             Visibility(
               visible: true,
-              child: PopupMenuButton<MediaDevice>(
+              child: IconButton(
+                onPressed: _disableVideo,
                 icon: const Icon(Icons.videocam_sharp),
-                itemBuilder: (BuildContext context) {
-                  return [
-                    PopupMenuItem<MediaDevice>(
-                      value: null,
-                      onTap: _disableVideo,
-                      child: const ListTile(
-                        leading: Icon(
-                          Icons.videocam_off,
-                          color: Colors.white,
-                        ),
-                        title: Text('Disable Camera'),
-                      ),
-                    ),
-                    if (_videoInputs != null)
-                      ..._videoInputs!.map((device) {
-                        return PopupMenuItem<MediaDevice>(
-                          value: device,
-                          child: ListTile(
-                            leading: (device.deviceId ==
-                                    widget.room.selectedVideoInputDeviceId)
-                                ? const Icon(
-                                    Icons.check_box_outlined,
-                                    color: Colors.white,
-                                  )
-                                : const Icon(
-                                    Icons.check_box_outline_blank,
-                                    color: Colors.white,
-                                  ),
-                            title: Text(device.label),
-                          ),
-                          onTap: () => _selectVideoInput(device),
-                        );
-                      })
-                  ];
-                },
+                tooltip: 'Mute video',
+                
               ),
             )
           else
@@ -593,7 +579,39 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               ),
               onPressed: _toggleRaiseHand,
             ),
-          )
+          ),
+          Visibility(
+            visible: true,
+            child: PopupMenuButton<String>(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onSelected: (String value) {
+              if (value == 'Microphone') {
+              _showMicrophoneOptions(context);
+              } else if (value == 'Camera') {
+              _showVideoOptions(context);
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+              const PopupMenuItem<String>(
+                value: 'Microphone',
+                child: ListTile(
+                leading: Icon(Icons.mic),
+                title: Text('Microphone'),
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'Camera',
+                child: ListTile(
+                leading: Icon(Icons.videocam),
+                title: Text('Camera'),
+                ),
+                    ),
+                  ];
+                },
+              ),
+            ),
         ],
       ),
     );
