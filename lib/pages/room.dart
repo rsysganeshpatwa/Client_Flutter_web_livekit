@@ -211,31 +211,35 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  void _handleHandraiseUpdate(String identity, bool handraise) {
-    setState(() {
-      participantTracks.forEach((track) {
-        if (track.participant.identity == identity) {
-          final currentMetadata =
-              jsonDecode(track.participant.metadata ?? '{}');
-          currentMetadata['handraise'] = handraise;
-          track.participant.metadata = jsonEncode(currentMetadata);
+void _handleHandraiseUpdate(String identity, bool handraise) {
+  setState(() {
+    participantTracks.forEach((track) {
+      if (track.participant.identity == identity) {
+        final currentMetadata =
+            jsonDecode(track.participant.metadata ?? '{}');
 
-          if (widget.room.localParticipant?.identity == identity) {
-            setState(() {
-              _isHandleRaiseHand = handraise;
-            });
-          }
-          // Show notification if the hand is raised
-          if (handraise) {
-            // Only notify the local participant if they are an admin
-            if (localParticipantRole == Role.admin.toString()) {
-              _showHandRaiseNotification(context, track.participant);
-            }
-          }
+        currentMetadata['handraise'] = handraise;
+
+        // If the hand is being raised, store the current timestamp
+        if (handraise) {
+          currentMetadata['handraiseTime'] = DateTime.now().millisecondsSinceEpoch;
         }
-      });
+
+        track.participant.metadata = jsonEncode(currentMetadata);
+
+        // Handle the local participant's hand raise status
+        if (widget.room.localParticipant?.identity == identity) {
+          _isHandleRaiseHand = handraise;
+        }
+
+        // Show notification if the hand is raised and the local participant is an admin
+        if (handraise && localParticipantRole == Role.admin.toString()) {
+          _showHandRaiseNotification(context, track.participant);
+        }
+      }
     });
-  }
+  });
+}
 
   void _sortParticipants() {
     List<ParticipantTrack> userMediaTracks = [];
@@ -255,7 +259,6 @@ class _RoomPageState extends State<RoomPage> {
           type: ParticipantTrackType.kScreenShare,
         ));
       } else if (isHost || remoteParticipantRole == Role.admin.toString()) {
-        print(' isHost Participant sonu: ${participant.identity}');
         userMediaTracks.add(ParticipantTrack(participant: participant));
       }
     }
@@ -305,9 +308,7 @@ class _RoomPageState extends State<RoomPage> {
       _allowedToTalk.clear();
       if (localParticipantRole == Role.admin.toString()) {
         // New admin joins: Mute all participants
-        for (var participant in widget.room.remoteParticipants.values) {
-          _allowedToTalk.remove(participant);
-        }
+         _allowedToTalk.add(widget.room.localParticipant as Participant);
       } else {
         // Participant joins: Check if they should be allowed to talk
         for (var participant in widget.room.remoteParticipants.values) {
@@ -336,6 +337,8 @@ class _RoomPageState extends State<RoomPage> {
         // Also set _muteAll to false when toggling individual participants
         _muteAll = false;
       }
+        
+        print('Starting _toggleParticipantForTalk _allowedToTalk ganesh ${_allowedToTalk}');
 
       // Update audio subscriptions only if there's a change in allowedToTalk
       if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
@@ -368,31 +371,51 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
-  void _trackSubscribed(TrackSubscribedEvent event) {
-    final participant = event.participant;
-
-    setState(() {
+void _trackSubscribed(TrackSubscribedEvent event) {
+  final participant = event.participant;
+  final metadata = participant.metadata;
+  final role = _getRoleFromMetadata(metadata);
+  print('Track subscribed _allowedToTalk ganesh + ${_allowedToTalk}');
+   print('Track subscribed identity ganesh + ${participant.identity}');
+   print('Track subscribed _muteAll ganesh + ${_muteAll}');
+  setState(() {
+    if (role != Role.admin.toString()) {
       if (!_muteAll) {
         _allowedToTalk.add(participant);
       } else {
         _allowedToTalk.remove(participant);
       }
+    } else {
+      _allowedToTalk.add(participant);  // Admin is always allowed to talk
+    }
 
-      _updateAudioSubscriptions();
-    });
-  }
+    _updateAudioSubscriptions();
+  });
+}
 
-  void _trackUnsubscribed(TrackUnsubscribedEvent event) {
-    final participant = event.participant;
+void _trackUnsubscribed(TrackUnsubscribedEvent event) {
+  final participant = event.participant;
+  final metadata = participant.metadata;
+  final role = _getRoleFromMetadata(metadata);
 
-    setState(() {
-      if (_allowedToTalk.contains(participant) &&
-          localParticipantRole != Role.admin.toString()) {
+  setState(() {
+    if (role != Role.admin.toString()) {
+      if (_allowedToTalk.contains(participant)) {
         _allowedToTalk.remove(participant);
       }
-      _updateAudioSubscriptions();
-    });
+    }
+    _updateAudioSubscriptions();
+  });
+}
+
+String _getRoleFromMetadata(String? metadata) {
+  if (metadata != null && metadata.isNotEmpty) {
+    final decodedMetadata = jsonDecode(metadata);
+    return decodedMetadata['role'] ?? '';
   }
+  return '';
+}
+
 
   void _updateAudioSubscriptions() {
     print('Starting _updateAudioSubscriptions ganesh');
@@ -410,8 +433,10 @@ class _RoomPageState extends State<RoomPage> {
         if ((_allowedToTalk.contains(participant) &&
                 localParticipantRole == Role.admin.toString()) ||
             role == Role.admin.toString()) {
+               print('subscribing from audio track ganesh${participant.identity}');
           track.subscribe();
         } else {
+          print('Unsubscribing from audio track ganesh${participant.identity}');
           track.unsubscribe();
         }
       }
