@@ -220,6 +220,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
        
       );
 
+   
+
+      
+
+    
       await Navigator.push<void>(
         context,
         MaterialPageRoute(builder: (_) => RoomPage(room, listener)),
