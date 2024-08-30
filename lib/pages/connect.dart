@@ -26,10 +26,12 @@ class _ConnectPageState extends State<ConnectPage> {
 
   final _identityCtrl = TextEditingController();
   final _roomCtrl = TextEditingController();
+  final _welcomeMessageCtrl = TextEditingController();
 
   bool _busy = false;
   String? roomNameFromUrl;
   String? roomRoleFromUrl;
+  String? welcomeMessage;
   bool _isRoomNameInUrl = false;
 
   @override
@@ -56,10 +58,16 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _readPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
-
+     String? room = Uri.base.queryParameters['room'];
+     if(room == null){
+       room = "";
+     }
+      String metadata = await _apiService.getWelcomeMessage(room);
+    welcomeMessage = metadata;
     setState(() {
       roomNameFromUrl = Uri.base.queryParameters['room'];
       roomRoleFromUrl = Uri.base.queryParameters['role'];
+    
 
       if (roomNameFromUrl != null) {
         _roomCtrl.text = roomNameFromUrl!;
@@ -86,9 +94,10 @@ class _ConnectPageState extends State<ConnectPage> {
 
       final identity = _identityCtrl.text;
       final roomName = _roomCtrl.text;
+      final adminWelcomeMessage = _welcomeMessageCtrl.text;
       final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 
-      final token = await _apiService.getToken(identity, roomName, _role.toString());
+      final token = await _apiService.getToken(identity, roomName, _role.toString(), adminWelcomeMessage);
 
       await Navigator.push<void>(
         ctx,
@@ -212,6 +221,15 @@ class _ConnectPageState extends State<ConnectPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+               // Welcome message
+    Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Text(
+           welcomeMessage!,
+           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+           textAlign: TextAlign.center,
+           ),
+          ),
               if (!_isRoomNameInUrl) buildRoleSelection(),
               if (_isRoomNameInUrl)
                 Padding(
@@ -285,6 +303,13 @@ class _ConnectPageState extends State<ConnectPage> {
           child: LKTextField(
             label: 'Room Name',
             ctrl: _roomCtrl,
+          ),
+        ),
+         Padding(
+          padding: const EdgeInsets.only(bottom: 25),
+          child: LKTextField(
+            label: 'Welcome Message',
+            ctrl: _welcomeMessageCtrl,
           ),
         ),
       ],

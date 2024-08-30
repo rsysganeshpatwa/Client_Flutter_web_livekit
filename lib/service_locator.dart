@@ -6,7 +6,7 @@ import 'services/permission_service.dart';
 final GetIt getIt = GetIt.instance;
 
 void setup() {
-  final String apiServiceUrl = dotenv.env['API_NODE_URL']! ;
+  final String apiServiceUrl = dotenv.env['API_LOCAL_NODE_URL']! ;
   getIt.registerSingleton<ApiService>(ApiService(apiServiceUrl));
   getIt.registerSingleton<PermissionService>(PermissionService());
 }
