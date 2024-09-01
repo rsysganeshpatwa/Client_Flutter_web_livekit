@@ -4,9 +4,9 @@ import 'package:flutter_window_close/flutter_window_close.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:logging/logging.dart';
 import 'package:intl/intl.dart';
+import 'package:video_meeting_room/pages/login.dart';
 import 'package:video_meeting_room/service_locator.dart';
 import 'package:video_meeting_room/theme.dart';
-import 'pages/connect.dart';
 import 'utils.dart';
 
 
@@ -55,8 +55,8 @@ class LiveKitExampleApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'POC Live kit',
+        title: 'R Systems Connect',
         theme: LiveKitTheme().buildThemeData(context),
-        home: const ConnectPage(),
+        home:  LoginPage(),
       );
 }
