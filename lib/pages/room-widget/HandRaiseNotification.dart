@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 class HandRaiseNotification {
-  static void show(BuildContext context, Participant participant, void Function(Participant) allowSpeak) {
+  static void show(BuildContext context, Participant participant, void Function(Participant) allowSpeak, void Function(Participant) denySpeak) {
     final participantName = participant.name ?? 'Unknown';
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -22,6 +22,7 @@ class HandRaiseNotification {
             TextButton(
               onPressed: () {
                 // Handle cancel action
+                denySpeak(participant);
                 scaffoldMessenger.hideCurrentSnackBar();
               },
               child: Text('No', style: TextStyle(color: Colors.red)),

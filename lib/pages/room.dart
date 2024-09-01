@@ -47,8 +47,7 @@ class _RoomPageState extends State<RoomPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? localParticipantRole;
   List<ParticipantStatus> participantsManager = [];
-    bool _isScreenShareMode = false; // State to toggle view mode
-
+  bool _isScreenShareMode = false; // State to toggle view mode
 
   @override
   void initState() {
@@ -215,26 +214,27 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _addNewParticipantStatus(ParticipantConnectedEvent event) {
-   setState(() {
-        print('Participant connected: ${event.participant.identity}');
-        final isNew = participantsManager
-            .every((element) => element.identity != event.participant.identity);
-      
-        if (isNew) {
-          print('new Participant connected: ${event.participant.identity}');
-          final newParticipantStatus = ParticipantStatus(
-            identity: event.participant.identity,
-            isAudioEnable: false,
-            isVideoEnable: false,
-            isHandRaised: false,
-            isTalkToHostEnable: false,
-            handRaisedTimeStamp: 0,
-            // Set other default values for the new participant status
-          );
+    setState(() {
+      print('Participant connected: ${event.participant.identity}');
+      final isNew = participantsManager
+          .every((element) => element.identity != event.participant.identity);
 
-          participantsManager.add(newParticipantStatus);
-        }
-      });
+      if (isNew) {
+        print('new Participant connected: ${event.participant.identity}');
+        final newParticipantStatus = ParticipantStatus(
+          identity: event.participant.identity,
+          isAudioEnable: false,
+          isVideoEnable: false,
+          isHandRaised: false,
+          isTalkToHostEnable: false,
+          handRaisedTimeStamp: 0,
+          // Set other default values for the new participant status
+        );
+
+        participantsManager.add(newParticipantStatus);
+        sendParticipantsStatus(participantsManager);
+      }
+    });
   }
 
   void removeParticipantStatus(ParticipantDisconnectedEvent event) {
@@ -263,8 +263,6 @@ class _RoomPageState extends State<RoomPage> {
     await widget.room.localParticipant?.publishData(utf8.encode(metadata));
     // Send the entire metadata object at once
 
-    
-
     setState(() {
       participantsManager = participantsStatus;
       _sortParticipants();
@@ -288,12 +286,14 @@ class _RoomPageState extends State<RoomPage> {
               ))
           .toList();
 
-      participantsStatusList.forEach((element) {
-        print('rohit participantsStatus recevie ${element.toJson()}');
-      });
       // Update the state with the new participants status list
       setState(() {
         participantsManager = participantsStatusList;
+        participantsStatusList.forEach((element) {
+          if (element.identity == widget.room.localParticipant?.identity) {
+            _isHandleRaiseHand = element.isHandRaised;
+          }
+        });
         _sortParticipants();
       });
     }
@@ -372,14 +372,15 @@ class _RoomPageState extends State<RoomPage> {
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
 
-    
       print(
           'rohit _sortParticipants 123 for  participantStatus${participantStatus.toJson()}');
 
       // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
-     final shouldAudioSubscribe = 
-    (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
-    (isAudio && !( (isLocalHost || isRemoteParticipantHost) && !isTalkToHostEnable));
+      final shouldAudioSubscribe =
+          (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
+              (isAudio &&
+                  !((isLocalHost || isRemoteParticipantHost) &&
+                      !isTalkToHostEnable));
 
       if (shouldAudioSubscribe) {
         participant.audioTrackPublications?.forEach((element) {
@@ -505,6 +506,18 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
+  void _denySpeak(Participant participant) {
+    setState(() {
+      // Find the corresponding participantsManager by participant identity
+      final participantStatus = _getParticipantStatus(participant.identity);
+
+      // Update the isTalkToHostEnable field to false
+      participantStatus.isTalkToHostEnable = false;
+      participantStatus.isHandRaised = false;
+      sendParticipantsStatus(participantsManager);
+    });
+  }
+
   void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
     // Create the metadata with the updated hand raise status
     final handRaiseData = jsonEncode(
@@ -528,7 +541,7 @@ class _RoomPageState extends State<RoomPage> {
 
   void _showHandRaiseNotification(
       BuildContext context, Participant participant) {
-    HandRaiseNotification.show(context, participant, _allowSpeak);
+    HandRaiseNotification.show(context, participant, _allowSpeak, _denySpeak);
   }
 
   Future<void> _showParticipantSelectionDialog(context) async {
@@ -554,29 +567,31 @@ class _RoomPageState extends State<RoomPage> {
 
   @override
   Widget build(BuildContext context) {
-      final screenWidth = MediaQuery.of(context).size.width;
-     final bool isMobile = screenWidth < 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
 
     return Scaffold(
       key: _scaffoldKey,
-      body:  SafeArea(
+      body: SafeArea(
         child: Stack(
           children: [
             // Conditional layout based on view mode
-            if (participantTracks.any((track) => track.type == ParticipantTrackType.kScreenShare) &&_isScreenShareMode)
+            if (participantTracks.any((track) =>
+                    track.type == ParticipantTrackType.kScreenShare) &&
+                _isScreenShareMode)
               Positioned.fill(
                 child: Stack(
                   children: [
                     // Display the screen share participant prominently
                     Positioned.fill(
                       child: ParticipantWidget.widgetFor(
-                        participantTracks
-                            .firstWhere((track) => track.participant.isScreenShareEnabled()), // Assuming you have a way to find the screen share track
+                        participantTracks.firstWhere((track) => track
+                            .participant
+                            .isScreenShareEnabled()), // Assuming you have a way to find the screen share track
                         showStatsLayer: false,
                       ),
                     ),
                     // Display other participants in a side panel
-                  
                   ],
                 ),
               )
@@ -606,8 +621,6 @@ class _RoomPageState extends State<RoomPage> {
           ],
         ),
       ),
-     
-
       floatingActionButton: FloatingActionButtonBar(
         localParticipantRole: localParticipantRole!,
         isMobile: isMobile,
@@ -615,7 +628,8 @@ class _RoomPageState extends State<RoomPage> {
         copyInviteLinkToClipboard: _copyInviteLinkToClipboard,
         showParticipantSelectionDialog: _showParticipantSelectionDialog,
         openEndDrawer: _openEndDrawer,
-        isScreenShare: participantTracks.any((track) => track.type == ParticipantTrackType.kScreenShare),
+        isScreenShare: participantTracks
+            .any((track) => track.type == ParticipantTrackType.kScreenShare),
         toggleViewMode: _toggleViewMode,
         isScreenShareMode: _isScreenShareMode,
       ),

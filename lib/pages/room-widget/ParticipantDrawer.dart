@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/models/role.dart';
@@ -137,6 +138,14 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
 
   @override
   Widget build(BuildContext context) {
+  final nonAdminParticipants = widget
+    .filterParticipants(widget.searchQuery)
+    .where((track) => track.participant.metadata != null &&
+        jsonDecode(track.participant.metadata!)['role'] !=
+            Role.admin.toString())
+    .toList();
+
+final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 2;
     return DefaultTabController(
       length: 2,
       child: Drawer(
@@ -175,6 +184,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
                   // Tab 2: Together Mode
                   ListView(
                     children: [
+                      if(isAnyParticipantRoleAvailableMoreThenOne)
                       ListTile(
                         title: Text('Select All',
                             style: TextStyle(fontWeight: FontWeight.bold),

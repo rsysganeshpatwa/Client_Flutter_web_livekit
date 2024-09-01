@@ -449,7 +449,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               child: IconButton(
                 onPressed: _disableAudio,
                 icon: const Icon(Icons.mic),
-                tooltip: 'mute audio',
+                tooltip: 'Mute audio',
               ),
             )
           else
@@ -458,7 +458,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               child: IconButton(
                 onPressed: _enableAudio,
                 icon: const Icon(Icons.mic_off),
-                tooltip: 'un-mute audio',
+                tooltip: 'Un-mute audio',
               ),
             ),
           if (!lkPlatformIs(PlatformType.iOS))
@@ -531,7 +531,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               child: IconButton(
                 onPressed: _enableVideo,
                 icon: const Icon(Icons.videocam_off),
-                tooltip: 'un-mute video',
+                tooltip: 'Un-mute video',
               ),
             ),
           Visibility(
@@ -546,7 +546,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           ),
           if (participant.isScreenShareEnabled())
             Visibility(
-              visible: widget.role == Role.admin.toString() ? true : false,
+              visible: widget.role == Role.admin.toString(),
               child: IconButton(
                 icon: const Icon(
                   Icons.monitor_outlined,
@@ -558,11 +558,11 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             )
           else
             Visibility(
-              visible: widget.role == Role.admin.toString() ? true : false,
+              visible: widget.role == Role.admin.toString(),
               child: IconButton(
                 icon: const Icon(Icons.monitor),
                 onPressed: () => _enableScreenShare(),
-                tooltip: 'Start Share screen ',
+                tooltip: 'Start Screen Share ',
               ),
             ),
           Visibility(
