@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:js_interop';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 import 'package:video_meeting_room/models/role.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/CopyInviteLinkDialog.dart';
 import 'package:video_meeting_room/pages/room-widget/FloatingActionButtonBar.dart';
 import 'package:video_meeting_room/pages/room-widget/HandRaiseNotification.dart';
@@ -41,25 +43,26 @@ class _RoomPageState extends State<RoomPage> {
   bool _flagStartedReplayKit = false;
   bool _muteAll = true;
   bool _isHandleRaiseHand = false;
-  Set<Participant> _allowedToTalk = {}; // Track participants allowed to talk
   String searchQuery = '';
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? localParticipantRole;
+  List<ParticipantStatus> participantsManager = [];
+    bool _isScreenShareMode = false; // State to toggle view mode
+
 
   @override
   void initState() {
     super.initState();
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
+    // Set up role for the local participant
+    _initializeLocalParticipantRole();
     _sortParticipants();
     WidgetsBinding.instance?.addPostFrameCallback((_) {
       if (!fastConnection) {
         _askPublish();
       }
     });
-
-    // Set up role for the local participant
-    _initializeLocalParticipantRole();
 
     if (lkPlatformIs(PlatformType.android)) {
       Hardware.instance.setSpeakerphoneOn(true);
@@ -99,9 +102,9 @@ class _RoomPageState extends State<RoomPage> {
       final role = metadata != null ? jsonDecode(metadata)['role'] : null;
       setState(() {
         localParticipantRole = role.toString();
+        _initializeParticipantStatuses();
       });
     }
-    _initializeAllowedToTalk();
   }
 
   void _setUpListeners() => _listener
@@ -129,21 +132,28 @@ class _RoomPageState extends State<RoomPage> {
     // ignore: unnecessary_set_literal
     ..on<TrackSubscribedEvent>((event) {
       _sortParticipants();
-      _trackSubscribed(event);
+      //  _trackSubscribed(event);
     })
     ..on<TrackUnsubscribedEvent>((event) {
       _sortParticipants();
-      _trackUnsubscribed(event);
+      //   _trackUnsubscribed(event);
     })
     ..on<ParticipantNameUpdatedEvent>((event) {
       _sortParticipants();
     })
     ..on<DataReceivedEvent>((event) {
       try {
-        _receivedMetadata(event);
+        _receivedHandRaiseRequest(utf8.decode(event.data));
+        updateParticipantStatusFromMetadata(utf8.decode(event.data));
       } catch (_) {
         print('Failed to decode: $_');
       }
+    })
+    ..on<ParticipantConnectedEvent>((event) {
+      _addNewParticipantStatus(event);
+    })
+    ..on<ParticipantDisconnectedEvent>((event) {
+      removeParticipantStatus(event);
     })
     ..on<AudioPlaybackStatusChanged>((event) async {
       if (!widget.room.canPlaybackAudio) {
@@ -175,127 +185,172 @@ class _RoomPageState extends State<RoomPage> {
     _sortParticipants();
   }
 
-  Future<void> _updateAllowedToTalkMetadata() async {
-    // Broadcast the updated list to all participants
-    final allowedToTalkIdentities =
-        _allowedToTalk.map((p) => p.identity).toList();
-    final dataMessage = jsonEncode({'allowedToTalk': allowedToTalkIdentities});
-    await widget.room.localParticipant?.publishData(utf8.encode(dataMessage));
-  }
+  void _initializeParticipantStatuses() {
+    participantsManager.clear();
 
-  void _receivedMetadata(DataReceivedEvent event) {
-    try {
-      final decodedData = utf8.decode(event.data);
-      final data = jsonDecode(decodedData) as Map<String, dynamic>;
-      print('Received metadata: $data');
+    // Initialize status for the local participant
+    final localParticipant = widget.room.localParticipant;
+    if (localParticipant != null) {
+      final localStatus = ParticipantStatus(
+        identity: localParticipant.identity,
+        isAudioEnable: localParticipantRole == Role.admin.toString(),
+        isVideoEnable: localParticipantRole == Role.admin.toString(),
+        isTalkToHostEnable: localParticipantRole == Role.admin.toString(),
+      );
+      participantsManager.add(localStatus);
+    }
 
-      setState(() {
-        // Handle allowedToTalk updates
-        if (data.containsKey('allowedToTalk')) {
-          final allowedIdentities = data['allowedToTalk'] as List<dynamic>;
-          _allowedToTalk = widget.room.remoteParticipants.values
-              .where((p) => allowedIdentities.contains(p.identity))
-              .toSet();
-          _updateAudioSubscriptions();
-        }
-
-        // Handle handraise updates
-        if (data.containsKey('identity') && data.containsKey('handraise')) {
-          final identity = data['identity'] as String;
-          final handraise = data['handraise'] as bool;
-          _handleHandraiseUpdate(identity, handraise);
-        }
-
-        if (data.containsKey('audio') || data.containsKey('video')) {
-          final identity = data['participant'] as String;
-          final audio = (data['audio'] as bool?) ?? false;
-          final video = (data['video'] as bool?) ?? false;
-          print('Starting _receivedMetadata 123 ${identity} ${audio} ${video}');
-          _updateParticipantVideoMetadata(identity, audio, video);
-          _sortParticipants();
-          _updateAudioSubscriptions();
-        }
-       
-
-      });
-    } catch (e) {
-      print('Failed to parse metadata: $e');
+    // Initialize status for remote participants
+    for (var participant in widget.room.remoteParticipants.values) {
+      final remoteParticipantRole = _getRoleFromMetadata(participant.metadata);
+      final participantStatus = ParticipantStatus(
+        identity: participant.identity,
+        isAudioEnable: remoteParticipantRole == Role.admin.toString(),
+        isVideoEnable: remoteParticipantRole == Role.admin.toString(),
+        isTalkToHostEnable: remoteParticipantRole == Role.admin.toString(),
+        // Other default values (e.g., isHandRaised, isTalkToHostEnable) are already false by default
+      );
+      participantsManager.add(participantStatus);
     }
   }
 
+  void _addNewParticipantStatus(ParticipantConnectedEvent event) {
+   setState(() {
+        print('Participant connected: ${event.participant.identity}');
+        final isNew = participantsManager
+            .every((element) => element.identity != event.participant.identity);
+      
+        if (isNew) {
+          print('new Participant connected: ${event.participant.identity}');
+          final newParticipantStatus = ParticipantStatus(
+            identity: event.participant.identity,
+            isAudioEnable: false,
+            isVideoEnable: false,
+            isHandRaised: false,
+            isTalkToHostEnable: false,
+            handRaisedTimeStamp: 0,
+            // Set other default values for the new participant status
+          );
 
-  void _updateParticipantVideoMetadata(String identity, bool audio, bool video) {
+          participantsManager.add(newParticipantStatus);
+        }
+      });
+  }
 
-setState(() {
-    final participant = widget.room.remoteParticipants[identity];
-  final currentMetadata = jsonDecode(participant?.metadata ?? '{}');
-  currentMetadata['audio'] = audio;
-  currentMetadata['video'] = video;
-  participant?.metadata = jsonEncode(currentMetadata);
-});
-
-}
-
-
-  void _handleHandraiseUpdate(String identity, bool handraise) {
+  void removeParticipantStatus(ParticipantDisconnectedEvent event) {
     setState(() {
-      participantTracks.forEach((track) {
-        if (track.participant.identity == identity) {
-          final currentMetadata =
-              jsonDecode(track.participant.metadata ?? '{}');
-
-          currentMetadata['handraise'] = handraise;
-
-          // If the hand is being raised, store the current timestamp
-          if (handraise) {
-            currentMetadata['handraiseTime'] =
-                DateTime.now().millisecondsSinceEpoch;
-          }
-
-          track.participant.metadata = jsonEncode(currentMetadata);
-
-          // Handle the local participant's hand raise status
-          if (widget.room.localParticipant?.identity == identity) {
-            _isHandleRaiseHand = handraise;
-          }
-
-          // Show notification if the hand is raised and the local participant is an admin
-          if (handraise && localParticipantRole == Role.admin.toString()) {
-            _showHandRaiseNotification(context, track.participant);
-          }
-        }
-      });
+      participantsManager.removeWhere(
+          (status) => status.identity == event.participant.identity);
     });
   }
 
-  void _updateMetadataTogetherMode(Participant participant,
-      {bool? audioStatus, bool? videoStatus}) async {
-    final metadata =
-        participant.metadata != null ? jsonDecode(participant.metadata!) : {};
+  Future<void> sendParticipantsStatus(
+      List<ParticipantStatus> participantsStatus) async {
+    // Convert the list of ParticipantStatus objects to a list of JSON objects
+    final participantsJsonList =
+        participantsStatus.map((status) => status.toJson()).toList();
 
-    if (audioStatus != null) {
-      metadata['audio'] = audioStatus;
-    }
-    if (videoStatus != null) {
-        metadata['video'] = videoStatus ;
-    }
-    print('Starting _updateMetadataTogetherMode 987 ${metadata}');
-
-    // Broadcast the updated metadata to all participants
-    final dataMessage = jsonEncode({
-      'participant': participant.identity,
-      'video': videoStatus,
-      'audio': audioStatus,
+    // Wrap the list in an object with additional keys
+    final metadata = jsonEncode({
+      'type':
+          'participantsStatusUpdate', // Example key to describe the type of metadata
+      'timestamp':
+          DateTime.now().toIso8601String(), // Example key to add a timestamp
+      'participants':
+          participantsJsonList, // The actual list of participant statuses
     });
 
-     print('Starting dataMessage 987 ${dataMessage}');
+    await widget.room.localParticipant?.publishData(utf8.encode(metadata));
+    // Send the entire metadata object at once
 
-    await widget.room.localParticipant?.publishData(utf8.encode(dataMessage));
+    
 
-     print('Starting publishData 987 ${videoStatus}');
+    setState(() {
+      participantsManager = participantsStatus;
+      _sortParticipants();
+    });
+  }
 
-    _updateParticipantVideoMetadata(participant.identity, audioStatus ?? false, videoStatus ?? false);
-    _sortParticipants();
+  void updateParticipantStatusFromMetadata(String metadata) {
+    // Parse the received metadata
+    final decodedMetadata = jsonDecode(metadata);
+
+    if (decodedMetadata['type'] == 'participantsStatusUpdate') {
+      // Extract the list of participant status data from the 'participants' key
+      final participantsStatusList = (decodedMetadata['participants'] as List)
+          .map((item) => ParticipantStatus(
+                identity: item['identity'],
+                isAudioEnable: item['isAudioEnable'],
+                isVideoEnable: item['isVideoEnable'],
+                isHandRaised: item['isHandRaised'],
+                isTalkToHostEnable: item['isTalkToHostEnable'],
+                handRaisedTimeStamp: item['handRaisedTimeStamp'],
+              ))
+          .toList();
+
+      participantsStatusList.forEach((element) {
+        print('rohit participantsStatus recevie ${element.toJson()}');
+      });
+      // Update the state with the new participants status list
+      setState(() {
+        participantsManager = participantsStatusList;
+        _sortParticipants();
+      });
+    }
+  }
+
+  void _receivedHandRaiseRequest(String metadata) {
+    final decodedMetadata = jsonDecode(metadata);
+
+    if (decodedMetadata['handraise'] != null) {
+      _handleRaiseHandFromParticipant(
+        decodedMetadata['identity'],
+        decodedMetadata['handraise'],
+      );
+    }
+  }
+
+  void _handleRaiseHandFromParticipant(String identity, bool isHandRaised) {
+    setState(() {
+      // Find the participant status by identity
+      final participantStatus = _getParticipantStatus(identity);
+      final participant = participantTracks
+          .firstWhere((track) => track.participant.identity == identity)
+          .participant;
+
+      // Update the handraise status
+      participantStatus.isHandRaised = isHandRaised;
+
+      // If the hand is being raised, store the current timestamp
+      if (isHandRaised) {
+        participantStatus.handRaisedTimeStamp =
+            DateTime.now().millisecondsSinceEpoch;
+      }
+
+      // Handle the local participant's hand raise status
+      if (widget.room.localParticipant?.identity == identity) {
+        _isHandleRaiseHand = isHandRaised;
+      }
+
+      // Show notification if the hand is raised and the local participant is an admin
+      if (isHandRaised && localParticipantRole == Role.admin.toString()) {
+        _showHandRaiseNotification(context, participant);
+      }
+      _sortParticipants();
+    });
+  }
+
+  _getParticipantStatus(String identity) {
+    return participantsManager?.firstWhere(
+        (status) => status.identity == identity,
+        orElse: () => ParticipantStatus(
+              identity: identity,
+              isAudioEnable: false,
+              isVideoEnable: false,
+              isHandRaised: false,
+              isTalkToHostEnable: false,
+              handRaisedTimeStamp: 0,
+            ));
   }
 
   void _sortParticipants() {
@@ -303,27 +358,50 @@ setState(() {
     List<ParticipantTrack> screenTracks = [];
     final localParticipant = widget.room.localParticipant;
 
-    bool isHost = localParticipant != null &&
+    bool isLocalHost = localParticipant != null &&
         localParticipantRole == Role.admin.toString();
+
     for (var participant in widget.room.remoteParticipants.values) {
-      final metadata = participant.metadata;
-      final remoteParticipantRole =
-          metadata != null ? jsonDecode(metadata)['role'] : null;
-      
-      final isVideo = metadata != null ? jsonDecode(metadata)['video'] ?? false : false;
-     
-      print('Starting _sortParticipants 123 ${metadata}');
+      // Find the corresponding ParticipantStatus
+
+      final participantStatus = _getParticipantStatus(participant.identity);
+      final isRemoteParticipantHost =
+          _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
+
+      final isVideo = participantStatus.isVideoEnable;
+      final isAudio = participantStatus.isAudioEnable;
+      final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
+
+    
+      print(
+          'rohit _sortParticipants 123 for  participantStatus${participantStatus.toJson()}');
+
+      // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
+     final shouldAudioSubscribe = 
+    (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
+    (isAudio && !( (isLocalHost || isRemoteParticipantHost) && !isTalkToHostEnable));
+
+      if (shouldAudioSubscribe) {
+        participant.audioTrackPublications?.forEach((element) {
+          element.subscribe();
+        });
+      } else {
+        participant.audioTrackPublications?.forEach((element) {
+          element.unsubscribe();
+        });
+      }
 
       if (participant.isScreenShareEnabled()) {
         screenTracks.add(ParticipantTrack(
           participant: participant,
           type: ParticipantTrackType.kScreenShare,
         ));
-      } else if (isHost ||
-          remoteParticipantRole == Role.admin.toString() || isVideo ) {
+        setState(() {
+          _isScreenShareMode = true;
+        });
+      } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
         userMediaTracks.add(ParticipantTrack(participant: participant));
       }
-       
     }
 
     userMediaTracks.sort((a, b) {
@@ -340,7 +418,6 @@ setState(() {
           if (lkPlatformIs(PlatformType.iOS)) {
             if (!_flagStartedReplayKit) {
               _flagStartedReplayKit = true;
-
               ReplayKitChannel.startReplayKit();
             }
           }
@@ -352,122 +429,39 @@ setState(() {
           if (lkPlatformIs(PlatformType.iOS)) {
             if (_flagStartedReplayKit) {
               _flagStartedReplayKit = false;
-
               ReplayKitChannel.closeReplayKit();
             }
           }
         }
       }
     }
-    userMediaTracks
-        .add(ParticipantTrack(participant: widget.room.localParticipant!));
+
+    // Add the local participant to the user media tracks list
+    if (localParticipant != null) {
+      userMediaTracks.add(ParticipantTrack(participant: localParticipant));
+    }
+
     setState(() {
       participantTracks = [...screenTracks, ...userMediaTracks];
-    });
-  }
-
-  void _initializeAllowedToTalk() {
-    setState(() {
-      _allowedToTalk.clear();
-      if (localParticipantRole == Role.admin.toString()) {
-        // New admin joins: Mute all participants
-        _allowedToTalk.add(widget.room.localParticipant as Participant);
-      } else {
-        // Participant joins: Check if they should be allowed to talk
-        for (var participant in widget.room.remoteParticipants.values) {
-          if (_allowedToTalk.contains(participant)) {
-            _allowedToTalk.add(participant);
-          } else {
-            _allowedToTalk.remove(participant);
-          }
-        }
-      }
-      _updateAudioSubscriptions();
-    });
-  }
-
-  void _toggleParticipantForTalk(Participant participant) {
-    setState(() {
-      final isAllowedToTalk = _allowedToTalk.contains(participant);
-
-      // Toggle the participant's allowed to talk status
-      if (isAllowedToTalk) {
-        // If the participant is currently allowed to talk, remove them
-        _allowedToTalk.remove(participant);
-      } else {
-        // If the participant is currently not allowed to talk, add them
-        _allowedToTalk.add(participant);
-      }
-      // Also set _muteAll to false when toggling individual participants
-      _muteAll = false;
-      print(
-          'Starting _toggleParticipantForTalk _allowedToTalk gane ${_allowedToTalk}');
-
-      // Update audio subscriptions only if there's a change in allowedToTalk
-      //  if (isAllowedToTalk != _allowedToTalk.contains(participant)) {
-      _updateAudioSubscriptions();
-      //   }
-
-      // Ensure metadata is consistent with allowedToTalk state
-      _updateAllowedToTalkMetadata();
-      _toggleRaiseHand(participant, false);
     });
   }
 
   void _toggleMuteAll(bool muteAll) {
     setState(() {
       _muteAll = muteAll;
-      _allowedToTalk.clear(); // Clear the current set
-      print('12345 Starting _toggleMuteAll   ${muteAll}');
-      if (muteAll) {
-        final localParticipant = widget.room.localParticipant;
+      print('rohit muteAll ${muteAll}');
 
-        if (localParticipant != null &&
-            localParticipantRole == Role.admin.toString()) {
-          _allowedToTalk.add(localParticipant);
+      // Update the participantsManager with new participants
+      for (var participantStatus in participantsManager) {
+        if (participantStatus.identity !=
+            widget.room.localParticipant?.identity) {
+          participantStatus.isTalkToHostEnable = !muteAll;
         }
-      } else {
-        _allowedToTalk.addAll(widget.room.remoteParticipants.values);
-      }
-      _updateAudioSubscriptions();
-      _updateAllowedToTalkMetadata();
-    });
-  }
-
-  void _trackSubscribed(TrackSubscribedEvent event) {
-    final participant = event.participant;
-    final metadata = participant.metadata;
-    final role = _getRoleFromMetadata(metadata);
-    print('Track subscribed _allowedToTalk gane + ${_allowedToTalk}');
-    print('Track subscribed identity gane + ${participant.identity}');
-    print('Track subscribed _muteAll gane + ${_muteAll}');
-    setState(() {
-      if (role != Role.admin.toString()) {
-        if (!_muteAll) {
-          _allowedToTalk.add(participant);
-        } else {
-          _allowedToTalk.remove(participant);
-        }
-      } else {
-        _allowedToTalk.add(participant); // Admin is always allowed to talk
+        print('rohitg participantStatus ${participantStatus.toJson()}');
       }
 
-      _updateAudioSubscriptions();
-    });
-  }
-
-  void _trackUnsubscribed(TrackUnsubscribedEvent event) {
-    final participant = event.participant;
-    final metadata = participant.metadata;
-    final role = _getRoleFromMetadata(metadata);
-
-    setState(() {
-      if (role != Role.admin.toString()) {
-        if (_allowedToTalk.contains(participant)) {
-          _allowedToTalk.remove(participant);
-        }
-      }
-      _updateAudioSubscriptions();
+      // Trigger the callback with the updated list
+      sendParticipantsStatus(participantsManager);
     });
   }
 
@@ -477,43 +471,6 @@ setState(() {
       return decodedMetadata['role'] ?? '';
     }
     return '';
-  }
-
-  void _updateAudioSubscriptions() {
-    print('Starting _updateAudioSubscriptions gane');
-    print('Current _allowedToTalk gane: ${_allowedToTalk}');
-
-    setState(() {
-      if (localParticipantRole == Role.admin.toString() &&
-          !_allowedToTalk.contains(widget.room.localParticipant!)) {
-        _allowedToTalk.add(widget.room.localParticipant!);
-      }
-
-      for (var track in participantTracks) {
-        if (track.participant is LocalParticipant) {
-          continue;
-        }
-
-        final participant = track.participant as RemoteParticipant;
-
-        final metadata = participant.metadata;
-        final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-        final isAudio = metadata != null ? jsonDecode(metadata)['audio'] ?? false : false;
-      
-        for (var track in participant.audioTrackPublications) {
-          if ((_allowedToTalk.contains(participant) &&
-                  localParticipantRole == Role.admin.toString()) ||
-              role == Role.admin.toString() || isAudio) {
-            print('Subscribing to audio track gane ${participant.identity}');
-            track.subscribe(); // Awaiting the subscription
-          } else {
-            print(
-                'Unsubscribing from audio track gane ${participant.identity}');
-            track.unsubscribe(); // Awaiting the unsubscription
-          }
-        }
-      }
-    });
   }
 
   List<ParticipantTrack> _filterParticipants(String searchQuery) {
@@ -537,7 +494,15 @@ setState(() {
   }
 
   void _allowSpeak(Participant participant) {
-    _toggleParticipantForTalk(participant);
+    setState(() {
+      // Find the corresponding participantsManager by participant identity
+      final participantStatus = _getParticipantStatus(participant.identity);
+
+      // Update the isTalkToHostEnable field to true
+      participantStatus.isTalkToHostEnable = true;
+      participantStatus.isHandRaised = false;
+      sendParticipantsStatus(participantsManager);
+    });
   }
 
   void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
@@ -550,7 +515,7 @@ setState(() {
       utf8.encode(handRaiseData),
     );
 
-    _handleHandraiseUpdate(participant.identity, isHandRaised);
+    _handleRaiseHandFromParticipant(participant.identity, isHandRaised);
   }
 
   void _handleToggleRaiseHand(bool isHandRaised) async {
@@ -571,56 +536,54 @@ setState(() {
     final isMobile = screenWidth < 600;
 
     if (isMobile) {
-      // await showDialog(
-      //   context: context,
-      //   builder: (context) {
-      //     return ParticipantSelectionDialog(
-      //       participantTracks: participantTracks,
-      //       allowedToTalk: _allowedToTalk,
-      //       onToggleParticipantForTalk: _toggleParticipantForTalk,
-      //       localParticipantIdentity:
-      //           widget.room.localParticipant?.identity ?? '',
-      //     );
-      //   },
-      // );
       _scaffoldKey.currentState?.openEndDrawer();
     }
   }
 
   void _openEndDrawer() {
-    // _initializeAllowedToTalk();
+    //_initializeAllowedToTalk();
     _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  // Toggle between view modes
+  void _toggleViewMode() {
+    setState(() {
+      _isScreenShareMode = !_isScreenShareMode;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final int numParticipants = participantTracks.length;
-    final bool isMobile = screenWidth < 600;
-
-    final int crossAxisCount = (isMobile && numParticipants == 2)
-        ? 1
-        : (numParticipants > 1)
-            ? (screenWidth / (screenWidth / math.sqrt(numParticipants))).ceil()
-            : 1;
-
-    final int rowCount = (isMobile && numParticipants == 2)
-        ? 2
-        : (numParticipants / crossAxisCount).ceil();
+      final screenWidth = MediaQuery.of(context).size.width;
+     final bool isMobile = screenWidth < 600;
 
     return Scaffold(
       key: _scaffoldKey,
-      body: SafeArea(
+      body:  SafeArea(
         child: Stack(
           children: [
-            ParticipantGridView(
-              participantTracks: participantTracks,
-              crossAxisCount: crossAxisCount,
-              rowCount: rowCount,
-              screenWidth: screenWidth,
-              screenHeight: screenHeight,
-            ),
+            // Conditional layout based on view mode
+            if (participantTracks.any((track) => track.type == ParticipantTrackType.kScreenShare) &&_isScreenShareMode)
+              Positioned.fill(
+                child: Stack(
+                  children: [
+                    // Display the screen share participant prominently
+                    Positioned.fill(
+                      child: ParticipantWidget.widgetFor(
+                        participantTracks
+                            .firstWhere((track) => track.participant.isScreenShareEnabled()), // Assuming you have a way to find the screen share track
+                        showStatsLayer: false,
+                      ),
+                    ),
+                    // Display other participants in a side panel
+                  
+                  ],
+                ),
+              )
+            else
+              ParticipantGridView(
+                participantTracks: participantTracks,
+              ),
             if (widget.room.localParticipant != null)
               Positioned(
                 left: 0,
@@ -636,12 +599,15 @@ setState(() {
                     localParticipantRole,
                     widget.room,
                     widget.room.localParticipant!,
+                    participantsManager,
                   ),
                 ),
               ),
           ],
         ),
       ),
+     
+
       floatingActionButton: FloatingActionButtonBar(
         localParticipantRole: localParticipantRole!,
         isMobile: isMobile,
@@ -649,6 +615,9 @@ setState(() {
         copyInviteLinkToClipboard: _copyInviteLinkToClipboard,
         showParticipantSelectionDialog: _showParticipantSelectionDialog,
         openEndDrawer: _openEndDrawer,
+        isScreenShare: participantTracks.any((track) => track.type == ParticipantTrackType.kScreenShare),
+        toggleViewMode: _toggleViewMode,
+        isScreenShareMode: _isScreenShareMode,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       endDrawer: ParticipantDrawer(
@@ -660,9 +629,8 @@ setState(() {
         },
         filterParticipants: _filterParticipants,
         localParticipant: widget.room.localParticipant,
-        allowedToTalk: _allowedToTalk,
-        toggleParticipantForTalk: _toggleParticipantForTalk,
-        updateMetadataTogetherMode: _updateMetadataTogetherMode,
+        onParticipantsStatusChanged: sendParticipantsStatus,
+        participantsStatusList: participantsManager,
       ),
     );
   }

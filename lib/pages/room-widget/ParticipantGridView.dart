@@ -1,24 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
+import 'dart:math' as math;
 
 class ParticipantGridView extends StatelessWidget {
   final List<ParticipantTrack> participantTracks;
-  final int crossAxisCount;
-  final int rowCount;
-  final double screenWidth;
-  final double screenHeight;
 
   ParticipantGridView({
     required this.participantTracks,
-    required this.crossAxisCount,
-    required this.rowCount,
-    required this.screenWidth,
-    required this.screenHeight,
   });
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final int numParticipants = participantTracks.length;
+    final bool isMobile = screenWidth < 600;
+
+    final int crossAxisCount = (isMobile && numParticipants == 2)
+        ? 1
+        : (numParticipants > 1)
+            ? (screenWidth / (screenWidth / math.sqrt(numParticipants))).ceil()
+            : 1;
+
+    final int rowCount = (isMobile && numParticipants == 2)
+        ? 2
+        : (numParticipants / crossAxisCount).ceil();
+
     return Column(
       children: [
         Expanded(

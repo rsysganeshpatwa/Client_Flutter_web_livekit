@@ -7,6 +7,7 @@ import 'package:flutter_background/flutter_background.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:video_meeting_room/models/role.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 
 import '../exts.dart';
 
@@ -18,6 +19,7 @@ class ControlsWidget extends StatefulWidget {
   final String? role;
   final bool isHandleRaiseHand;
   final bool isHandleMuteAll;
+  final List<ParticipantStatus> participantsStatusList;
 
   const ControlsWidget(
     this.onToggleParticipants,
@@ -26,7 +28,8 @@ class ControlsWidget extends StatefulWidget {
     this.isHandleRaiseHand,
     this.role,
     this.room,
-    this.participant, {
+    this.participant,
+    this.participantsStatusList, {
     super.key,
   });
 
@@ -70,10 +73,15 @@ class _ControlsWidgetState extends State<ControlsWidget> {
       }
     }
     if (widget.isHandleMuteAll != oldWidget.isHandleMuteAll) {
-    
       setState(() {
         _allMuted =
             widget.isHandleMuteAll; // Set local state to match parent state
+      });
+    }
+
+    if (widget.participantsStatusList != oldWidget.participantsStatusList) {
+      setState(() {
+        _allMuted = !_areAllParticipantMuted();
       });
     }
   }
@@ -86,6 +94,11 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   LocalParticipant get participant => widget.participant;
+
+  bool _areAllParticipantMuted() {
+    return widget.participantsStatusList
+        .every((status) => status.isTalkToHostEnable);
+  }
 
   void _loadDevices(List<MediaDevice> devices) async {
     _audioInputs = devices.where((d) => d.kind == 'audioinput').toList();
@@ -327,66 +340,79 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   Future<void> _showMicrophoneOptions(BuildContext context) async {
-	  showModalBottomSheet(
-		context: context,
-		builder: (BuildContext context) {
-		  return SafeArea(
-			child: Container(
-			  width: MediaQuery.of(context).size.width * 0.2, // 20% of screen width
-			  child: ListView(
-				shrinkWrap: true, // Ensures ListView takes up as much space as it needs
-				children: [
-				  if (_audioInputs != null)
-					..._audioInputs!.map((device) {
-					  return ListTile(
-						leading: (device.deviceId == widget.room.selectedAudioInputDeviceId)
-							? const Icon(Icons.check_box_outlined, color: Colors.black)
-							: const Icon(Icons.check_box_outline_blank, color: Colors.black),
-						title: Text(device.label),
-						onTap: () {
-						  _selectAudioInput(device);
-						  Navigator.pop(context); // Close the bottom sheet after selection
-						},
-					  );
-					}).toList(),
-				],
-			  ),
-			),
-		  );
-		},
-	  );
-	}
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
+            width:
+                MediaQuery.of(context).size.width * 0.2, // 20% of screen width
+            child: ListView(
+              shrinkWrap:
+                  true, // Ensures ListView takes up as much space as it needs
+              children: [
+                if (_audioInputs != null)
+                  ..._audioInputs!.map((device) {
+                    return ListTile(
+                      leading: (device.deviceId ==
+                              widget.room.selectedAudioInputDeviceId)
+                          ? const Icon(Icons.check_box_outlined,
+                              color: Colors.black)
+                          : const Icon(Icons.check_box_outline_blank,
+                              color: Colors.black),
+                      title: Text(device.label),
+                      onTap: () {
+                        _selectAudioInput(device);
+                        Navigator.pop(
+                            context); // Close the bottom sheet after selection
+                      },
+                    );
+                  }).toList(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _showVideoOptions(BuildContext context) async {
-	  showModalBottomSheet(
-		context: context,
-		builder: (BuildContext context) {
-		  return SafeArea(
-			child: Container(
-			  width: MediaQuery.of(context).size.width * 0.2, // 20% of screen width
-			  child: ListView(
-				shrinkWrap: true, // Ensures ListView takes up as much space as it needs
-				children: [
-				  if (_videoInputs != null)
-					..._videoInputs!.map((device) {
-					  return ListTile(
-						leading: (device.deviceId == widget.room.selectedVideoInputDeviceId)
-							? const Icon(Icons.check_box_outlined, color: Colors.black)
-							: const Icon(Icons.check_box_outline_blank, color: Colors.black),
-						title: Text(device.label),
-						onTap: () {
-						  _selectVideoInput(device);
-						  Navigator.pop(context); // Close the bottom sheet after selection
-						},
-					  );
-					}).toList(),
-				],
-			  ),
-			),
-		  );
-		},
-	  );
-	}
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
+            width:
+                MediaQuery.of(context).size.width * 0.2, // 20% of screen width
+            child: ListView(
+              shrinkWrap:
+                  true, // Ensures ListView takes up as much space as it needs
+              children: [
+                if (_videoInputs != null)
+                  ..._videoInputs!.map((device) {
+                    return ListTile(
+                      leading: (device.deviceId ==
+                              widget.room.selectedVideoInputDeviceId)
+                          ? const Icon(Icons.check_box_outlined,
+                              color: Colors.black)
+                          : const Icon(Icons.check_box_outline_blank,
+                              color: Colors.black),
+                      title: Text(device.label),
+                      onTap: () {
+                        _selectVideoInput(device);
+                        Navigator.pop(
+                            context); // Close the bottom sheet after selection
+                      },
+                    );
+                  }).toList(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -419,14 +445,14 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           ),
           if (participant.isMicrophoneEnabled())
             Visibility(
-                visible: true,
-                child: IconButton(
-                  onPressed: _disableAudio,
-                  icon: const Icon(Icons.mic),
-                  tooltip: 'mute audio',
-                ),
-              )
-            else
+              visible: true,
+              child: IconButton(
+                onPressed: _disableAudio,
+                icon: const Icon(Icons.mic),
+                tooltip: 'mute audio',
+              ),
+            )
+          else
             Visibility(
               visible: true,
               child: IconButton(
@@ -497,7 +523,6 @@ class _ControlsWidgetState extends State<ControlsWidget> {
                 onPressed: _disableVideo,
                 icon: const Icon(Icons.videocam_sharp),
                 tooltip: 'Mute video',
-                
               ),
             )
           else
@@ -521,30 +546,25 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           ),
           if (participant.isScreenShareEnabled())
             Visibility(
-              visible: false,
+              visible: widget.role == Role.admin.toString() ? true : false,
               child: IconButton(
-                icon: const Icon(Icons.monitor_outlined),
+                icon: const Icon(
+                  Icons.monitor_outlined,
+                  color: Colors.red,
+                ),
                 onPressed: () => _disableScreenShare(),
-                tooltip: 'unshare screen (experimental)',
+                tooltip: 'Stop Screen Share',
               ),
             )
           else
             Visibility(
-              visible: false,
+              visible: widget.role == Role.admin.toString() ? true : false,
               child: IconButton(
                 icon: const Icon(Icons.monitor),
                 onPressed: () => _enableScreenShare(),
-                tooltip: 'share screen (experimental)',
+                tooltip: 'Start Share screen ',
               ),
             ),
-          Visibility(
-            visible: true,
-            child: IconButton(
-              onPressed: _onTapDisconnect,
-              icon: const Icon(Icons.close_sharp),
-              tooltip: 'disconnect',
-            ),
-          ),
           Visibility(
             visible: false,
             child: IconButton(
@@ -583,35 +603,43 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           Visibility(
             visible: true,
             child: PopupMenuButton<String>(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            onSelected: (String value) {
-              if (value == 'Microphone') {
-              _showMicrophoneOptions(context);
-              } else if (value == 'Camera') {
-              _showVideoOptions(context);
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              return [
-              const PopupMenuItem<String>(
-                value: 'Microphone',
-                child: ListTile(
-                leading: Icon(Icons.mic),
-                title: Text('Microphone'),
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'Camera',
-                child: ListTile(
-                leading: Icon(Icons.videocam),
-                title: Text('Camera'),
-                ),
+              icon: const Icon(Icons.settings),
+              tooltip: 'Settings',
+              onSelected: (String value) {
+                if (value == 'Microphone') {
+                  _showMicrophoneOptions(context);
+                } else if (value == 'Camera') {
+                  _showVideoOptions(context);
+                }
+              },
+              itemBuilder: (BuildContext context) {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'Microphone',
+                    child: ListTile(
+                      leading: Icon(Icons.mic),
+                      title: Text('Microphone'),
                     ),
-                  ];
-                },
-              ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'Camera',
+                    child: ListTile(
+                      leading: Icon(Icons.videocam),
+                      title: Text('Camera'),
+                    ),
+                  ),
+                ];
+              },
             ),
+          ),
+          Visibility(
+            visible: true,
+            child: IconButton(
+              onPressed: _onTapDisconnect,
+              icon: const Icon(Icons.close_sharp),
+              tooltip: 'disconnect',
+            ),
+          ),
         ],
       ),
     );
