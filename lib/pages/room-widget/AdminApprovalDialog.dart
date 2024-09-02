@@ -14,6 +14,7 @@ class AdminApprovalDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      
       title: Text('Approval Request'),
       content: Text('Participant $participantName has requested to join room $roomName.'),
       actions: <Widget>[

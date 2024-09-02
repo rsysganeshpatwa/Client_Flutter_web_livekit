@@ -10,9 +10,12 @@ extension LKExampleExt on BuildContext {
       return AlertDialog(
         title: Text('Approval Status'),
         content: Text(
-          status == 'approved'
-              ? 'Your request has been approved! You can now join the room.'
-              : 'Your request has been rejected. You cannot join the room at this time.',
+status == 'approved'
+    ? 'Your request has been approved! You can now join the room.'
+    : status == 'rejected'
+        ? 'Your request has been rejected. You cannot join the room at this time.'
+        : 'Your request is still pending. No host is available at the moment. Please try again .',
+
         ),
         actions: <Widget>[
           TextButton(

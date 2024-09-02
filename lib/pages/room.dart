@@ -56,6 +56,7 @@ class _RoomPageState extends State<RoomPage> {
   bool _isScreenShareModeOnce = false; // State to toggle view mode
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   List<dynamic> _pendingRequests = [];
+ Map<String, BuildContext> _dialogContexts = {}; // Map to store dialog contexts
 
   @override
   void initState() {
@@ -271,45 +272,75 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
-  Future<void> _checkForPendingRequests() async {
-    while (true) {
-      try {
-        final requests = await _approvalService.fetchPendingRequests();
-        if (requests.isNotEmpty) {
-          for (var request in requests) {
-            if (!_pendingRequests.contains(request)) {
-              _showApprovalDialog(request);
-              setState(() {
-                _pendingRequests.add(request);
-              });
-            }
-          }
-        }
-      } catch (error) {
-        print('Error fetching pending requests: $error');
-      }
-      await Future.delayed(Duration(seconds: 10)); // Check every 10 seconds
-    }
-  }
+Future<void> _checkForPendingRequests() async {
+  while (true) {
+    try {
+      final requests = await _approvalService.fetchPendingRequests(widget.room.name!);
+      final currentRequestIds = requests.map((request) => request['id'].toString()).toSet();
 
-  void _showApprovalDialog(dynamic request) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AdminApprovalDialog(
-          participantName: request['participantName'],
-          roomName: request['roomName'],
-          onDecision: (approved) async {
-            final requestId = request['id'];
-            await _approvalService.approveRequest(requestId, approved);
-            setState(() {
-              _pendingRequests.removeWhere((r) => r['id'] == requestId);
-            });
-          },
-        );
-      },
-    );
+      // Close dialogs for requests not found
+      _dialogContexts.keys.toList().forEach((requestId) {
+        if (!currentRequestIds.contains(requestId)) {
+          _closeDialog(requestId);
+        }
+      });
+
+      // Close all dialogs if no pending requests
+      if (requests.isEmpty && _dialogContexts.isNotEmpty) {
+        _dialogContexts.keys.toList().forEach((requestId) {
+          _closeDialog(requestId);
+        });
+      }
+
+      // Check for new requests
+      for (var request in requests) {
+        final requestId = request['id'].toString();
+        if (!_dialogContexts.containsKey(requestId)) {
+          _showApprovalDialog(request);
+        }
+      }
+    } catch (error) {
+      print('Error fetching pending requests: $error');
+    }
+    await Future.delayed(Duration(seconds: 5)); // Check every 10 seconds
   }
+}
+
+void _closeDialog(String requestId) {
+  final dialogContext = _dialogContexts[requestId];
+  if (dialogContext != null) {
+    Navigator.of(dialogContext).pop(); // Close the dialog
+    setState(() {
+      _dialogContexts.remove(requestId); // Remove the context from the map
+    });
+  }
+}
+
+
+void _showApprovalDialog(dynamic request) {
+  final requestId = request['id'].toString(); // Use request ID as the key
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      // Store the context with the dialog's unique ID
+      _dialogContexts[requestId] = context;
+      
+      return AdminApprovalDialog(
+        participantName: request['participantName'],
+        roomName: request['roomName'],
+        onDecision: (approved) async {
+          await _approvalService.approveRequest( request['id'], approved);
+          _closeDialog(requestId); // Close this specific dialog
+        },
+      );
+    },
+  ).then((_) {
+    // Clean up after the dialog is closed
+    _dialogContexts.remove(requestId);
+  });
+}
+
 
   Future<void> sendParticipantsStatus(
       List<ParticipantStatus> participantsStatus) async {

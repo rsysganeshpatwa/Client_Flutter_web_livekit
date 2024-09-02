@@ -173,35 +173,45 @@ class _PreJoinPageState extends State<PreJoinPage> {
     super.dispose();
   }
 
-  Future<bool> _waitForApproval(String participantName, String roomName) async {
-    try {
-      // Request approval before joining
-      final request = await _approvalService.createApprovalRequest(
-          participantName, roomName);
-      final requestId = request['id'];
+ Future<bool> _waitForApproval(String participantName, String roomName) async {
+  try {
+    // Request approval before joining
+    final request = await _approvalService.createApprovalRequest(participantName, roomName);
+    final requestId = request['id'];
 
-      // Polling for approval status
-      bool approved = false;
-      while (!approved) {
-        await Future.delayed(Duration(seconds: 5));
-        final statusResponse =
-            await _approvalService.getRequestStatus(requestId);
-        final status = statusResponse['status'];
-        if (status == 'approved') {
-          approved = true;
-          context.showApprovalStatusDialog('approved');
-        } else if (status == 'rejected') {
-          context.showApprovalStatusDialog('rejected');
-          return false; // Exit early if rejected
-        }
+    // Initialize timer for 30 seconds
+    const int timeout = 30;
+    int elapsedTime = 0;
+    bool approved = false;
+
+    while (elapsedTime < timeout) {
+      await Future.delayed(Duration(seconds: 5));
+      elapsedTime += 5;
+
+      final statusResponse = await _approvalService.getRequestStatus(requestId);
+      final status = statusResponse['status'];
+
+      if (status == 'approved') {
+        approved = true;
+        context.showApprovalStatusDialog('approved');
+        return true; // Approval was granted
+      } else if (status == 'rejected') {
+        context.showApprovalStatusDialog('rejected');
+        return false; // Approval was denied
       }
-
-      return true; // Approval was granted
-    } catch (error) {
-      print('Error during approval process: $error');
-      return false; // Approval was not granted or an error occurred
     }
+
+    // If 30 seconds have passed and no approval was granted
+    if (!approved) {
+      context.showApprovalStatusDialog('No host available, please try again.');
+      return false;
+    }
+  } catch (error) {
+    print('Error during approval process: $error');
+    return false; // Approval was not granted or an error occurred
   }
+  return false; // Fallback, in case nothing happened
+}
 
   _join(BuildContext context) async {
     _busy = true;
@@ -217,7 +227,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
       if (args.role == Role.participant) {
         bool isApproved = await _waitForApproval(args.identity, args.roomName);
         if (!isApproved) {
-          throw Exception('Approval was not granted');
+          return;
         }
       }
 

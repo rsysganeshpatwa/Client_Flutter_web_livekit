@@ -7,8 +7,10 @@ class ApprovalService {
   ApprovalService(this.baseUrl);
 
   // Fetch pending requests
-  Future<List<dynamic>> fetchPendingRequests() async {
-    final response = await http.get(Uri.parse('$baseUrl/room-permission/pending-requests'));
+ Future<List<dynamic>> fetchPendingRequests(String roomName) async {
+    final uri = Uri.parse('$baseUrl/room-permission/pending-requests').replace(queryParameters: {'roomName': roomName});
+
+    final response = await http.get(uri);
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
