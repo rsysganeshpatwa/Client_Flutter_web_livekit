@@ -194,9 +194,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
       if (status == 'approved') {
         approved = true;
         context.showApprovalStatusDialog('approved');
+         await _approvalService.removeRequest(requestId);
         return true; // Approval was granted
       } else if (status == 'rejected') {
         context.showApprovalStatusDialog('rejected');
+         await _approvalService.removeRequest(requestId);
         return false; // Approval was denied
       }
     }
@@ -204,6 +206,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
     // If 30 seconds have passed and no approval was granted
     if (!approved) {
       context.showApprovalStatusDialog('No host available, please try again.');
+      await _approvalService.removeRequest(requestId);
       return false;
     }
   } catch (error) {

@@ -69,4 +69,23 @@ class ApprovalService {
       throw Exception('Failed to get request status');
     }
   }
+
+  // Cancel a request
+  Future<Map<String, dynamic>> removeRequest(int requestId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/room-permission/remove-request'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: json.encode({
+        'requestId': requestId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to cancel request');
+    }
+  }
 }
