@@ -5,16 +5,21 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
+import 'package:video_meeting_room/pages/login.dart';
+import 'package:video_meeting_room/pages/room-widget/AdminApprovalDialog.dart';
 import 'package:video_meeting_room/pages/room-widget/CopyInviteLinkDialog.dart';
 import 'package:video_meeting_room/pages/room-widget/FloatingActionButtonBar.dart';
 import 'package:video_meeting_room/pages/room-widget/HandRaiseNotification.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
+import 'package:video_meeting_room/services/approval_service.dart';
+import 'package:video_meeting_room/widgets/thank_you.dart';
 
 import '../exts.dart';
 import '../utils.dart';
@@ -48,6 +53,9 @@ class _RoomPageState extends State<RoomPage> {
   String? localParticipantRole;
   List<ParticipantStatus> participantsManager = [];
   bool _isScreenShareMode = false; // State to toggle view mode
+  bool _isScreenShareModeOnce = false; // State to toggle view mode
+  final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
+  List<dynamic> _pendingRequests = [];
 
   @override
   void initState() {
@@ -102,6 +110,9 @@ class _RoomPageState extends State<RoomPage> {
       setState(() {
         localParticipantRole = role.toString();
         _initializeParticipantStatuses();
+        if (localParticipantRole == Role.admin.toString()) {
+          _checkForPendingRequests();
+        }
       });
     }
   }
@@ -111,8 +122,8 @@ class _RoomPageState extends State<RoomPage> {
       if (event.reason != null) {
         // print('Room disconnected: reason => ${event.reason}');
       }
-      WidgetsBinding.instance?.addPostFrameCallback(
-          (timeStamp) => Navigator.popUntil(context, (route) => route.isFirst));
+      WidgetsBinding.instance?.addPostFrameCallback((timeStamp) =>
+          handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
       // print('Participant event');
@@ -180,6 +191,20 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
+  void handleRoomDisconnected(BuildContext context, Participant participant) {
+    if (localParticipantRole == Role.admin.toString()) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ThankYouWidget()),
+      );
+    }
+  }
+
   void _onRoomDidUpdate() {
     _sortParticipants();
   }
@@ -195,6 +220,7 @@ class _RoomPageState extends State<RoomPage> {
         isAudioEnable: localParticipantRole == Role.admin.toString(),
         isVideoEnable: localParticipantRole == Role.admin.toString(),
         isTalkToHostEnable: localParticipantRole == Role.admin.toString(),
+        role: localParticipantRole!,
       );
       participantsManager.add(localStatus);
     }
@@ -207,6 +233,7 @@ class _RoomPageState extends State<RoomPage> {
         isAudioEnable: remoteParticipantRole == Role.admin.toString(),
         isVideoEnable: remoteParticipantRole == Role.admin.toString(),
         isTalkToHostEnable: remoteParticipantRole == Role.admin.toString(),
+        role: remoteParticipantRole,
         // Other default values (e.g., isHandRaised, isTalkToHostEnable) are already false by default
       );
       participantsManager.add(participantStatus);
@@ -242,6 +269,46 @@ class _RoomPageState extends State<RoomPage> {
       participantsManager.removeWhere(
           (status) => status.identity == event.participant.identity);
     });
+  }
+
+  Future<void> _checkForPendingRequests() async {
+    while (true) {
+      try {
+        final requests = await _approvalService.fetchPendingRequests();
+        if (requests.isNotEmpty) {
+          for (var request in requests) {
+            if (!_pendingRequests.contains(request)) {
+              _showApprovalDialog(request);
+              setState(() {
+                _pendingRequests.add(request);
+              });
+            }
+          }
+        }
+      } catch (error) {
+        print('Error fetching pending requests: $error');
+      }
+      await Future.delayed(Duration(seconds: 10)); // Check every 10 seconds
+    }
+  }
+
+  void _showApprovalDialog(dynamic request) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AdminApprovalDialog(
+          participantName: request['participantName'],
+          roomName: request['roomName'],
+          onDecision: (approved) async {
+            final requestId = request['id'];
+            await _approvalService.approveRequest(requestId, approved);
+            setState(() {
+              _pendingRequests.removeWhere((r) => r['id'] == requestId);
+            });
+          },
+        );
+      },
+    );
   }
 
   Future<void> sendParticipantsStatus(
@@ -388,7 +455,9 @@ class _RoomPageState extends State<RoomPage> {
         });
       } else {
         participant.audioTrackPublications?.forEach((element) {
-          element.unsubscribe();
+          if (!(isLocalHost && isRemoteParticipantHost)) {
+            element.unsubscribe();
+          }
         });
       }
 
@@ -397,9 +466,13 @@ class _RoomPageState extends State<RoomPage> {
           participant: participant,
           type: ParticipantTrackType.kScreenShare,
         ));
-        setState(() {
-          _isScreenShareMode = true;
-        });
+        if (_isScreenShareModeOnce == false) {
+          print('isScreenShareModeOnce ${_isScreenShareModeOnce}');
+          setState(() {
+            _isScreenShareMode = true;
+            _isScreenShareModeOnce = true;
+          });
+        }
       } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
         userMediaTracks.add(ParticipantTrack(participant: participant));
       }
@@ -455,7 +528,8 @@ class _RoomPageState extends State<RoomPage> {
       // Update the participantsManager with new participants
       for (var participantStatus in participantsManager) {
         if (participantStatus.identity !=
-            widget.room.localParticipant?.identity) {
+                widget.room.localParticipant?.identity &&
+            participantStatus.role != Role.admin.toString()) {
           participantStatus.isTalkToHostEnable = !muteAll;
         }
         print('rohitg participantStatus ${participantStatus.toJson()}');

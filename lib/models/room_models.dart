@@ -5,6 +5,7 @@ class ParticipantStatus {
    bool isHandRaised = false;
    bool isTalkToHostEnable = false;
    int handRaisedTimeStamp = 0;
+   String role = '';
 
   ParticipantStatus({
     required this.identity,
@@ -13,6 +14,7 @@ class ParticipantStatus {
     this.isHandRaised = false,
     required this.isTalkToHostEnable,
     this.handRaisedTimeStamp = 0,
+    this.role = '',
   });
 
    ParticipantStatus copyWith({
@@ -21,6 +23,7 @@ class ParticipantStatus {
         bool? isVideoEnable,
         bool? isTalkToHostEnable,
         bool? isHandRaised,
+        String? role
       }) {
         // Implement the copyWith method
         return ParticipantStatus(
@@ -30,6 +33,7 @@ class ParticipantStatus {
           isVideoEnable: isVideoEnable ?? this.isVideoEnable,
           isTalkToHostEnable: isTalkToHostEnable ?? this.isTalkToHostEnable,
           isHandRaised: isHandRaised ?? this.isHandRaised,
+          role: role ?? this.role,
         );
       }
 
@@ -42,6 +46,7 @@ class ParticipantStatus {
       'isHandRaised': isHandRaised,
       'isTalkToHostEnable': isTalkToHostEnable,
       'handRaisedTimeStamp': handRaisedTimeStamp,
+      'role': role,
     };
   }
 
@@ -54,6 +59,8 @@ class ParticipantStatus {
       isHandRaised: json['isHandRaised'],
       isTalkToHostEnable: json['isTalkToHostEnable'],
       handRaisedTimeStamp: json['handRaisedTimeStamp'],
+      role: json['role'],
+
     );
   }
 }

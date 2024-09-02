@@ -18,7 +18,7 @@ void main() async {
   // configure logs for debugging
   Logger.root.level = Level.FINE;
   Logger.root.onRecord.listen((record) {
-    print('${format.format(record.time)}: ${record.message}');
+  //  print('${format.format(record.time)}: ${record.message}');
   });
 
   WidgetsFlutterBinding.ensureInitialized();

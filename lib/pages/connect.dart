@@ -109,7 +109,7 @@ class _ConnectPageState extends State<ConnectPage> {
       final identity = _identityCtrl.text;
       final roomName = _roomCtrl.text;
       final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
-
+     print('roomName: $roomName, identity: $identity, role: $_role');
       final token =
           await _apiService.getToken(identity, roomName, _role.toString());
 
@@ -127,6 +127,8 @@ class _ConnectPageState extends State<ConnectPage> {
               enableBackupVideoCodec:
                   ['VP9', 'AV1'].contains('Preferred Codec'),
               role: _role,
+              roomName: roomName,
+              identity: identity,
             ),
           ),
         ),
