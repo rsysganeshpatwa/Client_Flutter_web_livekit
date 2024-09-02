@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart' as livekit;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/exts.dart';
 import 'package:video_meeting_room/pages/prejoin.dart';
+import 'package:video_meeting_room/utils.dart';
 import '../services/api_service.dart';
 import '../services/permission_service.dart';
 import '../widgets/text_field.dart';
@@ -36,7 +37,7 @@ class _ConnectPageState extends State<ConnectPage> {
   void initState() {
     super.initState();
     _readPrefs();
-    
+
     if (livekit.lkPlatformIs(livekit.PlatformType.android)) {
       _checkPermissions();
     }
@@ -57,18 +58,39 @@ class _ConnectPageState extends State<ConnectPage> {
     final prefs = await SharedPreferences.getInstance();
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
 
-    setState(() {
-      roomNameFromUrl = Uri.base.queryParameters['room'];
-      roomRoleFromUrl = Uri.base.queryParameters['role'];
+    _initializeParams();
+  }
 
-      if (roomNameFromUrl != null) {
-        _roomCtrl.text = roomNameFromUrl!;
-        _isRoomNameInUrl = true;
-      }
-      if (roomRoleFromUrl != null) {
-        _selectedRole = roomRoleFromUrl == Role.admin.name ? Role.admin : Role.participant;
-      }
-    });
+  Future<void> _initializeParams() async {
+    final uri = Uri.base;
+    final encryptedParams = uri.queryParameters['data'];
+
+    if (encryptedParams != null && encryptedParams.isNotEmpty) {
+          final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
+       
+      final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
+      final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
+
+      setState(() {
+        roomNameFromUrl = decodedParams['room'] ?? '';
+        roomRoleFromUrl = decodedParams['role'] ?? '';
+        if (roomNameFromUrl != null) {
+          _roomCtrl.text = roomNameFromUrl!;
+          _isRoomNameInUrl = true;
+        }
+        if (roomRoleFromUrl != null) {
+          _selectedRole = roomRoleFromUrl == Role.admin.name
+              ? Role.admin
+              : Role.participant;
+        }
+      });
+
+
+    } else {
+      // Handle the case where no encrypted parameters are present
+      // For example, show an error or redirect to another page
+      print('No encrypted parameters found in the URL.');
+    }
   }
 
   Future<void> _writePrefs() async {
@@ -88,7 +110,8 @@ class _ConnectPageState extends State<ConnectPage> {
       final roomName = _roomCtrl.text;
       final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 
-      final token = await _apiService.getToken(identity, roomName, _role.toString());
+      final token =
+          await _apiService.getToken(identity, roomName, _role.toString());
 
       await Navigator.push<void>(
         ctx,
@@ -101,7 +124,8 @@ class _ConnectPageState extends State<ConnectPage> {
               adaptiveStream: true,
               dynacast: true,
               preferredCodec: 'Preferred Codec',
-              enableBackupVideoCodec: ['VP9', 'AV1'].contains('Preferred Codec'),
+              enableBackupVideoCodec:
+                  ['VP9', 'AV1'].contains('Preferred Codec'),
               role: _role,
             ),
           ),
@@ -148,8 +172,11 @@ class _ConnectPageState extends State<ConnectPage> {
                   stream: _apiService.getRoomList(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return const Center(child: Text('Error loading rooms', style: TextStyle(color: Colors.white)));
-                    } else if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                          child: Text('Error loading rooms',
+                              style: TextStyle(color: Colors.white)));
+                    } else if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     } else {
                       final roomList = snapshot.data;
@@ -348,8 +375,11 @@ class _ConnectPageState extends State<ConnectPage> {
                   stream: _apiService.getRoomList(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return const Center(child: Text('Error loading rooms', style: TextStyle(color: Colors.white)));
-                    } else if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                          child: Text('Error loading rooms',
+                              style: TextStyle(color: Colors.white)));
+                    } else if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     } else {
                       final roomList = snapshot.data;

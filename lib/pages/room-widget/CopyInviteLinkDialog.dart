@@ -1,13 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:video_meeting_room/utils.dart';
 
 class CopyInviteLinkDialog {
   static Future<void> show(BuildContext context, String roomName) async {
-    String encodedRoomName = Uri.encodeComponent(roomName);
+    // Encode the room name for safe URL usage
+    String encodedRoomName = roomName;
 
-    final hostInviteLink = 'https://${Uri.base.host}?room=$encodedRoomName&role=admin';
-    final participantInviteLink = 'https://${Uri.base.host}?room=$encodedRoomName&role=participant';
+    // Define the parameters for both host and participant
+      final baseUrl = 'https://${Uri.base.host}';
+    final Map<String, String> hostParams = {
+      'room': encodedRoomName,
+      'role': 'admin',
+    };
 
+    final Map<String, String> participantParams = {
+      'room': encodedRoomName,
+      'role': 'participant',
+    };
+
+ 
+  final encodedHostParams = UrlEncryptionHelper.encodeParams(hostParams);
+    final encryptedHostParams = UrlEncryptionHelper.encrypt(encodedHostParams);
+    final encodedEncryptedHostParams = Uri.encodeComponent(encryptedHostParams);
+
+    final encodedParticipantParams = UrlEncryptionHelper.encodeParams(participantParams);
+    final encryptedParticipantParams = UrlEncryptionHelper.encrypt(encodedParticipantParams);
+    final encodedEncryptedParticipantParams = Uri.encodeComponent(encryptedParticipantParams);
+
+    final hostInviteLink = 'https://${Uri.base.host}?data=$encodedEncryptedHostParams';
+    final participantInviteLink = 'https://${Uri.base.host}?data=$encodedEncryptedParticipantParams';
+
+    print('Encrypted Host Params: $encryptedHostParams');
+    final decryptedHostParams = UrlEncryptionHelper.decrypt(encryptedHostParams);
+    print('Decrypted Host Params: $decryptedHostParams');
+
+  
+    // Show the dialog to select which link to copy
     final selectedLink = await showDialog<String>(
       context: context,
       builder: (BuildContext context) {
@@ -31,6 +60,7 @@ class CopyInviteLinkDialog {
       },
     );
 
+    // Copy the selected link to the clipboard and show a snackbar
     if (selectedLink != null) {
       await Clipboard.setData(ClipboardData(text: selectedLink));
       ScaffoldMessenger.of(context).showSnackBar(

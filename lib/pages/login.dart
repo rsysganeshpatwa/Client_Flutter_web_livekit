@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/pages/connect.dart';
+import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/text_field.dart';
 
 class LoginPage extends StatefulWidget {
@@ -25,7 +27,31 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _initializePreferences() async {
     prefs = await SharedPreferences.getInstance();
-    _checkLoginStatus();
+     var uri = Uri.base;
+     final encryptedParams = uri.queryParameters['data'];
+    if (encryptedParams != null) {
+      print('Encrypted Params: $encryptedParams');
+   
+        final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
+        print('Decoded Encrypted Params: $decodedEncryptedParams');
+      final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
+      final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
+   print('Decrypted Params: $decryptedParams');
+     
+      final role = decodedParams['role'];
+      final room = decodedParams['room'];
+      print('role: $role, room: $room');
+      if (role != null && room != null) {
+         _navigateToConnect();
+      }
+      else
+      {
+        _checkLoginStatus();
+      }
+    }
+    else {
+      _checkLoginStatus();
+    }
   }
 
   Future<void> _checkLoginStatus() async {
@@ -106,6 +132,8 @@ class _LoginPageState extends State<LoginPage> {
                   child: LKTextField(
                     ctrl: _passwordController,
                     label: 'Password',
+                    isPasswordField: true,
+                  
                   ),
                 ),
                 ElevatedButton(
