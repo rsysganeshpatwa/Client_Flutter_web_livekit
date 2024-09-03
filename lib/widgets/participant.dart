@@ -85,7 +85,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   TrackPublication? get audioPublication;
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
-  
+
   @override
   void initState() {
     super.initState();
@@ -115,71 +115,88 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
     super.didUpdateWidget(oldWidget);
   }
 
-  // Notify Flutter that UI re-build is required, but we don't set anything here
-  // since the updated values are computed properties.
-  void _onParticipantChanged() => setState(() {});
+  void _onParticipantChanged() => setState(() {
+    print('12345 Participant name  ${audioPublication?.participant.identity}');
+    print('12345 Participant audioPublication ganesh ${audioPublication?.subscribed}');
 
-  // Widgets to show above the info bar
+    widget.participant.audioTrackPublications.forEach((pub) {
+      print('12345 Participant changed each ganesh ${pub.subscribed} ${pub.participant.identity}');
+    });
+  });
+
   List<Widget> extraWidgets(bool isScreenShare) => [];
 
   @override
-  Widget build(BuildContext ctx) => Container(
-        foregroundDecoration: BoxDecoration(
-          border: widget.participant.isSpeaking && audioPublication?.subscribed == false && !isScreenShare
-              ? Border.all(
-                  width: 5,
-                  color: LKColors.lkBlue,
-                )
-              : null,
-        ),
-        decoration: BoxDecoration(
-          color: Theme.of(ctx).cardColor,
-        ),
-        child: Stack(
-          children: [
-            // Video
+  Widget build(BuildContext ctx) {
+    return Container(
+      foregroundDecoration: BoxDecoration(
+        border: widget.participant.isSpeaking && audioPublication?.subscribed == false && !isScreenShare
+            ? Border.all(
+                width: 5,
+                color: LKColors.lkBlue,
+              )
+            : null,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(ctx).cardColor,
+      ),
+      child: Stack(
+        children: [
+          if (isScreenShare)
+            // Display the screen share
+            Positioned.fill(
+              child: activeVideoTrack != null && !activeVideoTrack!.muted
+                  ? VideoTrackRenderer(
+                      activeVideoTrack!,
+                      fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                    )
+                  : const NoVideoWidget(),
+            )
+          else
+            // Display the regular video
             InkWell(
               onTap: () => setState(() => _visible = !_visible),
               child: activeVideoTrack != null && !activeVideoTrack!.muted
                   ? VideoTrackRenderer(
                       activeVideoTrack!,
-                      fit: (MediaQuery.of(ctx).size.width < 600
+                      fit: MediaQuery.of(ctx).size.width < 600
                           ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
+                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
                     )
                   : const NoVideoWidget(),
             ),
-            if (widget.showStatsLayer)
-              Positioned(
-                  top: 30,
-                  right: 30,
-                  child: ParticipantStatsWidget(
-                    participant: widget.participant,
-                  )),
-            // Bottom bar
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  //   ...extraWidgets(isScreenShare),
-                  ParticipantInfoWidget(
-                    title: widget.participant.name.isNotEmpty
-                        ? '${widget.participant.name} (${widget.participant.identity})'
-                        : widget.participant.identity,
-                    audioAvailable: audioPublication?.muted == false ,
-                      publicAudioDisabled: audioPublication?.subscribed == false,
-                    connectionQuality: widget.participant.connectionQuality,
-                    isScreenShare: isScreenShare,
-                    enabledE2EE: widget.participant.isEncrypted,
-                  ),
-                ],
-              ),
+          if (widget.showStatsLayer)
+            Positioned(
+                top: 30,
+                right: 30,
+                child: ParticipantStatsWidget(
+                  participant: widget.participant,
+                )),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+               // ...extraWidgets(isScreenShare),
+                ParticipantInfoWidget(
+                  title: widget.participant.name.isNotEmpty
+                      ? '${widget.participant.name} (${widget.participant.identity})'
+                      : widget.participant.identity,
+                  audioAvailable: audioPublication?.muted == false,
+                  publicAudioDisabled: audioPublication?.subscribed == false,
+                  connectionQuality: widget.participant.connectionQuality,
+                  isScreenShare: isScreenShare,
+                  enabledE2EE: widget.participant.isEncrypted,
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          ),
+          // Optionally, you could add other participants' video feeds here if needed
+        ],
+      ),
+    );
+  }
 }
 
 class _LocalParticipantWidgetState
@@ -195,6 +212,7 @@ class _LocalParticipantWidgetState
       widget.participant.audioTrackPublications
           .where((element) => element.source == widget.type.lkAudioSourceType)
           .firstOrNull;
+          
 
   @override
   VideoTrack? get activeVideoTrack => videoPublication?.track;

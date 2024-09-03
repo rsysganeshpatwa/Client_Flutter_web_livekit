@@ -4,9 +4,13 @@ import 'dart:math' as math;
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/exts.dart';
+import 'package:video_meeting_room/main.dart';
 import 'package:video_meeting_room/models/role.dart';
+import 'package:video_meeting_room/services/approval_service.dart';
 
 import '../theme.dart';
 import 'room.dart';
@@ -23,6 +27,8 @@ class JoinArgs {
     this.preferredCodec = 'VP8',
     this.enableBackupVideoCodec = true,
     this.role = Role.participant,
+    this.roomName = '',
+    this.identity = '',
   });
   final String url;
   final String token;
@@ -34,6 +40,8 @@ class JoinArgs {
   final bool dynacast;
   final String preferredCodec;
   final bool enableBackupVideoCodec;
+  final String roomName;
+  final String identity;
 }
 
 class PreJoinPage extends StatefulWidget {
@@ -60,6 +68,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
   MediaDevice? _selectedVideoDevice;
   MediaDevice? _selectedAudioDevice;
   VideoParameters _selectedVideoParameters = VideoParametersPresets.h720_169;
+  final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
+  late SharedPreferences prefs;
 
   @override
   void initState() {
@@ -67,6 +77,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
     _subscription =
         Hardware.instance.onDeviceChange.stream.listen(_loadDevices);
     Hardware.instance.enumerateDevices().then(_loadDevices);
+  }
+
+  _initializePreferences() async {
+    prefs = await SharedPreferences.getInstance();
   }
 
   @override
@@ -159,14 +173,67 @@ class _PreJoinPageState extends State<PreJoinPage> {
     super.dispose();
   }
 
+ Future<bool> _waitForApproval(String participantName, String roomName) async {
+  try {
+    // Request approval before joining
+    final request = await _approvalService.createApprovalRequest(participantName, roomName);
+    final requestId = request['id'];
+
+    // Initialize timer for 30 seconds
+    const int timeout = 30;
+    int elapsedTime = 0;
+    bool approved = false;
+
+    while (elapsedTime < timeout) {
+      await Future.delayed(Duration(seconds: 5));
+      elapsedTime += 5;
+
+      final statusResponse = await _approvalService.getRequestStatus(requestId);
+      final status = statusResponse['status'];
+
+      if (status == 'approved') {
+        approved = true;
+        context.showApprovalStatusDialog('approved');
+         await _approvalService.removeRequest(requestId);
+        return true; // Approval was granted
+      } else if (status == 'rejected') {
+        context.showApprovalStatusDialog('rejected');
+         await _approvalService.removeRequest(requestId);
+        return false; // Approval was denied
+      }
+    }
+
+    // If 30 seconds have passed and no approval was granted
+    if (!approved) {
+      context.showApprovalStatusDialog('No host available, please try again.');
+      await _approvalService.removeRequest(requestId);
+      return false;
+    }
+  } catch (error) {
+    print('Error during approval process: $error');
+    return false; // Approval was not granted or an error occurred
+  }
+  return false; // Fallback, in case nothing happened
+}
+
   _join(BuildContext context) async {
     _busy = true;
 
     setState(() {});
 
     var args = widget.args;
+    var prefs = await SharedPreferences.getInstance();
 
     try {
+      // Wait for approval before proceeding
+     // final isLoggedIn = prefs.getBool('isLoggedIn');
+      if (args.role == Role.participant) {
+        bool isApproved = await _waitForApproval(args.identity, args.roomName);
+        if (!isApproved) {
+          return;
+        }
+      }
+
       //create new room
       final room = Room();
 
@@ -186,10 +253,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
         args.url,
         args.token,
         roomOptions: RoomOptions(
-          
           adaptiveStream: args.adaptiveStream,
           dynacast: args.dynacast,
-          
           defaultAudioPublishOptions: const AudioPublishOptions(
             name: 'custom_audio_track_name',
           ),
@@ -211,13 +276,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
           defaultCameraCaptureOptions: CameraCaptureOptions(
               maxFrameRate: 30, params: _selectedVideoParameters),
           e2eeOptions: e2eeOptions,
-        
         ),
         fastConnectOptions: FastConnectOptions(
           microphone: TrackOption(track: _audioTrack),
           camera: TrackOption(track: _videoTrack),
         ),
-       
       );
 
       await Navigator.push<void>(

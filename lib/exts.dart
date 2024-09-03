@@ -2,6 +2,39 @@ import 'package:flutter/material.dart';
 
 extension LKExampleExt on BuildContext {
   //
+
+  void showApprovalStatusDialog( String status) {
+  showDialog(
+    context: this,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Approval Status'),
+        content: Text(
+status == 'approved'
+    ? 'Your request has been approved! You can now join the room.'
+    : status == 'rejected'
+        ? 'Your request has been rejected. You cannot join the room at this time.'
+        : 'Your request is still pending. No host is available at the moment. Please try again .',
+
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Navigate back or close the dialog based on the status
+              if (status == 'rejected') {
+                // Optionally, handle rejection (e.g., navigate back or show a message)
+                Navigator.of(context).pop(); // Or navigate to another page
+              }
+            },
+            child: Text('OK'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
   Future<bool?> showPublishDialog() => showDialog<bool>(
         context: this,
         builder: (ctx) => AlertDialog(
@@ -219,3 +252,5 @@ enum SimulateScenarioResult {
   participantMetadata,
   clear,
 }
+
+

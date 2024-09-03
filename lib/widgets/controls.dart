@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:video_meeting_room/models/role.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 
 import '../exts.dart';
 
@@ -16,16 +16,20 @@ class ControlsWidget extends StatefulWidget {
   final LocalParticipant participant;
   final void Function(bool) onToggleParticipants;
   final void Function(bool) onToggleRaiseHand;
-  final  String? role;
+  final String? role;
   final bool isHandleRaiseHand;
+  final bool isHandleMuteAll;
+  final List<ParticipantStatus> participantsStatusList;
 
   const ControlsWidget(
     this.onToggleParticipants,
     this.onToggleRaiseHand,
+    this.isHandleMuteAll,
     this.isHandleRaiseHand,
     this.role,
     this.room,
-    this.participant, {
+    this.participant,
+    this.participantsStatusList, {
     super.key,
   });
 
@@ -57,15 +61,28 @@ class _ControlsWidgetState extends State<ControlsWidget> {
     Hardware.instance.enumerateDevices().then(_loadDevices);
   }
 
-   @override
+  @override
   void didUpdateWidget(ControlsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isHandleRaiseHand != oldWidget.isHandleRaiseHand) {
       if (!widget.isHandleRaiseHand) {
         setState(() {
-          _isHandRaised = false; // Reset local state if isHandleRaiseHand is false
+          _isHandRaised =
+              false; // Reset local state if isHandleRaiseHand is false
         });
       }
+    }
+    if (widget.isHandleMuteAll != oldWidget.isHandleMuteAll) {
+      setState(() {
+        _allMuted =
+            widget.isHandleMuteAll; // Set local state to match parent state
+      });
+    }
+
+    if (widget.participantsStatusList != oldWidget.participantsStatusList) {
+      setState(() {
+        _allMuted = !_areAllParticipantMuted();
+      });
     }
   }
 
@@ -78,6 +95,11 @@ class _ControlsWidgetState extends State<ControlsWidget> {
 
   LocalParticipant get participant => widget.participant;
 
+  bool _areAllParticipantMuted() {
+    return widget.participantsStatusList
+        .every((status) => status.isTalkToHostEnable);
+  }
+
   void _loadDevices(List<MediaDevice> devices) async {
     _audioInputs = devices.where((d) => d.kind == 'audioinput').toList();
     _audioOutputs = devices.where((d) => d.kind == 'audiooutput').toList();
@@ -88,17 +110,15 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   void _onChange() {
     // trigger refresh
     setState(() {});
-    
   }
 
-   void _toggleRaiseHand() {
+  void _toggleRaiseHand() {
     setState(() {
       _isHandRaised = !_isHandRaised;
     });
 
-   widget.onToggleRaiseHand(_isHandRaised); // Call the parent function
+    widget.onToggleRaiseHand(_isHandRaised); // Call the parent function
   }
-
 
   void _unpublishAll() async {
     final result = await context.showUnPublishDialog();
@@ -108,7 +128,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   bool get isMuted => participant.isMuted;
 
   void _toggleMuteAll() async {
-      widget.onToggleParticipants(!_allMuted );
+    widget.onToggleParticipants(!_allMuted);
     setState(() {
       _allMuted = !_allMuted;
     });
@@ -319,6 +339,80 @@ class _ControlsWidgetState extends State<ControlsWidget> {
     }
   }
 
+  Future<void> _showMicrophoneOptions(BuildContext context) async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
+            width:
+                MediaQuery.of(context).size.width * 0.2, // 20% of screen width
+            child: ListView(
+              shrinkWrap:
+                  true, // Ensures ListView takes up as much space as it needs
+              children: [
+                if (_audioInputs != null)
+                  ..._audioInputs!.map((device) {
+                    return ListTile(
+                      leading: (device.deviceId ==
+                              widget.room.selectedAudioInputDeviceId)
+                          ? const Icon(Icons.check_box_outlined,
+                              color: Colors.black)
+                          : const Icon(Icons.check_box_outline_blank,
+                              color: Colors.black),
+                      title: Text(device.label),
+                      onTap: () {
+                        _selectAudioInput(device);
+                        Navigator.pop(
+                            context); // Close the bottom sheet after selection
+                      },
+                    );
+                  }).toList(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showVideoOptions(BuildContext context) async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
+            width:
+                MediaQuery.of(context).size.width * 0.2, // 20% of screen width
+            child: ListView(
+              shrinkWrap:
+                  true, // Ensures ListView takes up as much space as it needs
+              children: [
+                if (_videoInputs != null)
+                  ..._videoInputs!.map((device) {
+                    return ListTile(
+                      leading: (device.deviceId ==
+                              widget.room.selectedVideoInputDeviceId)
+                          ? const Icon(Icons.check_box_outlined,
+                              color: Colors.black)
+                          : const Icon(Icons.check_box_outline_blank,
+                              color: Colors.black),
+                      title: Text(device.label),
+                      onTap: () {
+                        _selectVideoInput(device);
+                        Navigator.pop(
+                            context); // Close the bottom sheet after selection
+                      },
+                    );
+                  }).toList(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -350,64 +444,21 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             ),
           ),
           if (participant.isMicrophoneEnabled())
-            if (lkPlatformIs(PlatformType.android))
-              Visibility(
-                visible: false,
-                child: IconButton(
-                  onPressed: _disableAudio,
-                  icon: const Icon(Icons.mic),
-                  tooltip: 'mute audio',
-                ),
-              )
-            else
-              Visibility(
-                visible: true,
-                child: PopupMenuButton<MediaDevice>(
-                  icon: const Icon(Icons.settings_voice),
-                  itemBuilder: (BuildContext context) {
-                    return [
-                      PopupMenuItem<MediaDevice>(
-                        value: null,
-                        onTap: isMuted ? _enableAudio : _disableAudio,
-                        child: const ListTile(
-                          leading: Icon(
-                            Icons.mic_off,
-                            color: Colors.white,
-                          ),
-                          title: Text('Mute Microphone'),
-                        ),
-                      ),
-                      if (_audioInputs != null)
-                        ..._audioInputs!.map((device) {
-                          return PopupMenuItem<MediaDevice>(
-                            value: device,
-                            child: ListTile(
-                              leading: (device.deviceId ==
-                                      widget.room.selectedAudioInputDeviceId)
-                                  ? const Icon(
-                                      Icons.check_box_outlined,
-                                      color: Colors.white,
-                                    )
-                                  : const Icon(
-                                      Icons.check_box_outline_blank,
-                                      color: Colors.white,
-                                    ),
-                              title: Text(device.label),
-                            ),
-                            onTap: () => _selectAudioInput(device),
-                          );
-                        })
-                    ];
-                  },
-                ),
-              )
+            Visibility(
+              visible: true,
+              child: IconButton(
+                onPressed: _disableAudio,
+                icon: const Icon(Icons.mic),
+                tooltip: 'Mute audio',
+              ),
+            )
           else
             Visibility(
               visible: true,
               child: IconButton(
                 onPressed: _enableAudio,
                 icon: const Icon(Icons.mic_off),
-                tooltip: 'un-mute audio',
+                tooltip: 'Un-mute audio',
               ),
             ),
           if (!lkPlatformIs(PlatformType.iOS))
@@ -468,43 +519,10 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           if (participant.isCameraEnabled())
             Visibility(
               visible: true,
-              child: PopupMenuButton<MediaDevice>(
+              child: IconButton(
+                onPressed: _disableVideo,
                 icon: const Icon(Icons.videocam_sharp),
-                itemBuilder: (BuildContext context) {
-                  return [
-                    PopupMenuItem<MediaDevice>(
-                      value: null,
-                      onTap: _disableVideo,
-                      child: const ListTile(
-                        leading: Icon(
-                          Icons.videocam_off,
-                          color: Colors.white,
-                        ),
-                        title: Text('Disable Camera'),
-                      ),
-                    ),
-                    if (_videoInputs != null)
-                      ..._videoInputs!.map((device) {
-                        return PopupMenuItem<MediaDevice>(
-                          value: device,
-                          child: ListTile(
-                            leading: (device.deviceId ==
-                                    widget.room.selectedVideoInputDeviceId)
-                                ? const Icon(
-                                    Icons.check_box_outlined,
-                                    color: Colors.white,
-                                  )
-                                : const Icon(
-                                    Icons.check_box_outline_blank,
-                                    color: Colors.white,
-                                  ),
-                            title: Text(device.label),
-                          ),
-                          onTap: () => _selectVideoInput(device),
-                        );
-                      })
-                  ];
-                },
+                tooltip: 'Mute video',
               ),
             )
           else
@@ -513,7 +531,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               child: IconButton(
                 onPressed: _enableVideo,
                 icon: const Icon(Icons.videocam_off),
-                tooltip: 'un-mute video',
+                tooltip: 'Un-mute video',
               ),
             ),
           Visibility(
@@ -528,30 +546,25 @@ class _ControlsWidgetState extends State<ControlsWidget> {
           ),
           if (participant.isScreenShareEnabled())
             Visibility(
-              visible: false,
+              visible: widget.role == Role.admin.toString(),
               child: IconButton(
-                icon: const Icon(Icons.monitor_outlined),
+                icon: const Icon(
+                  Icons.monitor_outlined,
+                  color: Colors.red,
+                ),
                 onPressed: () => _disableScreenShare(),
-                tooltip: 'unshare screen (experimental)',
+                tooltip: 'Stop Screen Share',
               ),
             )
           else
             Visibility(
-              visible: false,
+              visible: widget.role == Role.admin.toString(),
               child: IconButton(
                 icon: const Icon(Icons.monitor),
                 onPressed: () => _enableScreenShare(),
-                tooltip: 'share screen (experimental)',
+                tooltip: 'Start Screen Share ',
               ),
             ),
-          Visibility(
-            visible: true,
-            child: IconButton(
-              onPressed: _onTapDisconnect,
-              icon: const Icon(Icons.close_sharp),
-              tooltip: 'disconnect',
-            ),
-          ),
           Visibility(
             visible: false,
             child: IconButton(
@@ -576,16 +589,57 @@ class _ControlsWidgetState extends State<ControlsWidget> {
               tooltip: 'Simulate scenario',
             ),
           ),
-         Visibility(
-          visible: widget.role == Role.admin.toString() ? false : true,
-          child: // New Raise Hand Button
-          IconButton(
-            icon: Icon(
-              _isHandRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
-              color: _isHandRaised ? Colors.amber : Colors.white,
+          Visibility(
+            visible: widget.role == Role.admin.toString() ? false : true,
+            child: // New Raise Hand Button
+                IconButton(
+              icon: Icon(
+                _isHandRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
+                color: _isHandRaised ? Colors.amber : Colors.white,
+              ),
+              onPressed: _toggleRaiseHand,
             ),
-            onPressed: _toggleRaiseHand,
-          ),)
+          ),
+          Visibility(
+            visible: true,
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.settings),
+              tooltip: 'Settings',
+              onSelected: (String value) {
+                if (value == 'Microphone') {
+                  _showMicrophoneOptions(context);
+                } else if (value == 'Camera') {
+                  _showVideoOptions(context);
+                }
+              },
+              itemBuilder: (BuildContext context) {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'Microphone',
+                    child: ListTile(
+                      leading: Icon(Icons.mic),
+                      title: Text('Microphone'),
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'Camera',
+                    child: ListTile(
+                      leading: Icon(Icons.videocam),
+                      title: Text('Camera'),
+                    ),
+                  ),
+                ];
+              },
+            ),
+          ),
+          Visibility(
+            visible: true,
+            child: IconButton(
+              onPressed: _onTapDisconnect,
+              icon: const Icon(Icons.close_sharp),
+              tooltip: 'disconnect',
+            ),
+          ),
         ],
       ),
     );

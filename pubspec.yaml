@@ -52,6 +52,7 @@ dependencies:
   http: ^1.2.2
   envied: ^0.5.4+1
   get_it: ^7.7.0
+  encrypt: ^5.0.3
 
 dev_dependencies:
   flutter_test:

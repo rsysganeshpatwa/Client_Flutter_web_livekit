@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 class LKTextField extends StatelessWidget {
   final String label;
   final TextEditingController? ctrl;
+  final isPasswordField;
   const LKTextField({
     required this.label,
     this.ctrl,
+    this.isPasswordField = false,
     super.key,
   });
 
@@ -16,6 +18,7 @@ class LKTextField extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
+              
               label,
               style: const TextStyle(
                 fontSize: 16,
@@ -36,6 +39,7 @@ class LKTextField extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: TextField(
+              obscureText: isPasswordField,
               controller: ctrl,
               decoration: const InputDecoration.collapsed(
                 hintText: '',
