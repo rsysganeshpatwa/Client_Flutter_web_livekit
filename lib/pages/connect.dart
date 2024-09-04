@@ -133,7 +133,7 @@ class _ConnectPageState extends State<ConnectPage> {
         MaterialPageRoute(
           builder: (_) => PreJoinPage(
             args: JoinArgs(
-              url: dotenv.env['API_LIVEKIT_HTTPS_URL'] ?? '',
+              url: dotenv.env['API_LIVEKIT_LOCAL_URL'] ?? '',
               token: token,
               simulcast: true,
               adaptiveStream: true,
