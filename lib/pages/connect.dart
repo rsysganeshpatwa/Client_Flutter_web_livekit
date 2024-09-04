@@ -59,14 +59,19 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _readPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
-     String? room = Uri.base.queryParameters['room'];
-     if(room == null){
-       room = "";
-     }
-      String metadata = await _apiService.getWelcomeMessage(room);
+    String? room = "";
+    final uri = Uri.base;
+    final encryptedParams = uri.queryParameters['data'];
+
+    if (encryptedParams != null && encryptedParams.isNotEmpty) {
+          final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
+       
+      final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
+      final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
+      room = decodedParams['room'] ?? '';
+    }
+    String metadata = await _apiService.getWelcomeMessage(room);
     welcomeMessage = metadata;
-
-
     _initializeParams();
   }
 
