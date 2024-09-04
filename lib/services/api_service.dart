@@ -31,7 +31,7 @@ class ApiService {
         yield roomList;
       }
 
-      await Future.delayed(Duration(seconds: 30));
+      await Future.delayed(const Duration(seconds: 30));
     }
   }
 }

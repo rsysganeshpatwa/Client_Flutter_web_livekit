@@ -41,19 +41,19 @@ class CopyInviteLinkDialog {
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(
-          title: Text('Copy Invite Link'),
+          title: const Text('Copy Invite Link'),
           children: [
             SimpleDialogOption(
               onPressed: () {
                 Navigator.pop(context, hostInviteLink);
               },
-              child: Text('Host Link'),
+              child: const Text('Host Link'),
             ),
             SimpleDialogOption(
               onPressed: () {
                 Navigator.pop(context, participantInviteLink);
               },
-              child: Text('Participant Link'),
+              child: const Text('Participant Link'),
             ),
           ],
         );
@@ -64,7 +64,7 @@ class CopyInviteLinkDialog {
     if (selectedLink != null) {
       await Clipboard.setData(ClipboardData(text: selectedLink));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Invite link copied to clipboard'),
         ),
       );

@@ -298,7 +298,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   void _onTapSimulateScenario() async {
     final result = await context.showSimulateScenarioDialog();
     if (result != null) {
-      print('${result}');
+      print('$result');
 
       if (SimulateScenarioResult.e2eeKeyRatchet == result) {
         await widget.room.e2eeManager?.ratchetKey();
@@ -344,7 +344,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
       context: context,
       builder: (BuildContext context) {
         return SafeArea(
-          child: Container(
+          child: SizedBox(
             width:
                 MediaQuery.of(context).size.width * 0.2, // 20% of screen width
             child: ListView(
@@ -367,7 +367,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
                             context); // Close the bottom sheet after selection
                       },
                     );
-                  }).toList(),
+                  }),
               ],
             ),
           ),
@@ -381,7 +381,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
       context: context,
       builder: (BuildContext context) {
         return SafeArea(
-          child: Container(
+          child: SizedBox(
             width:
                 MediaQuery.of(context).size.width * 0.2, // 20% of screen width
             child: ListView(
@@ -404,7 +404,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
                             context); // Close the bottom sheet after selection
                       },
                     );
-                  }).toList(),
+                  }),
               ],
             ),
           ),

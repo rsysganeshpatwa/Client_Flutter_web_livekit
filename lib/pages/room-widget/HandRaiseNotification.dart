@@ -17,7 +17,7 @@ class HandRaiseNotification {
                 allowSpeak(participant);
                 scaffoldMessenger.hideCurrentSnackBar();
               },
-              child: Text('Allow Speak', style: TextStyle(color: Colors.blue)),
+              child: const Text('Allow Speak', style: TextStyle(color: Colors.blue)),
             ),
             TextButton(
               onPressed: () {
@@ -25,11 +25,11 @@ class HandRaiseNotification {
                 denySpeak(participant);
                 scaffoldMessenger.hideCurrentSnackBar();
               },
-              child: Text('No', style: TextStyle(color: Colors.red)),
+              child: const Text('No', style: TextStyle(color: Colors.red)),
             ),
           ],
         ),
-        duration: Duration(seconds: 10),
+        duration: const Duration(seconds: 10),
       ),
     );
   }

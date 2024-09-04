@@ -8,13 +8,13 @@ extension LKExampleExt on BuildContext {
     context: this,
     builder: (BuildContext context) {
       return AlertDialog(
-        title: Text('Approval Status'),
+        title: const Text('Approval Status'),
         content: Text(
 status == 'approved'
     ? 'Your request has been approved! You can now join the room.'
     : status == 'rejected'
         ? 'Your request has been rejected. You cannot join the room at this time.'
-        : 'Your request is still pending. No host is available at the moment. Please try again .',
+        : 'No host is available at the moment. Please try again .',
 
         ),
         actions: <Widget>[
@@ -27,7 +27,7 @@ status == 'approved'
                 Navigator.of(context).pop(); // Or navigate to another page
               }
             },
-            child: Text('OK'),
+            child: const Text('OK'),
           ),
         ],
       );

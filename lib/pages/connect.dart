@@ -108,10 +108,10 @@ class _ConnectPageState extends State<ConnectPage> {
 
       final identity = _identityCtrl.text;
       final roomName = _roomCtrl.text;
-      final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
-     print('roomName: $roomName, identity: $identity, role: $_role');
+      final role = _selectedRole == Role.admin ? Role.admin : Role.participant;
+     print('roomName: $roomName, identity: $identity, role: $role');
       final token =
-          await _apiService.getToken(identity, roomName, _role.toString());
+          await _apiService.getToken(identity, roomName, role.toString());
 
       await Navigator.push<void>(
         ctx,
@@ -126,7 +126,7 @@ class _ConnectPageState extends State<ConnectPage> {
               preferredCodec: 'Preferred Codec',
               enableBackupVideoCodec:
                   ['VP9', 'AV1'].contains('Preferred Codec'),
-              role: _role,
+              role: role,
               roomName: roomName,
               identity: identity,
             ),
@@ -218,7 +218,7 @@ class _ConnectPageState extends State<ConnectPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('POC Health Care Monitoring'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).indicatorColor,
       ),
       body: Stack(
         children: [
@@ -415,7 +415,7 @@ class _ConnectPageState extends State<ConnectPage> {
   }
 
   Widget buildFloatingActionButton() {
-    if (!_isRoomNameInUrl)
+    if (!_isRoomNameInUrl) {
       return Positioned(
         right: 16,
         top: 16,
@@ -424,6 +424,7 @@ class _ConnectPageState extends State<ConnectPage> {
           child: const Icon(Icons.list),
         ),
       );
+    }
     return Container();
   }
 }

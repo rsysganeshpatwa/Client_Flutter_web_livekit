@@ -6,6 +6,8 @@ import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/text_field.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -87,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
       _navigateToConnect();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Invalid username or password'),
         ),
       );
@@ -107,7 +109,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Login Rsystem Connect',
+        title: const Text('Login Rsystem Connect',
             style: TextStyle(color: Colors.white)),
       ),
       body: Container(
@@ -142,7 +144,7 @@ class _LoginPageState extends State<LoginPage> {
                     if (_usernameController.text.isEmpty ||
                         _passwordController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content:
                               Text('Please enter both username and password'),
                         ),
@@ -151,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                       _login(context);
                     }
                   },
-                  child: Text('Login'),
+                  child: const Text('Login'),
                 ),
               ],
             ),

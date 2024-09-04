@@ -12,7 +12,7 @@ class ParticipantSelectionDialog extends StatefulWidget {
   final void Function(Participant) onToggleParticipantForTalk;
   final String localParticipantIdentity;
 
-  ParticipantSelectionDialog({
+  const ParticipantSelectionDialog({super.key, 
     required this.participantTracks,
     required this.allowedToTalk,
     required this.onToggleParticipantForTalk,
@@ -42,7 +42,7 @@ class _ParticipantSelectionDialogState
     }).toList();
 
     return AlertDialog(
-      title: Text('Select Participants'),
+      title: const Text('Select Participants'),
       content: SingleChildScrollView(
         child: ListBody(
           children: [
@@ -53,11 +53,11 @@ class _ParticipantSelectionDialogState
               final displayName = isLocal ? '$participantName (you) (host)' : '$participantName (host)';
 
               return ListTile(
-                title: Text(displayName, style: TextStyle(color: Colors.white)),
+                title: Text(displayName, style: const TextStyle(color: Colors.white)),
                 trailing: null, // No checkbox for admins
                 onTap: null, // No tap action for admins
               );
-            }).toList(),
+            }),
 
             // Displaying non-admin participants
             ...nonAdminTracks.map((track) {
@@ -70,12 +70,12 @@ class _ParticipantSelectionDialogState
               return ListTile(
                 title: Text(
                   isLocal ? '$participantName (you)' : participantName,
-                  style: TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isHandRaised) Icon(Icons.pan_tool, color: Colors.orange), // Hand raised icon
+                    if (isHandRaised) const Icon(Icons.pan_tool, color: Colors.orange), // Hand raised icon
                     if (!isLocal) Checkbox(
                       value: widget.allowedToTalk.contains(track),
                       onChanged: (value) {
@@ -90,7 +90,7 @@ class _ParticipantSelectionDialogState
                         widget.onToggleParticipantForTalk(track as Participant<TrackPublication<Track>>);
                       },
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -99,7 +99,7 @@ class _ParticipantSelectionDialogState
           onPressed: () {
             Navigator.of(context).pop(); // Close the dialog
           },
-          child: Text('Close'),
+          child: const Text('Close'),
         ),
       ],
     );

@@ -55,9 +55,8 @@ class _RoomPageState extends State<RoomPage> {
   bool _isScreenShareMode = false; // State to toggle view mode
   bool _isScreenShareModeOnce = false; // State to toggle view mode
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
-  List<dynamic> _pendingRequests = [];
- Map<String, BuildContext> _dialogContexts = {}; // Map to store dialog contexts
-
+ final Map<String, BuildContext> _dialogContexts = {}; // Map to store dialog contexts
+ bool _isRunning = true; // Control flag for the loop
   @override
   void initState() {
     super.initState();
@@ -66,7 +65,7 @@ class _RoomPageState extends State<RoomPage> {
     // Set up role for the local participant
     _initializeLocalParticipantRole();
     _sortParticipants();
-    WidgetsBinding.instance?.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!fastConnection) {
         _askPublish();
       }
@@ -87,7 +86,13 @@ class _RoomPageState extends State<RoomPage> {
             duration: const Duration(seconds: 5));
       };
     }
+
+    //sendParticipant call every 5 second
+    //exchangeData();
+   
   }
+
+
 
   @override
   void dispose() {
@@ -100,8 +105,11 @@ class _RoomPageState extends State<RoomPage> {
       await widget.room.dispose();
     })();
     onWindowShouldClose = null;
+    _isRunning = false;
     super.dispose();
   }
+
+ 
 
   void _initializeLocalParticipantRole() {
     final localParticipant = widget.room.localParticipant;
@@ -123,7 +131,7 @@ class _RoomPageState extends State<RoomPage> {
       if (event.reason != null) {
         // print('Room disconnected: reason => ${event.reason}');
       }
-      WidgetsBinding.instance?.addPostFrameCallback((timeStamp) =>
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) =>
           handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
@@ -201,7 +209,7 @@ class _RoomPageState extends State<RoomPage> {
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => ThankYouWidget()),
+        MaterialPageRoute(builder: (context) => const ThankYouWidget()),
       );
     }
   }
@@ -224,6 +232,7 @@ class _RoomPageState extends State<RoomPage> {
         role: localParticipantRole!,
       );
       participantsManager.add(localStatus);
+      print('localStatus ${localStatus.toJson()}');
     }
 
     // Initialize status for remote participants
@@ -237,6 +246,7 @@ class _RoomPageState extends State<RoomPage> {
         role: remoteParticipantRole,
         // Other default values (e.g., isHandRaised, isTalkToHostEnable) are already false by default
       );
+      print('remote status${participantStatus.toJson()}');
       participantsManager.add(participantStatus);
     }
   }
@@ -246,16 +256,19 @@ class _RoomPageState extends State<RoomPage> {
       print('Participant connected: ${event.participant.identity}');
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
-
+ 
+      final role = _getRoleFromMetadata(event.participant.metadata);
+      final isAdmin = role == Role.admin.toString();
       if (isNew) {
         print('new Participant connected: ${event.participant.identity}');
         final newParticipantStatus = ParticipantStatus(
           identity: event.participant.identity,
-          isAudioEnable: false,
-          isVideoEnable: false,
+          isAudioEnable: isAdmin ,
+          isVideoEnable: isAdmin,
           isHandRaised: false,
-          isTalkToHostEnable: false,
+          isTalkToHostEnable: isAdmin,
           handRaisedTimeStamp: 0,
+          role: role,
           // Set other default values for the new participant status
         );
 
@@ -273,7 +286,7 @@ class _RoomPageState extends State<RoomPage> {
   }
 
 Future<void> _checkForPendingRequests() async {
-  while (true) {
+  while (_isRunning) {
     try {
       final requests = await _approvalService.fetchPendingRequests(widget.room.name!);
       final currentRequestIds = requests.map((request) => request['id'].toString()).toSet();
@@ -302,7 +315,7 @@ Future<void> _checkForPendingRequests() async {
     } catch (error) {
       print('Error fetching pending requests: $error');
     }
-    await Future.delayed(Duration(seconds: 5)); // Check every 10 seconds
+    await Future.delayed(const Duration(seconds: 5)); // Check every 10 seconds
   }
 }
 
@@ -358,9 +371,9 @@ void _showApprovalDialog(dynamic request) {
           participantsJsonList, // The actual list of participant statuses
     });
 
-    await widget.room.localParticipant?.publishData(utf8.encode(metadata));
+    await widget.room.localParticipant?.publishData(utf8.encode(metadata), reliable: true);
     // Send the entire metadata object at once
-
+     print('sendParticipantsStatus ${metadata}');
     setState(() {
       participantsManager = participantsStatus;
       _sortParticipants();
@@ -381,17 +394,22 @@ void _showApprovalDialog(dynamic request) {
                 isHandRaised: item['isHandRaised'],
                 isTalkToHostEnable: item['isTalkToHostEnable'],
                 handRaisedTimeStamp: item['handRaisedTimeStamp'],
+                role: item['role'],
               ))
           .toList();
+
+          for (var element in participantsStatusList) { 
+            print('updateParticipantStatusFromMetadata ${element.toJson()}');
+          }
 
       // Update the state with the new participants status list
       setState(() {
         participantsManager = participantsStatusList;
-        participantsStatusList.forEach((element) {
+        for (var element in participantsStatusList) {
           if (element.identity == widget.room.localParticipant?.identity) {
             _isHandleRaiseHand = element.isHandRaised;
           }
-        });
+        }
         _sortParticipants();
       });
     }
@@ -439,7 +457,7 @@ void _showApprovalDialog(dynamic request) {
   }
 
   _getParticipantStatus(String identity) {
-    return participantsManager?.firstWhere(
+    return participantsManager.firstWhere(
         (status) => status.identity == identity,
         orElse: () => ParticipantStatus(
               identity: identity,
@@ -470,9 +488,7 @@ void _showApprovalDialog(dynamic request) {
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
 
-      print(
-          'rohit _sortParticipants 123 for  participantStatus${participantStatus.toJson()}');
-
+    
       // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
           (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
@@ -481,11 +497,11 @@ void _showApprovalDialog(dynamic request) {
                       !isTalkToHostEnable));
 
       if (shouldAudioSubscribe) {
-        participant.audioTrackPublications?.forEach((element) {
+        participant.audioTrackPublications.forEach((element) {
           element.subscribe();
         });
       } else {
-        participant.audioTrackPublications?.forEach((element) {
+        participant.audioTrackPublications.forEach((element) {
           if (!(isLocalHost && isRemoteParticipantHost)) {
             element.unsubscribe();
           }
@@ -498,7 +514,7 @@ void _showApprovalDialog(dynamic request) {
           type: ParticipantTrackType.kScreenShare,
         ));
         if (_isScreenShareModeOnce == false) {
-          print('isScreenShareModeOnce ${_isScreenShareModeOnce}');
+        //  print('isScreenShareModeOnce ${_isScreenShareModeOnce}');
           setState(() {
             _isScreenShareMode = true;
             _isScreenShareModeOnce = true;
@@ -554,17 +570,20 @@ void _showApprovalDialog(dynamic request) {
   void _toggleMuteAll(bool muteAll) {
     setState(() {
       _muteAll = muteAll;
-      print('rohit muteAll ${muteAll}');
+      print('rohit muteAll $muteAll');
 
       // Update the participantsManager with new participants
-      for (var participantStatus in participantsManager) {
-        if (participantStatus.identity !=
-                widget.room.localParticipant?.identity &&
-            participantStatus.role != Role.admin.toString()) {
+     final participants = participantsManager.where((participantStatus) {
+        return participantStatus.role != Role.admin.toString();
+      });
+      for (var participantStatus in participants) {
           participantStatus.isTalkToHostEnable = !muteAll;
-        }
-        print('rohitg participantStatus ${participantStatus.toJson()}');
       }
+
+    for (var participantStatus in participantsManager) {
+        
+        print('rohit muteAll ${participantStatus.toJson()}');
+      };
 
       // Trigger the callback with the updated list
       sendParticipantsStatus(participantsManager);
@@ -626,7 +645,7 @@ void _showApprovalDialog(dynamic request) {
   void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
     // Create the metadata with the updated hand raise status
     final handRaiseData = jsonEncode(
-        {'identity': participant?.identity, 'handraise': isHandRaised});
+        {'identity': participant.identity, 'handraise': isHandRaised});
 
     // Publish the data to the room so that other participants can receive it
     await widget.room.localParticipant?.publishData(

@@ -12,6 +12,8 @@ class ReplayKitChannel {
   static const MethodChannel _replayKitChannel =
       MethodChannel(kReplayKitChannel);
 
+      
+
   static void listenMethodChannel(Room room) {
     _replayKitChannel.setMethodCallHandler((call) async {
       if (call.method == 'closeReplayKitFromNative') {

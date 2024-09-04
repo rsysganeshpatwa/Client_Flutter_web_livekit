@@ -6,7 +6,7 @@ import 'dart:math' as math;
 class ParticipantGridView extends StatelessWidget {
   final List<ParticipantTrack> participantTracks;
 
-  ParticipantGridView({
+  const ParticipantGridView({super.key, 
     required this.participantTracks,
   });
 
@@ -34,24 +34,45 @@ class ParticipantGridView extends StatelessWidget {
               ? GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 4.0,
-                    mainAxisSpacing: 4.0,
+                    crossAxisSpacing: 8.0,
+                    mainAxisSpacing: 8.0,
                     childAspectRatio: (screenWidth / crossAxisCount) /
                         (screenHeight / rowCount),
                   ),
                   itemCount: participantTracks.length,
                   itemBuilder: (context, index) {
                     return GestureDetector(
-                      child: Container(
-                        child: ParticipantWidget.widgetFor(
-                          participantTracks[index],
-                          showStatsLayer: false,
+                      onTap: () {
+                        // Add interaction logic here
+                      },
+                      child: Card(
+                        elevation: 4.0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12.0),
+                            child: ParticipantWidget.widgetFor(
+                              participantTracks[index],
+                              showStatsLayer: false,
+                            ),
+                          ),
                         ),
                       ),
                     );
                   },
                 )
-              : Container(),
+              : const Center(
+                  child: Text(
+                    'No Participants',
+                    style: TextStyle(
+                      fontSize: 18.0,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
         ),
       ],
     );
