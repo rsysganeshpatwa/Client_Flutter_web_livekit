@@ -32,7 +32,7 @@ class _ConnectPageState extends State<ConnectPage> {
   bool _busy = false;
   String? roomNameFromUrl;
   String? roomRoleFromUrl;
-  String? welcomeMessage;
+  String? welcomeMessage = "";
   bool _isRoomNameInUrl = false;
 
   @override
