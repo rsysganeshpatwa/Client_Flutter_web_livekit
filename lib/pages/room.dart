@@ -19,6 +19,7 @@ import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
+import 'package:video_meeting_room/services/room_data_manage_service.dart';
 import 'package:video_meeting_room/widgets/thank_you.dart';
 
 import '../exts.dart';
@@ -55,8 +56,11 @@ class _RoomPageState extends State<RoomPage> {
   bool _isScreenShareMode = false; // State to toggle view mode
   bool _isScreenShareModeOnce = false; // State to toggle view mode
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
- final Map<String, BuildContext> _dialogContexts = {}; // Map to store dialog contexts
- bool _isRunning = true; // Control flag for the loop
+  final RoomDataManageService _roomDataManageService =
+      GetIt.instance<RoomDataManageService>();
+  final Map<String, BuildContext> _dialogContexts =
+      {}; // Map to store dialog contexts
+  bool _isRunning = true; // Control flag for the loop
   @override
   void initState() {
     super.initState();
@@ -89,10 +93,7 @@ class _RoomPageState extends State<RoomPage> {
 
     //sendParticipant call every 5 second
     //exchangeData();
-   
   }
-
-
 
   @override
   void dispose() {
@@ -108,8 +109,6 @@ class _RoomPageState extends State<RoomPage> {
     _isRunning = false;
     super.dispose();
   }
-
- 
 
   void _initializeLocalParticipantRole() {
     final localParticipant = widget.room.localParticipant;
@@ -200,6 +199,17 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
+  _updateRoomData(participantsManager) async {
+    final roomSID = await widget.room.getSid();
+    //remove duplicate cate participant based on identity
+    final uniqueParticipants = participantsManager
+        .map((e) => e.toJson())
+        .toSet()
+        .map((e) => ParticipantStatus.fromJson(e))
+        .toList();
+    _roomDataManageService.setLatestData(roomSID, uniqueParticipants);
+  }
+
   void handleRoomDisconnected(BuildContext context, Participant participant) {
     if (localParticipantRole == Role.admin.toString()) {
       Navigator.push(
@@ -218,7 +228,7 @@ class _RoomPageState extends State<RoomPage> {
     _sortParticipants();
   }
 
-  void _initializeParticipantStatuses() {
+  Future<void> _initializeParticipantStatuses() async {
     participantsManager.clear();
 
     // Initialize status for the local participant
@@ -231,23 +241,42 @@ class _RoomPageState extends State<RoomPage> {
         isTalkToHostEnable: localParticipantRole == Role.admin.toString(),
         role: localParticipantRole!,
       );
-      participantsManager.add(localStatus);
-      print('localStatus ${localStatus.toJson()}');
-    }
 
-    // Initialize status for remote participants
-    for (var participant in widget.room.remoteParticipants.values) {
-      final remoteParticipantRole = _getRoleFromMetadata(participant.metadata);
-      final participantStatus = ParticipantStatus(
-        identity: participant.identity,
-        isAudioEnable: remoteParticipantRole == Role.admin.toString(),
-        isVideoEnable: remoteParticipantRole == Role.admin.toString(),
-        isTalkToHostEnable: remoteParticipantRole == Role.admin.toString(),
-        role: remoteParticipantRole,
-        // Other default values (e.g., isHandRaised, isTalkToHostEnable) are already false by default
-      );
-      print('remote status${participantStatus.toJson()}');
-      participantsManager.add(participantStatus);
+      // Initialize status for remote participants
+
+      // get Room Data from server
+      final roomSID = await widget.room.getSid();
+      final data = await _roomDataManageService.getLatestData(roomSID);
+       final List<ParticipantStatus> participantsStatusList;
+      if (data != null) {
+        final participantsStatusList = (data as List)
+            .map((item) => ParticipantStatus(
+                  identity: item['identity'],
+                  isAudioEnable: item['isAudioEnable'],
+                  isVideoEnable: item['isVideoEnable'],
+                  isHandRaised: item['isHandRaised'],
+                  isTalkToHostEnable: item['isTalkToHostEnable'],
+                  handRaisedTimeStamp: item['handRaisedTimeStamp'],
+                  role: item['role'],
+                ))
+            .toList();
+            setState(() {
+         participantsManager.addAll(participantsStatusList);
+            });
+         
+        for (var element in participantsStatusList) {
+          print('data ${element.toJson()}');
+        }
+       
+      }
+
+       setState(() {
+          participantsManager.add(localStatus);
+          
+       
+          _updateRoomData(participantsManager);
+          _sortParticipants();
+        });
     }
   }
 
@@ -256,14 +285,14 @@ class _RoomPageState extends State<RoomPage> {
       print('Participant connected: ${event.participant.identity}');
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
- 
+
       final role = _getRoleFromMetadata(event.participant.metadata);
       final isAdmin = role == Role.admin.toString();
       if (isNew) {
         print('new Participant connected: ${event.participant.identity}');
         final newParticipantStatus = ParticipantStatus(
           identity: event.participant.identity,
-          isAudioEnable: isAdmin ,
+          isAudioEnable: isAdmin,
           isVideoEnable: isAdmin,
           isHandRaised: false,
           isTalkToHostEnable: isAdmin,
@@ -285,75 +314,76 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
-Future<void> _checkForPendingRequests() async {
-  while (_isRunning) {
-    try {
-      final requests = await _approvalService.fetchPendingRequests(widget.room.name!);
-      final currentRequestIds = requests.map((request) => request['id'].toString()).toSet();
+  Future<void> _checkForPendingRequests() async {
+    while (_isRunning) {
+      try {
+        final requests =
+            await _approvalService.fetchPendingRequests(widget.room.name!);
+        final currentRequestIds =
+            requests.map((request) => request['id'].toString()).toSet();
 
-      // Close dialogs for requests not found
-      _dialogContexts.keys.toList().forEach((requestId) {
-        if (!currentRequestIds.contains(requestId)) {
-          _closeDialog(requestId);
-        }
-      });
-
-      // Close all dialogs if no pending requests
-      if (requests.isEmpty && _dialogContexts.isNotEmpty) {
+        // Close dialogs for requests not found
         _dialogContexts.keys.toList().forEach((requestId) {
-          _closeDialog(requestId);
+          if (!currentRequestIds.contains(requestId)) {
+            _closeDialog(requestId);
+          }
         });
-      }
 
-      // Check for new requests
-      for (var request in requests) {
-        final requestId = request['id'].toString();
-        if (!_dialogContexts.containsKey(requestId)) {
-          _showApprovalDialog(request);
+        // Close all dialogs if no pending requests
+        if (requests.isEmpty && _dialogContexts.isNotEmpty) {
+          _dialogContexts.keys.toList().forEach((requestId) {
+            _closeDialog(requestId);
+          });
         }
-      }
-    } catch (error) {
-      print('Error fetching pending requests: $error');
-    }
-    await Future.delayed(const Duration(seconds: 5)); // Check every 10 seconds
-  }
-}
 
-void _closeDialog(String requestId) {
-  final dialogContext = _dialogContexts[requestId];
-  if (dialogContext != null) {
-    Navigator.of(dialogContext).pop(); // Close the dialog
-    setState(() {
-      _dialogContexts.remove(requestId); // Remove the context from the map
+        // Check for new requests
+        for (var request in requests) {
+          final requestId = request['id'].toString();
+          if (!_dialogContexts.containsKey(requestId)) {
+            _showApprovalDialog(request);
+          }
+        }
+      } catch (error) {
+        print('Error fetching pending requests: $error');
+      }
+      await Future.delayed(
+          const Duration(seconds: 5)); // Check every 10 seconds
+    }
+  }
+
+  void _closeDialog(String requestId) {
+    final dialogContext = _dialogContexts[requestId];
+    if (dialogContext != null) {
+      Navigator.of(dialogContext).pop(); // Close the dialog
+      setState(() {
+        _dialogContexts.remove(requestId); // Remove the context from the map
+      });
+    }
+  }
+
+  void _showApprovalDialog(dynamic request) {
+    final requestId = request['id'].toString(); // Use request ID as the key
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // Store the context with the dialog's unique ID
+        _dialogContexts[requestId] = context;
+
+        return AdminApprovalDialog(
+          participantName: request['participantName'],
+          roomName: request['roomName'],
+          onDecision: (approved) async {
+            await _approvalService.approveRequest(request['id'], approved);
+            _closeDialog(requestId); // Close this specific dialog
+          },
+        );
+      },
+    ).then((_) {
+      // Clean up after the dialog is closed
+      _dialogContexts.remove(requestId);
     });
   }
-}
-
-
-void _showApprovalDialog(dynamic request) {
-  final requestId = request['id'].toString(); // Use request ID as the key
-
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      // Store the context with the dialog's unique ID
-      _dialogContexts[requestId] = context;
-      
-      return AdminApprovalDialog(
-        participantName: request['participantName'],
-        roomName: request['roomName'],
-        onDecision: (approved) async {
-          await _approvalService.approveRequest( request['id'], approved);
-          _closeDialog(requestId); // Close this specific dialog
-        },
-      );
-    },
-  ).then((_) {
-    // Clean up after the dialog is closed
-    _dialogContexts.remove(requestId);
-  });
-}
-
 
   Future<void> sendParticipantsStatus(
       List<ParticipantStatus> participantsStatus) async {
@@ -371,12 +401,15 @@ void _showApprovalDialog(dynamic request) {
           participantsJsonList, // The actual list of participant statuses
     });
 
-    await widget.room.localParticipant?.publishData(utf8.encode(metadata), reliable: true);
+    await widget.room.localParticipant
+        ?.publishData(utf8.encode(metadata), reliable: true);
     // Send the entire metadata object at once
-     print('sendParticipantsStatus ${metadata}');
+    print('sendParticipantsStatus ${metadata}');
     setState(() {
       participantsManager = participantsStatus;
+         _updateRoomData(participantsManager);
       _sortParticipants();
+   
     });
   }
 
@@ -398,9 +431,9 @@ void _showApprovalDialog(dynamic request) {
               ))
           .toList();
 
-          for (var element in participantsStatusList) { 
-            print('updateParticipantStatusFromMetadata ${element.toJson()}');
-          }
+      for (var element in participantsStatusList) {
+        print('updateParticipantStatusFromMetadata ${element.toJson()}');
+      }
 
       // Update the state with the new participants status list
       setState(() {
@@ -457,16 +490,20 @@ void _showApprovalDialog(dynamic request) {
   }
 
   _getParticipantStatus(String identity) {
-    return participantsManager.firstWhere(
+     final list = participantsManager.firstWhere(
         (status) => status.identity == identity,
         orElse: () => ParticipantStatus(
-              identity: identity,
+              identity: '',
               isAudioEnable: false,
               isVideoEnable: false,
               isHandRaised: false,
               isTalkToHostEnable: false,
               handRaisedTimeStamp: 0,
-            ));
+              role: '',
+            )
+        );
+
+    return list;
   }
 
   void _sortParticipants() {
@@ -481,14 +518,19 @@ void _showApprovalDialog(dynamic request) {
       // Find the corresponding ParticipantStatus
 
       final participantStatus = _getParticipantStatus(participant.identity);
+      if (participantStatus.identity.isEmpty) {
+       continue;
+      }
       final isRemoteParticipantHost =
           _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
 
       final isVideo = participantStatus.isVideoEnable;
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
-
-    
+      if(isRemoteParticipantHost){
+        print('isRemoteParticipantHost ${participantStatus.toJson()}');
+      }
+      // print('Starting  for  participantStatus${ participantStatus.toJson()}');
       // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
           (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
@@ -514,7 +556,7 @@ void _showApprovalDialog(dynamic request) {
           type: ParticipantTrackType.kScreenShare,
         ));
         if (_isScreenShareModeOnce == false) {
-        //  print('isScreenShareModeOnce ${_isScreenShareModeOnce}');
+          //  print('isScreenShareModeOnce ${_isScreenShareModeOnce}');
           setState(() {
             _isScreenShareMode = true;
             _isScreenShareModeOnce = true;
@@ -573,17 +615,17 @@ void _showApprovalDialog(dynamic request) {
       print('rohit muteAll $muteAll');
 
       // Update the participantsManager with new participants
-     final participants = participantsManager.where((participantStatus) {
+      final participants = participantsManager.where((participantStatus) {
         return participantStatus.role != Role.admin.toString();
       });
       for (var participantStatus in participants) {
-          participantStatus.isTalkToHostEnable = !muteAll;
+        participantStatus.isTalkToHostEnable = !muteAll;
       }
 
-    for (var participantStatus in participantsManager) {
-        
+      for (var participantStatus in participantsManager) {
         print('rohit muteAll ${participantStatus.toJson()}');
-      };
+      }
+      ;
 
       // Trigger the callback with the updated list
       sendParticipantsStatus(participantsManager);
