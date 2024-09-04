@@ -27,7 +27,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
   final _identityCtrl = TextEditingController();
   final _roomCtrl = TextEditingController();
-  final _welcomeMessageCtrl = TextEditingController();
+  final _welcomeMessageCtrl = TextEditingController(text: 'Welcome to the room!');
 
   bool _busy = false;
   String? roomNameFromUrl;
@@ -340,6 +340,7 @@ class _ConnectPageState extends State<ConnectPage> {
             ctrl: _roomCtrl,
           ),
         ),
+        if (_selectedRole == Role.admin)
          Padding(
           padding: const EdgeInsets.only(bottom: 25),
           child: LKTextField(
