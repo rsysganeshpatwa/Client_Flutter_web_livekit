@@ -105,25 +105,9 @@ class _RoomPageState extends State<RoomPage> {
 
   void _initializeLocalParticipantRole() {
     final localParticipant = widget.room.localParticipant;
-    // print('');
-    // print('');
-    // print('');
-    // print('');
-    // print('');
-    // print('');
-    // print('');
-    // print('');
-    // print('Local participant');
-    // print('');
-    // print('');
-    // print('');
-    // print('');
-    // print(localParticipant);
     if (localParticipant != null) {
       final metadata = localParticipant.metadata;
-      print('Local Paticipant Metadata: $metadata');
       final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-      print('Local Paticipant Role: $role');
       setState(() {
         localParticipantRole = role.toString();
         _initializeParticipantStatuses();
