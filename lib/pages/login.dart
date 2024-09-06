@@ -42,7 +42,6 @@ class _LoginPageState extends State<LoginPage> {
      
       final role = decodedParams['role'];
       final room = decodedParams['room'];
-      print('role: $role, room: $room');
       if (role != null && room != null) {
          _navigateToConnect();
       }
@@ -109,8 +108,9 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login Rsystem Connect',
+        title: const Text('Login To R Systems Connect',
             style: TextStyle(color: Colors.white)),
+            automaticallyImplyLeading: false,
       ),
       body: Container(
         alignment: Alignment.center,

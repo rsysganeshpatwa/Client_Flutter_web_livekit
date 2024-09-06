@@ -128,13 +128,13 @@ class _RoomPageState extends State<RoomPage> {
   void _setUpListeners() => _listener
     ..on<RoomDisconnectedEvent>((event) async {
       if (event.reason != null) {
-        // print('Room disconnected: reason => ${event.reason}');
+        print('Room disconnected: reason => ${event.reason}');
       }
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) =>
           handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
-      // print('Participant event');
+
       _sortParticipants();
     })
     ..on<RoomRecordingStatusChanged>((event) {
@@ -264,9 +264,7 @@ class _RoomPageState extends State<RoomPage> {
          participantsManager.addAll(participantsStatusList);
             });
          
-        for (var element in participantsStatusList) {
-          print('data ${element.toJson()}');
-        }
+      
        
       }
 
@@ -282,14 +280,13 @@ class _RoomPageState extends State<RoomPage> {
 
   void _addNewParticipantStatus(ParticipantConnectedEvent event) {
     setState(() {
-      print('Participant connected: ${event.participant.identity}');
+      
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
 
       final role = _getRoleFromMetadata(event.participant.metadata);
       final isAdmin = role == Role.admin.toString();
       if (isNew) {
-        print('new Participant connected: ${event.participant.identity}');
         final newParticipantStatus = ParticipantStatus(
           identity: event.participant.identity,
           isAudioEnable: isAdmin,
@@ -344,7 +341,7 @@ class _RoomPageState extends State<RoomPage> {
           }
         }
       } catch (error) {
-        print('Error fetching pending requests: $error');
+       // print('Error fetching pending requests: $error');
       }
       await Future.delayed(
           const Duration(seconds: 5)); // Check every 10 seconds
@@ -404,7 +401,7 @@ class _RoomPageState extends State<RoomPage> {
     await widget.room.localParticipant
         ?.publishData(utf8.encode(metadata), reliable: true);
     // Send the entire metadata object at once
-    print('sendParticipantsStatus ${metadata}');
+
     setState(() {
       participantsManager = participantsStatus;
          _updateRoomData(participantsManager);
@@ -431,9 +428,6 @@ class _RoomPageState extends State<RoomPage> {
               ))
           .toList();
 
-      for (var element in participantsStatusList) {
-        print('updateParticipantStatusFromMetadata ${element.toJson()}');
-      }
 
       // Update the state with the new participants status list
       setState(() {
@@ -527,11 +521,6 @@ class _RoomPageState extends State<RoomPage> {
       final isVideo = participantStatus.isVideoEnable;
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
-      if(isRemoteParticipantHost){
-        print('isRemoteParticipantHost ${participantStatus.toJson()}');
-      }
-      // print('Starting  for  participantStatus${ participantStatus.toJson()}');
-      // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
           (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
               (isAudio &&
@@ -556,7 +545,6 @@ class _RoomPageState extends State<RoomPage> {
           type: ParticipantTrackType.kScreenShare,
         ));
         if (_isScreenShareModeOnce == false) {
-          //  print('isScreenShareModeOnce ${_isScreenShareModeOnce}');
           setState(() {
             _isScreenShareMode = true;
             _isScreenShareModeOnce = true;
@@ -612,8 +600,6 @@ class _RoomPageState extends State<RoomPage> {
   void _toggleMuteAll(bool muteAll) {
     setState(() {
       _muteAll = muteAll;
-      print('rohit muteAll $muteAll');
-
       // Update the participantsManager with new participants
       final participants = participantsManager.where((participantStatus) {
         return participantStatus.role != Role.admin.toString();
@@ -622,11 +608,7 @@ class _RoomPageState extends State<RoomPage> {
         participantStatus.isTalkToHostEnable = !muteAll;
       }
 
-      for (var participantStatus in participantsManager) {
-        print('rohit muteAll ${participantStatus.toJson()}');
-      }
-      ;
-
+      
       // Trigger the callback with the updated list
       sendParticipantsStatus(participantsManager);
     });

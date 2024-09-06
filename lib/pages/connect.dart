@@ -126,8 +126,7 @@ class _ConnectPageState extends State<ConnectPage> {
       final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 
       final token = await _apiService.getToken(identity, roomName, _role.toString(), adminWelcomeMessage);
-     print('roomName: $roomName, identity: $identity, role: $_role');
-
+    
       await Navigator.push<void>(
         ctx,
         MaterialPageRoute(

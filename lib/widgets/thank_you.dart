@@ -9,6 +9,8 @@ class ThankYouWidget extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Thank You'),
+        automaticallyImplyLeading: false,
+
       ),
       body: Center(
         child: Column(

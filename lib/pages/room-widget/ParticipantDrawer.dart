@@ -91,7 +91,6 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       isTalkToHostEnable: isAllowToTalk,
       isHandRaised: false,
     );
-    print('rohit Allow to talk status updated: ${updatedStatus.toJson()}');
     _triggerParticipantsStatusUpdate(updatedStatus);
   }
 
@@ -285,7 +284,6 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
       final participantStatus =
           _getParticipantStatus(track.participant.identity);
 
-      print('rohit Participant status drawer: ${participantStatus?.toJson()}');
       final isLocal =
           track.participant.identity == widget.localParticipant?.identity;
       final participantName = track.participant.name ?? 'Unknown';
