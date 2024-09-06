@@ -13,7 +13,7 @@ class ParticipantDrawer extends StatefulWidget {
   final Participant? localParticipant;
   final List<ParticipantStatus> participantsStatusList;
   final void Function(List<ParticipantStatus>) onParticipantsStatusChanged;
-  ParticipantDrawer({
+  const ParticipantDrawer({super.key, 
     required this.searchQuery,
     required this.onSearchChanged,
     required this.filterParticipants,
@@ -22,6 +22,7 @@ class ParticipantDrawer extends StatefulWidget {
     required this.onParticipantsStatusChanged,
   });
 
+  @override
   _ParticipantDrawerState createState() => _ParticipantDrawerState();
 }
 
@@ -154,8 +155,8 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: TextField(
-                style: TextStyle(color: Colors.black),
-                decoration: InputDecoration(
+                style: const TextStyle(color: Colors.black),
+                decoration: const InputDecoration(
                   hintText: 'Search participants',
                   prefixIcon: Icon(Icons.search),
                   border: OutlineInputBorder(),
@@ -163,7 +164,8 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
                 onChanged: widget.onSearchChanged,
               ),
             ),
-            TabBar(
+            const TabBar(
+              
               tabs: [
                 Tab(text: 'Audio Manage'),
                 Tab(text: 'Together Mode'),
@@ -186,7 +188,7 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
                     children: [
                       if(isAnyParticipantRoleAvailableMoreThenOne)
                       ListTile(
-                        title: Text('Select All',
+                        title: const Text('Select All',
                             style: TextStyle(fontWeight: FontWeight.bold),
                             textAlign: TextAlign.center),
                         trailing: Row(
@@ -301,7 +303,7 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.pan_tool, color: Colors.orange),
+            const Icon(Icons.pan_tool, color: Colors.orange),
             if (!isLocal && !isAdmin)
               Checkbox(
                 value: participantStatus?.isTalkToHostEnable,

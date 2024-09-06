@@ -79,8 +79,8 @@ class ParticipantInfoWidget extends StatelessWidget {
                     ),
                   ),
             if (publicAudioDisabled)
-              Padding(
-                padding: const EdgeInsets.only(left: 5),
+              const Padding(
+                padding: EdgeInsets.only(left: 5),
                 child: Icon(
                   Icons.volume_off,
                   color: Colors.red,

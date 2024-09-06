@@ -13,7 +13,7 @@ class FloatingActionButtonBar extends StatelessWidget {
   final bool isScreenShareMode;
   final VoidCallback toggleViewMode;
 
-  FloatingActionButtonBar({
+  const FloatingActionButtonBar({super.key, 
     required this.localParticipantRole,
     required this.isMobile,
     required this.context,
@@ -33,17 +33,17 @@ class FloatingActionButtonBar extends StatelessWidget {
         if (isScreenShare)
           FloatingActionButton(
             onPressed: toggleViewMode,
-            child: Icon(isScreenShareMode ? Icons.grid_on : Icons.fullscreen),
             tooltip: isScreenShareMode ? 'View All' : 'View Shared Screen Only',
+            child: Icon(isScreenShareMode ? Icons.grid_on : Icons.fullscreen),
           ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         if (localParticipantRole == Role.admin.toString())
           FloatingActionButton(
             onPressed: () => copyInviteLinkToClipboard(context),
-            child: Icon(Icons.link),
             tooltip: 'Copy invite link',
+            child: Icon(Icons.link),
           ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         if (localParticipantRole == Role.admin.toString())
           FloatingActionButton(
             onPressed: () {
@@ -53,8 +53,8 @@ class FloatingActionButtonBar extends StatelessWidget {
                 openEndDrawer();
               }
             },
-            child: Icon(Icons.people),
             tooltip: 'Manage Participants',
+            child: Icon(Icons.people),
           ),
       ],
     );

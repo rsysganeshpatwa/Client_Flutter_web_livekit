@@ -30,7 +30,7 @@ static String encrypt(String text) {
   static String decrypt(String encryptedText) {
     try {
       final parts = encryptedText.split(':');
-      if (parts.length != 2) throw FormatException('Invalid encrypted data format');
+      if (parts.length != 2) throw const FormatException('Invalid encrypted data format');
 
       final iv = erc.IV.fromBase64(parts[0]);
       final encrypted = erc.Encrypted.fromBase64(parts[1]);
@@ -40,14 +40,14 @@ static String encrypt(String text) {
 
       // Extract the timestamp and data
       final splitData = decrypted.split('|');
-      if (splitData.length != 2) throw FormatException('Invalid data format');
+      if (splitData.length != 2) throw const FormatException('Invalid data format');
 
       final timestamp = splitData[0];
       final data = splitData[1];
 
       // Check if the data is expired
       if (_isExpired(timestamp)) {
-        throw FormatException('Data has expired');
+        throw const FormatException('Data has expired');
       }
 
       return data;
@@ -60,7 +60,7 @@ static String encrypt(String text) {
   static bool _isExpired(String timestamp) {
     final dateTime = DateTime.parse(timestamp);
     final now = DateTime.now();
-    final expirationDuration = Duration(hours: 24); // Example: 24 hours expiration
+    final expirationDuration = const Duration(hours: 24); // Example: 24 hours expiration
     return now.difference(dateTime) > expirationDuration;
   }
   // Encode a map of parameters to a query string

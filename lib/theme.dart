@@ -11,11 +11,16 @@ import 'package:google_fonts/google_fonts.dart';
 extension LKColors on Colors {
   static const lkBlue = Color(0xFF5A8BFF);
   static const lkDarkBlue = Color(0xFF00153C);
+    static const lkAccent = Color(0xFFFFC107); // Amber accent
+  static const lkGrey = Color(0xFFB0BEC5); // Light grey
+  static const lkSuccessGreen = Color(0xFF4CAF50); // Success color
+  static const lkErrorRed = Color(0xFFD32F2F); // Error color
+  static const lkLightBlue = Color(0xFFE3F2FD);
 }
 
 class LiveKitTheme {
   //
-  final bgColor = Color.fromARGB(255, 100, 59, 59);
+  final bgColor = const Color.fromARGB(255, 100, 59, 59);
   final textColor = Colors.white;
   final cardColor = LKColors.lkDarkBlue;
   final accentColor = LKColors.lkBlue;

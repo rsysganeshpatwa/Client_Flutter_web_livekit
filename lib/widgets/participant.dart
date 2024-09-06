@@ -116,12 +116,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   }
 
   void _onParticipantChanged() => setState(() {
-    print('12345 Participant name  ${audioPublication?.participant.identity}');
-    print('12345 Participant audioPublication ganesh ${audioPublication?.subscribed}');
-
-    widget.participant.audioTrackPublications.forEach((pub) {
-      print('12345 Participant changed each ganesh ${pub.subscribed} ${pub.participant.identity}');
-    });
+      
   });
 
   List<Widget> extraWidgets(bool isScreenShare) => [];

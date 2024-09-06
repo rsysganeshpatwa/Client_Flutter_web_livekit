@@ -233,7 +233,7 @@ class _ConnectPageState extends State<ConnectPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('POC Health Care Monitoring'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).indicatorColor,
       ),
       body: Stack(
         children: [
@@ -447,7 +447,7 @@ class _ConnectPageState extends State<ConnectPage> {
   }
 
   Widget buildFloatingActionButton() {
-    if (!_isRoomNameInUrl)
+    if (!_isRoomNameInUrl) {
       return Positioned(
         right: 16,
         top: 16,
@@ -456,6 +456,7 @@ class _ConnectPageState extends State<ConnectPage> {
           child: const Icon(Icons.list),
         ),
       );
+    }
     return Container();
   }
 }

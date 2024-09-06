@@ -5,7 +5,7 @@ class AdminApprovalDialog extends StatelessWidget {
   final String roomName;
   final Function(bool) onDecision;
 
-  AdminApprovalDialog({
+  const AdminApprovalDialog({super.key, 
     required this.participantName,
     required this.roomName,
     required this.onDecision,
@@ -15,7 +15,7 @@ class AdminApprovalDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       
-      title: Text('Approval Request'),
+      title: const Text('Approval Request'),
       content: Text('Participant $participantName has requested to join room $roomName.'),
       actions: <Widget>[
         TextButton(
@@ -23,14 +23,14 @@ class AdminApprovalDialog extends StatelessWidget {
             onDecision(true); // Approve
             Navigator.of(context).pop();
           },
-          child: Text('Approve'),
+          child: const Text('Approve'),
         ),
         TextButton(
           onPressed: () {
             onDecision(false); // Reject
             Navigator.of(context).pop();
           },
-          child: Text('Reject'),
+          child: const Text('Reject'),
         ),
       ],
     );
