@@ -27,10 +27,12 @@ class _ConnectPageState extends State<ConnectPage> {
 
   final _identityCtrl = TextEditingController();
   final _roomCtrl = TextEditingController();
+  final _welcomeMessageCtrl = TextEditingController(text: 'Welcome to the room!');
 
   bool _busy = false;
   String? roomNameFromUrl;
   String? roomRoleFromUrl;
+  String? welcomeMessage = "";
   bool _isRoomNameInUrl = false;
 
   @override
@@ -57,7 +59,19 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _readPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
+    String? room = "";
+    final uri = Uri.base;
+    final encryptedParams = uri.queryParameters['data'];
 
+    if (encryptedParams != null && encryptedParams.isNotEmpty) {
+          final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
+       
+      final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
+      final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
+      room = decodedParams['room'] ?? '';
+    }
+    String metadata = await _apiService.getWelcomeMessage(room);
+    welcomeMessage = metadata;
     _initializeParams();
   }
 
@@ -108,10 +122,11 @@ class _ConnectPageState extends State<ConnectPage> {
 
       final identity = _identityCtrl.text;
       final roomName = _roomCtrl.text;
-      final role = _selectedRole == Role.admin ? Role.admin : Role.participant;
-     print('roomName: $roomName, identity: $identity, role: $role');
-      final token =
-          await _apiService.getToken(identity, roomName, role.toString());
+      final adminWelcomeMessage = _welcomeMessageCtrl.text;
+      final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
+
+      final token = await _apiService.getToken(identity, roomName, _role.toString(), adminWelcomeMessage);
+     print('roomName: $roomName, identity: $identity, role: $_role');
 
       await Navigator.push<void>(
         ctx,
@@ -126,7 +141,7 @@ class _ConnectPageState extends State<ConnectPage> {
               preferredCodec: 'Preferred Codec',
               enableBackupVideoCodec:
                   ['VP9', 'AV1'].contains('Preferred Codec'),
-              role: role,
+              role: _role,
               roomName: roomName,
               identity: identity,
             ),
@@ -241,6 +256,15 @@ class _ConnectPageState extends State<ConnectPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+               // Welcome message
+    Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Text(
+           welcomeMessage!,
+           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+           textAlign: TextAlign.center,
+           ),
+          ),
               if (!_isRoomNameInUrl) buildRoleSelection(),
               if (_isRoomNameInUrl)
                 Padding(
@@ -314,6 +338,14 @@ class _ConnectPageState extends State<ConnectPage> {
           child: LKTextField(
             label: 'Room Name',
             ctrl: _roomCtrl,
+          ),
+        ),
+        if (_selectedRole == Role.admin)
+         Padding(
+          padding: const EdgeInsets.only(bottom: 25),
+          child: LKTextField(
+            label: 'Welcome Message',
+            ctrl: _welcomeMessageCtrl,
           ),
         ),
       ],
