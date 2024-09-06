@@ -61,6 +61,8 @@ class _RoomPageState extends State<RoomPage> {
   final Map<String, BuildContext> _dialogContexts =
       {}; // Map to store dialog contexts
   bool _isRunning = true; // Control flag for the loop
+  int _currentPage = 0;
+  final int _participantsPerPage = 6;
   @override
   void initState() {
     super.initState();
@@ -597,6 +599,22 @@ class _RoomPageState extends State<RoomPage> {
     });
   }
 
+  void _nextPage() {
+    setState(() {
+      if ((_currentPage + 1) * _participantsPerPage < participantTracks.length) {
+        _currentPage++;
+      }
+    });
+  }
+
+  void _previousPage() {
+    setState(() {
+      if (_currentPage > 0) {
+        _currentPage--;
+      }
+    });
+  }
+  
   void _toggleMuteAll(bool muteAll) {
     setState(() {
       _muteAll = muteAll;
@@ -717,35 +735,21 @@ class _RoomPageState extends State<RoomPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
+    final bool isparticipantScreenShared=participantTracks.any((track) =>
+                    track.type == ParticipantTrackType.kScreenShare);
 
     return Scaffold(
       key: _scaffoldKey,
       body: SafeArea(
         child: Stack(
           children: [
-            // Conditional layout based on view mode
-            if (participantTracks.any((track) =>
-                    track.type == ParticipantTrackType.kScreenShare) &&
-                _isScreenShareMode)
-              Positioned.fill(
-                child: Stack(
-                  children: [
-                    // Display the screen share participant prominently
-                    Positioned.fill(
-                      child: ParticipantWidget.widgetFor(
-                        participantTracks.firstWhere((track) => track
-                            .participant
-                            .isScreenShareEnabled()), // Assuming you have a way to find the screen share track
-                        showStatsLayer: false,
-                      ),
-                    ),
-                    // Display other participants in a side panel
-                  ],
-                ),
-              )
-            else
-              ParticipantGridView(
+            ParticipantGridView(
                 participantTracks: participantTracks,
+                currentPage: _currentPage,
+                onPreviousPage: _previousPage,
+                onNextPage: _nextPage,
+                participantScreenShared: isparticipantScreenShared,
+                isScreenShareMode: _isScreenShareMode,
               ),
             if (widget.room.localParticipant != null)
               Positioned(

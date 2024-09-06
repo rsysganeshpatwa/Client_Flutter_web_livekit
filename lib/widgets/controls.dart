@@ -188,6 +188,8 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   void _enableScreenShare() async {
+	  int screenShareCount=widget.room.remoteParticipants.values.where((element) => element.isScreenShareEnabled()).length;
+    if (screenShareCount < 2){
     if (lkPlatformIsDesktop()) {
       try {
         final source = await showDialog<DesktopCapturerSource>(
@@ -264,7 +266,28 @@ class _ControlsWidgetState extends State<ControlsWidget> {
     }
 
     await participant.setScreenShareEnabled(true, captureScreenAudio: true);
-  }
+	} else {
+      // Show a popup when screenShareCount is 2 or more
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Screen Share Limit Reached"),
+          content: Text(
+            "${screenShareCount} Admins are already sharing their screens. You can't share your screen as the limit is 2."),
+          actions: <Widget>[
+          TextButton(
+            child: Text("OK"),
+            onPressed: () {
+            Navigator.of(context).pop(); // Dismiss the dialog
+            },
+          ),
+          ],
+        );
+        },
+      );
+      }
+    }
 
   void _disableScreenShare() async {
     await participant.setScreenShareEnabled(false);
