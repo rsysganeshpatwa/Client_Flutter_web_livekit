@@ -32,18 +32,18 @@ void main() async {
   await dotenv.load();
    setup();
 
-     ErrorWidget.builder = (FlutterErrorDetails details) {
-      print(details.exception);
-      print(details.stack);
-      print(details.library);
-    // Return a custom widget when an error occurs
-    return Center(
-      child: Text(
-        'Something went wrong! ${details.library}', // Custom error message
-        style: TextStyle(color: Colors.red, fontSize: 18),
-      ),
-    );
-  };
+  //    ErrorWidget.builder = (FlutterErrorDetails details) {
+  //     print(details.exception);
+  //     print(details.stack);
+  //     print(details.library);
+  //   // Return a custom widget when an error occurs
+  //   return Center(
+  //     child: Text(
+  //       'Something went wrong! ${details.library}', // Custom error message
+  //       style: TextStyle(color: Colors.red, fontSize: 18),
+  //     ),
+  //   );
+  // };
   runApp(const LiveKitExampleApp());
 }
 

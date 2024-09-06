@@ -32,7 +32,7 @@ class ApiService {
       final data = response.body;
       return data;
     } else {
-      throw Exception('Failed to generate token');
+      throw Exception('Failed to get welcome message');
     }
   }
 
