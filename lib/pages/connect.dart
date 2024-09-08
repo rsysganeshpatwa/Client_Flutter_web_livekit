@@ -265,18 +265,6 @@ class _ConnectPageState extends State<ConnectPage> {
            ),
           ),
               if (!_isRoomNameInUrl) buildRoleSelection(),
-              if (_isRoomNameInUrl)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 25),
-                  child: Text(
-                    'Room Name: ${_roomCtrl.text}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 25),
                 child: LKTextField(
