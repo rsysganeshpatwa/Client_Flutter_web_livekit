@@ -139,9 +139,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
             ? Border.all(width: 5, color: Colors.green)
             : null,
       ),
-      decoration: BoxDecoration(
-        color: Color(0xFF1F2A38),
-      ),
+    
       child: Stack(
         children: [
           if (isScreenShare)

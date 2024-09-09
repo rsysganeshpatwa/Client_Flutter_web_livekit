@@ -9,11 +9,15 @@ class NoVideoWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.grey[700],
+          borderRadius: BorderRadius.circular(10),
+        ),
         child: LayoutBuilder(
           builder: (ctx, constraints) => Icon(
-            Icons.videocam_off_outlined,
-            color: LKColors.lkBlue,
-            size: math.min(constraints.maxHeight, constraints.maxWidth) * 0.3,
+            Icons.account_circle,
+            color: Colors.white,
+            size: math.min(constraints.maxHeight, constraints.maxWidth) /2,
           ),
         ),
       );
