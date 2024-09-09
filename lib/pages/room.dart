@@ -553,6 +553,7 @@ class _RoomPageState extends State<RoomPage> {
         }
       } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
         userMediaTracks.add(ParticipantTrack(participant: participant));
+      
       }
     }
 
