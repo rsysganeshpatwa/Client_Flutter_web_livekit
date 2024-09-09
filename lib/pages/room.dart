@@ -17,6 +17,7 @@ import 'package:video_meeting_room/pages/room-widget/FloatingActionButtonBar.dar
 import 'package:video_meeting_room/pages/room-widget/HandRaiseNotification.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
+import 'package:video_meeting_room/pages/room-widget/ParticipantListView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
@@ -599,7 +600,8 @@ class _RoomPageState extends State<RoomPage> {
 
   void _nextPage() {
     setState(() {
-      if ((_currentPage + 1) * _participantsPerPage < participantTracks.length) {
+      if ((_currentPage + 1) * _participantsPerPage <
+          participantTracks.length) {
         _currentPage++;
       }
     });
@@ -612,7 +614,7 @@ class _RoomPageState extends State<RoomPage> {
       }
     });
   }
-  
+
   void _toggleMuteAll(bool muteAll) {
     setState(() {
       _muteAll = muteAll;
@@ -734,8 +736,8 @@ class _RoomPageState extends State<RoomPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
-    final bool isparticipantScreenShared=participantTracks.any((track) =>
-                    track.type == ParticipantTrackType.kScreenShare);
+    final bool isparticipantScreenShared = participantTracks
+        .any((track) => track.type == ParticipantTrackType.kScreenShare);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -743,19 +745,13 @@ class _RoomPageState extends State<RoomPage> {
       body: SafeArea(
         child: Column(
           children: [
-            ParticipantGridView(
-                participantTracks: participantTracks,
-                currentPage: _currentPage,
-                onPreviousPage: _previousPage,
-                onNextPage: _nextPage,
-                participantScreenShared: isparticipantScreenShared,
-                isScreenShareMode: _isScreenShareMode,
-              ),
             if (widget.room.localParticipant != null)
               RoomHeader(
                   room: widget.room,
                   participantsStatusList: participantsManager,
-                  onToggleRaiseHand: _handleToggleRaiseHand,isHandRaisedStatusChanged: _isHandleRaiseHand,isAdmin: localParticipantRole == Role.admin.toString()),
+                  onToggleRaiseHand: _handleToggleRaiseHand,
+                  isHandRaisedStatusChanged: _isHandleRaiseHand,
+                  isAdmin: localParticipantRole == Role.admin.toString()),
 
             // Expanded Grid View (between header and footer)
             Expanded(
@@ -768,22 +764,32 @@ class _RoomPageState extends State<RoomPage> {
                       children: [
                         // Display the screen share participant prominently
                         Positioned.fill(
-                          child: ParticipantWidget.widgetFor(
-                            participantTracks.firstWhere((track) =>
-                                track.participant.isScreenShareEnabled()),
-                            showStatsLayer: false,
+                            child: ParticipantGridView(
+                          participantTracks: participantTracks.where((track) {
+                            return track.type == ParticipantTrackType.kScreenShare;
+                          }).toList(),  
+
+
+                        )),
+                        // Display other participants in a side panel (if needed)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 200,
+                            color: Colors.black.withOpacity(0.5),
+                            child: ParticipantListView(
+                              participantTracks: participantTracks.where((track) {
+                                return track.type != ParticipantTrackType.kScreenShare;
+                              }).toList(),
+                            ),
                           ),
                         ),
-                        // Display other participants in a side panel (if needed)
                       ],
                     )
                   : ParticipantGridView(
-                       participantTracks: participantTracks,
-                currentPage: _currentPage,
-                onPreviousPage: _previousPage,
-                onNextPage: _nextPage,
-                participantScreenShared: isparticipantScreenShared,
-                isScreenShareMode: _isScreenShareMode,
+                      participantTracks: participantTracks,
                     ),
             )),
 

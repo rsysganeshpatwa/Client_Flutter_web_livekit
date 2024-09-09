@@ -1,36 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
+import 'package:video_meeting_room/pages/room-widget/ParticipantGrid.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
 import 'dart:math' as math;
 
-class ParticipantGridView extends StatelessWidget {
+class ParticipantGridView extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
-  final int currentPage;
-  final int participantsPerPage;
-  final VoidCallback onPreviousPage;
-  final VoidCallback onNextPage;
-  final bool participantScreenShared;
-  final bool isScreenShareMode;
 
   const ParticipantGridView({
     super.key,
     required this.participantTracks,
-    required this.currentPage,
-    this.participantsPerPage = 6,
-    required this.onPreviousPage,
-    required this.onNextPage,
-    required this.participantScreenShared,
-    required this.isScreenShareMode,
   });
 
-  List<ParticipantTrack> _getParticipantsForCurrentPage() {
-    final startIndex = currentPage * participantsPerPage;
-    final endIndex = startIndex + participantsPerPage;
-    return participantTracks.sublist(
-      startIndex,
-      endIndex > participantTracks.length ? participantTracks.length : endIndex,
-    );
-  }
+  @override
+  _ParticipantGridViewState createState() => _ParticipantGridViewState();
+}
+
+class _ParticipantGridViewState extends State<ParticipantGridView> {
+  final PageController _pageController = PageController();
 
   @override
   Widget build(BuildContext context) {
@@ -40,73 +29,102 @@ class ParticipantGridView extends StatelessWidget {
         builder: (context, constraints) {
           final double gridWidth = constraints.maxWidth;
           final double gridHeight = constraints.maxHeight;
-          final int numParticipants = participantTracks.length;
-          final bool isMobile = gridWidth < 600;
+          final int numParticipants = widget.participantTracks.length;
 
-          final int crossAxisCount = (isMobile && numParticipants == 2)
-              ? 1
-              : (numParticipants > 1)
-                  ? (gridWidth / (gridWidth / math.sqrt(numParticipants))).ceil()
-                  : 1;
+          final bool hasPagination = numParticipants > 4;
+          final double paginationWidth = hasPagination ? 50.0 : 0.0; // Adjust as needed
+          final double paginationHeight = 50.0; // Adjust as needed
 
-          final int rowCount = (isMobile && numParticipants == 2)
-              ? 2
-              : (numParticipants / crossAxisCount).ceil();
+          final double adjustedGridWidth = gridWidth - 2 * paginationWidth - 16.0; // 16.0 for padding
+          final double adjustedGridHeight = gridHeight - paginationHeight - 16.0; // 16.0 for padding
 
-          final double aspectRatio = (gridWidth / crossAxisCount) / (gridHeight / rowCount);
+          if (numParticipants <= 4) {
+            return ParticipantGrid(
+              participantTracks: widget.participantTracks,
+              gridWidth: adjustedGridWidth,
+              gridHeight: adjustedGridHeight,
+            );
+          } else {
+            final int itemsPerPage = 4;
+            final int pageCount = (numParticipants / itemsPerPage).ceil();
 
-          return Column(
-            children: [
-              Expanded(
-                child: participantTracks.isNotEmpty
-                    ? GridView.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          childAspectRatio: aspectRatio,
-                           crossAxisSpacing: 8.0, // Space between items horizontally
-              mainAxisSpacing: 8.0, // Space between items vertically
-                        ),
-                        itemCount: participantTracks.length,
-                        itemBuilder: (context, index) {
-                          return GestureDetector(
-                            onTap: () {
-                              // Add interaction logic here
-                            },
-                            child: Card(
-                              elevation: 4.0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(0),
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(0),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(0),
-                                  child: ParticipantWidget.widgetFor(
-                                    participantTracks[index],
-                                    showStatsLayer: false,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                    : const Center(
-                        child: Text(
-                          'No Participants',
-                          style: TextStyle(
-                            fontSize: 18.0,
-                            color: Colors.grey,
-                          ),
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: pageCount,
+                    itemBuilder: (context, pageIndex) {
+                      final startIndex = pageIndex * itemsPerPage;
+                      final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
+                      final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
+
+                      return ParticipantGrid(
+                        participantTracks: pageParticipants,
+                        gridWidth: adjustedGridWidth,
+                        gridHeight: adjustedGridHeight,
+                      );
+                    },
+                  ),
+                ),
+                if (hasPagination)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 0),
+                    
+                      child: PaginationControls(
+                        pageController: _pageController,
+                        pageCount: pageCount,
+                        position: PaginationPosition.left,
+                      ),
+                    ),
+                  ),
+                if (hasPagination)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: EdgeInsets.only(right: 0),
+                      child: PaginationControls(
+                        pageController: _pageController,
+                        pageCount: pageCount,
+                        position: PaginationPosition.right,
+                      ),
+                    ),
+                  ),
+                  if (hasPagination)
+                  const SizedBox(height: 30),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: SmoothPageIndicator(
+                        controller: _pageController,
+                        count: pageCount,
+                        effect:JumpingDotEffect(
+                          dotWidth: 10.0,
+                          dotHeight: 10.0,
+                          spacing: 10.0,
+                          dotColor: Colors.white,
+                          activeDotColor: Colors.black,
                         ),
                       ),
-              ),
-            ],
-          );
+                    ),
+                  ),
+              ],
+            );
+            // add SmoothPageIndicator here
+
+
+          }
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 }
