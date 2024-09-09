@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/models/role.dart';
@@ -13,14 +12,16 @@ class ParticipantDrawer extends StatefulWidget {
   final Participant? localParticipant;
   final List<ParticipantStatus> participantsStatusList;
   final void Function(List<ParticipantStatus>) onParticipantsStatusChanged;
-  const ParticipantDrawer({super.key, 
+
+  const ParticipantDrawer({
+    Key? key,
     required this.searchQuery,
     required this.onSearchChanged,
     required this.filterParticipants,
     required this.localParticipant,
     required this.participantsStatusList,
     required this.onParticipantsStatusChanged,
-  });
+  }) : super(key: key);
 
   @override
   _ParticipantDrawerState createState() => _ParticipantDrawerState();
@@ -29,12 +30,15 @@ class ParticipantDrawer extends StatefulWidget {
 class _ParticipantDrawerState extends State<ParticipantDrawer> {
   late bool _selectAllAudio;
   late bool _selectAllVideo;
+  late bool _selectMuteAll;
 
   @override
   void initState() {
     super.initState();
     _selectAllAudio = _areAllParticipantsSelected('audio');
     _selectAllVideo = _areAllParticipantsSelected('video');
+    _selectMuteAll = !_areAllParticipantsSelected('talkToHost');
+    print('initState Select Mute All: $_selectMuteAll');
   }
 
   @override
@@ -43,20 +47,27 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     if (oldWidget.participantsStatusList != widget.participantsStatusList) {
       _selectAllAudio = _areAllParticipantsSelected('audio');
       _selectAllVideo = _areAllParticipantsSelected('video');
+     _selectMuteAll = !_areAllParticipantsSelected('talkToHost');
+   //   print('didUpdateWidget Select Mute All: $_selectMuteAll');
     }
   }
 
-  bool _areAllParticipantsSelected( String type) {
+  bool _areAllParticipantsSelected(String type) {
     if (type == 'audio') {
       return widget.participantsStatusList
           .every((status) => status.isAudioEnable);
-    } else {
+    } else if (type == 'video') {
       return widget.participantsStatusList
           .every((status) => status.isVideoEnable);
+    } else {
+      return widget.participantsStatusList
+      .where((status) => status.role != Role.admin.toString())
+          .every((status) => status.isTalkToHostEnable);
     }
   }
 
   void _toggleSelectAll(String type, bool value) {
+    print('Toggle select all: $type, $value');
     setState(() {
       if (type == 'audio') {
         _selectAllAudio = value;
@@ -64,17 +75,28 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
           return status.copyWith(isAudioEnable: _selectAllAudio);
         }).toList();
         widget.onParticipantsStatusChanged(updatedList);
-      } else {
+      } else if (type == 'video') {
         _selectAllVideo = value;
         final updatedList = widget.participantsStatusList.map((status) {
           return status.copyWith(isVideoEnable: _selectAllVideo);
+        }).toList();
+        widget.onParticipantsStatusChanged(updatedList);
+      } else {
+        _selectMuteAll = value;
+        print('Select Mute All: $_selectMuteAll');
+        final updatedList = widget.participantsStatusList.map((status) {
+          // Update only if the participant is not an admin
+          if (status.role != Role.admin.toString()) {
+            print('Select Mute All: status: ${status.toJson()}');
+            return status.copyWith(isTalkToHostEnable: !_selectMuteAll);
+          }
+          return status; // Leave admin participants unchanged
         }).toList();
         widget.onParticipantsStatusChanged(updatedList);
       }
     });
   }
 
-  // Function to update audio and video status
   void updateAudioVideoStatus(
       ParticipantStatus participantStatus, bool isAudio, bool isVideo) {
     final updatedStatus = participantStatus.copyWith(
@@ -84,19 +106,17 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     _triggerParticipantsStatusUpdate(updatedStatus);
   }
 
-  // Function to update 'Allow to Talk' status
   void updateAllowToTalkStatus(
       ParticipantStatus participantStatus, bool isAllowToTalk) {
     final updatedStatus = participantStatus.copyWith(
       isTalkToHostEnable: isAllowToTalk,
       isHandRaised: false,
     );
+    print('Allow to talk status updated: ${updatedStatus.toJson()}');
     _triggerParticipantsStatusUpdate(updatedStatus);
   }
 
-  // Function to trigger participants status update and call the callback
   void _triggerParticipantsStatusUpdate(ParticipantStatus updatedStatus) {
-    // Check if the identity already exists in the participantsStatusList
     bool exists = false;
     final updatedList = widget.participantsStatusList.map((status) {
       if (status.identity == updatedStatus.identity) {
@@ -106,17 +126,13 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       return status;
     }).toList();
 
-    // If the identity does not exist, add the new status
     if (!exists) {
       updatedList.add(updatedStatus);
     }
 
-    // Trigger the callback with the updated list
     widget.onParticipantsStatusChanged(updatedList);
   }
 
-  // Function to retrieve participant status safely
-  // Utility function to get participant status
   ParticipantStatus? _getParticipantStatus(String identity) {
     try {
       return widget.participantsStatusList.firstWhere(
@@ -138,104 +154,104 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
 
   @override
   Widget build(BuildContext context) {
-  final nonAdminParticipants = widget
-    .filterParticipants(widget.searchQuery)
-    .where((track) => track.participant.metadata != null &&
-        jsonDecode(track.participant.metadata!)['role'] !=
-            Role.admin.toString())
-    .toList();
+    final nonAdminParticipants = widget
+        .filterParticipants(widget.searchQuery)
+        .where((track) =>
+            track.participant.metadata != null &&
+            jsonDecode(track.participant.metadata!)['role'] !=
+                Role.admin.toString())
+        .toList();
 
-final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 2;
-    return DefaultTabController(
-      length: 2,
-      child: Drawer(
+    final isAnyParticipantRoleAvailableMoreThenOne =
+        nonAdminParticipants.length >= 2;
+
+    return Drawer(
+      child: SingleChildScrollView(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                style: const TextStyle(color: Colors.black),
-                decoration: const InputDecoration(
-                  hintText: 'Search participants',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: widget.onSearchChanged,
-              ),
-            ),
-            const TabBar(
-              
-              tabs: [
-                Tab(text: 'Audio Manage'),
-                Tab(text: 'Together Mode'),
-              ],
-            ),
-            Expanded(
-              child: TabBarView(
+            Container(
+              color: Colors.black.withOpacity(0.8),
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tab 1: Audio Manage
-                  ListView(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment
+                        .spaceBetween, // To push items to opposite ends
                     children: [
-                      ..._buildHostParticipants(),
-                      ..._buildHandRaisedParticipants(),
-                      ..._buildNonHandRaisedParticipants(),
+                      Text(
+                        'Participants',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
                     ],
                   ),
-
-                  // Tab 2: Together Mode
-                  ListView(
-                    children: [
-                      if(isAnyParticipantRoleAvailableMoreThenOne)
-                      ListTile(
-                        title: const Text('Select All',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tooltip(
-                              message: _selectAllAudio
-                                  ? 'Toggle audio off for all participants'
-                                  : 'Toggle audio on for all participants',
-                              child: IconButton(
-                                icon: Icon(
-                                  _selectAllAudio
-                                      ? Icons.volume_up
-                                      : Icons.volume_off,
-                                  color: _selectAllAudio
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                                onPressed: () {
-                                  _toggleSelectAll('audio', !_selectAllAudio);
-                                },
-                              ),
-                            ),
-                            Tooltip(
-                              message: _selectAllVideo
-                                  ? 'Toggle video off for all participants'
-                                  : 'Toggle video on for all participants',
-                              child: IconButton(
-                                icon: Icon(
-                                  _selectAllVideo
-                                      ? Icons.videocam
-                                      : Icons.videocam_off,
-                                  color: _selectAllVideo
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                                onPressed: () {
-                                  _toggleSelectAll('video', !_selectAllVideo);
-                                },
-                              ),
-                            ),
+                  SizedBox(height: 16),
+                  TextField(
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Search participants',
+                      prefixIcon: Icon(Icons.search, color: Colors.white),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.blueGrey[800],
+                    ),
+                    onChanged: widget.onSearchChanged,
+                  ),
+                  SizedBox(height: 16),
+                  DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      children: [
+                        TabBar(
+                          labelColor: const Color(0xFF9FF5FF),
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: const Color(
+                              0xFF9FF5FF), // Updated indicator color
+                          tabs: [
+                            Tab(text: 'Audio Manage'),
+                            Tab(text: 'Together Mode'),
                           ],
                         ),
-                        onTap: null,
-                      ),
-                      ..._buildHostParticipants(),
-                      ..._buildTogetherModeParticipants()
-                    ],
+                        Container(
+                          // as per drawer height:   // Set the height or use MediaQuery for dynamic sizing
+                          height: MediaQuery.of(context).size.height,
+                          child: TabBarView(
+                            children: [
+                              // Tab 1: Audio Manage
+                              ListView(
+                                children: [
+                                  if (isAnyParticipantRoleAvailableMoreThenOne)
+                                    _selectAllTalkToHostModeParticipants(),
+                                  ..._buildHostParticipants(),
+                                  ..._getHandRaisedParticipants(),
+                                  ..._buildAllParticipants('Audio Manage'),
+                                ],
+                              ),
+                              // Tab 2: Together Mode
+                              ListView(
+                                children: [
+                                  if (isAnyParticipantRoleAvailableMoreThenOne)
+                                    _selectAllTogetherModeParticipants(),
+                                  ..._buildHostParticipants(),
+                                  ..._buildAllParticipants('Together Mode'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -246,6 +262,23 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
     );
   }
 
+  List<Widget> _buildAllParticipants(tabName) {
+    return widget.filterParticipants(widget.searchQuery).where((track) {
+      final metadata = track.participant.metadata;
+      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+      return role != Role.admin.toString();
+    }).map((track) {
+      final participantStatus =
+          _getParticipantStatus(track.participant.identity);
+      final participantName = track.participant.name ?? 'Unknown';
+
+      return _buildParticipantTile(context,
+          name: participantName,
+          participantStatus: participantStatus,
+          tabName: tabName);
+    }).toList();
+  }
+
   List<Widget> _buildHostParticipants() {
     return widget.filterParticipants(widget.searchQuery).where((track) {
       final metadata = track.participant.metadata;
@@ -254,19 +287,126 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
     }).map((track) {
       final isLocal =
           track.participant.identity == widget.localParticipant?.identity;
+      final participantStatus =
+          _getParticipantStatus(track.participant.identity);
       final participantName = track.participant.name ?? 'Unknown';
       final displayName =
           isLocal ? '$participantName (you) (host)' : '$participantName (host)';
 
-      return ListTile(
-        title: Text(displayName),
-        trailing: null,
-        onTap: null,
-      );
+      return _buildParticipantTile(context,
+          name: displayName, participantStatus: participantStatus, tabName: '');
     }).toList();
   }
 
-  List<Widget> _buildHandRaisedParticipants() {
+Column _selectAllTalkToHostModeParticipants() {
+  return Column(
+    children: [
+      ListTile(
+        title: Text(
+          'Select all',
+          style: TextStyle(color: Colors.white),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tooltip(
+              message: _selectMuteAll
+                  ? 'Allow all to talk to host'
+                  : 'Disallow all to talk to host',
+              child: IconButton(
+                icon: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white, // White circle background
+                  ),
+                  padding: EdgeInsets.all(1), // Padding to make it a circle
+                  child: Icon(
+                    _selectMuteAll ? Icons.mic_off : Icons.mic,
+                    color: _selectMuteAll ? Colors.red : Colors.black,
+                  ),
+                ),
+                onPressed: () {
+                  print('onPressed Select Mute All: $_selectMuteAll');
+                  _toggleSelectAll('talkToHost', !_selectMuteAll);
+                },
+              ),
+            ),
+          ],
+        ),
+        onTap: null,
+      ),
+      Divider(
+        thickness: 0.2,
+        color: Colors.white, // Optional, to make the divider visible
+      ),
+    ],
+  );
+}
+
+  Column _selectAllTogetherModeParticipants() {
+  return Column(
+    children: [
+      ListTile(
+        title: Text(
+          'Select all',
+          style: TextStyle(color: Colors.white),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tooltip(
+              message: _selectAllAudio ? 'Mute All' : 'Unmute All',
+              child: IconButton(
+                icon: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white, // White circle background
+                  ),
+                  padding: EdgeInsets.all(1), // Padding for circle size
+                  child: Icon(
+                    _selectAllAudio ? Icons.volume_up : Icons.volume_off,
+                    color: _selectAllAudio ? Colors.black : Colors.red,
+                  ),
+                ),
+                onPressed: () {
+                  _toggleSelectAll('audio', !_selectAllAudio);
+                },
+              ),
+            ),
+            Tooltip(
+              message: _selectAllVideo
+                  ? 'Turn off video for all'
+                  : 'Turn on video for all',
+              child: IconButton(
+                icon: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white, // White circle background
+                  ),
+                  padding: EdgeInsets.all(1), // Padding for circle size
+                  child: Icon(
+                    _selectAllVideo ? Icons.videocam : Icons.videocam_off,
+                    color: _selectAllVideo ? Colors.black : Colors.red,
+                  ),
+                ),
+                onPressed: () {
+                  _toggleSelectAll('video', !_selectAllVideo);
+                },
+              ),
+            ),
+          ],
+        ),
+        onTap: null,
+      ),
+      Divider(
+        thickness: 0.2,
+        color: Colors.white, // Optional for better visibility
+      ),
+    ],
+  );
+}
+
+  List<Widget> _getHandRaisedParticipants() {
     final handRaisedParticipants =
         widget.filterParticipants(widget.searchQuery).where((track) {
       final participantStatus =
@@ -274,176 +414,159 @@ final isAnyParticipantRoleAvailableMoreThenOne = nonAdminParticipants.length >= 
       return participantStatus?.isHandRaised ?? false;
     }).toList()
           ..sort((a, b) {
-            final aStatus = _getParticipantStatus(a.participant.identity);
-            final bStatus = _getParticipantStatus(b.participant.identity);
-            return (aStatus?.handRaisedTimeStamp ?? 0)
-                .compareTo(bStatus?.handRaisedTimeStamp ?? 0);
+            final statusA = _getParticipantStatus(a.participant.identity);
+            final statusB = _getParticipantStatus(b.participant.identity);
+            return (statusB?.handRaisedTimeStamp ?? 0) -
+                (statusA?.handRaisedTimeStamp ?? 0);
           });
 
     return handRaisedParticipants.map((track) {
       final participantStatus =
           _getParticipantStatus(track.participant.identity);
-
-      final isLocal =
-          track.participant.identity == widget.localParticipant?.identity;
       final participantName = track.participant.name ?? 'Unknown';
-      final displayName = isLocal ? '$participantName (you)' : participantName;
 
       final index = handRaisedParticipants.indexOf(track) + 1;
-      final handRaisedText = ' (#$index)';
-      final isAdmin = isLocal &&
-          track.participant.metadata != null &&
-          jsonDecode(track.participant.metadata!)['role'] ==
-              Role.admin.toString();
+      final handRaisedText = '$participantName (#$index)';
 
-      return ListTile(
-        title: Text(displayName + handRaisedText),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.pan_tool, color: Colors.orange),
-            if (!isLocal && !isAdmin)
-              Checkbox(
-                value: participantStatus?.isTalkToHostEnable,
-                onChanged: (value) {
-                  if (participantStatus != null) {
-                    updateAllowToTalkStatus(
-                      participantStatus,
-                      value ?? false,
-                    );
-                  }
-                },
-              ),
-          ],
+      return _buildParticipantTile(context,
+          name: handRaisedText, participantStatus: participantStatus, tabName: 'Audio Manage', isFromHandRaised: true);
+    }).toList();
+  }
+
+  Widget _buildParticipantTile(BuildContext context,
+      {required String name, ParticipantStatus? participantStatus, tabName, bool isFromHandRaised = false}) {
+    print('Participant Status: ${participantStatus?.toJson()}');
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.account_circle,
+              size: 40, color: Colors.white), // Black icon for contrast
+          title: Text(
+            name,
+            style: const TextStyle(
+              fontWeight: FontWeight.normal,
+              color: Colors.white, // Adjusted for light background
+            ),
+          ),
+
+          trailing: tabName == 'Audio Manage'
+              ? _getAudioManageTrailingIcons(participantStatus!, isFromHandRaised)
+              : tabName == 'Together Mode'
+                  ? _getTogetherModeTrailingIcons(participantStatus!)
+                  : null,
         ),
-        onTap: isLocal || isAdmin
-            ? null
-            : () {
-                if (participantStatus != null) {
-                  updateAllowToTalkStatus(
-                    participantStatus,
-                    !participantStatus.isTalkToHostEnable,
-                  );
-                }
-              },
-      );
-    }).toList();
-  }
-
-  List<Widget> _buildNonHandRaisedParticipants() {
-    return widget.filterParticipants(widget.searchQuery).where((track) {
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      return !(participantStatus?.isHandRaised ?? false) &&
-          track.participant.metadata != null &&
-          jsonDecode(track.participant.metadata!)['role'] !=
-              Role.admin.toString();
-    }).map((track) {
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-
-      final isLocal =
-          track.participant.identity == widget.localParticipant?.identity;
-      final participantName = track.participant.name ?? 'Unknown';
-      final displayName = isLocal ? '$participantName (you)' : participantName;
-
-      return ListTile(
-        title: Text(displayName),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isLocal)
-              Checkbox(
-                value: participantStatus?.isTalkToHostEnable,
-                onChanged: (value) {
-                  if (participantStatus != null) {
-                    updateAllowToTalkStatus(
-                      participantStatus,
-                      value ?? false,
-                    );
-                  }
-                },
-              ),
-          ],
+        Divider(
+          thickness: 0.2,
         ),
-        onTap: isLocal
-            ? null
-            : () {
-                if (participantStatus != null) {
-                  updateAllowToTalkStatus(
-                    participantStatus,
-                    !participantStatus.isTalkToHostEnable,
-                  );
-                }
-              },
-      );
-    }).toList();
+      ],
+    );
   }
 
-  List<Widget> _buildTogetherModeParticipants() {
-    return widget.filterParticipants(widget.searchQuery).where((track) {
-      final metadata = track.participant.metadata;
-      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-      return role != Role.admin.toString();
-    }).map((track) {
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      if (participantStatus == null) return Container();
+Row _getAudioManageTrailingIcons(ParticipantStatus participantStatus,bool isFromHandRaised) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Tooltip(
+        message: (participantStatus.isTalkToHostEnable ?? false)
+            ? 'Disallow to talk'
+            : 'Allow to talk',
+        child: IconButton(
+          icon: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white, // White circle background
+            ),
+            padding: EdgeInsets.all(1), // Padding to make it a circle
+            child: Icon(
+              (participantStatus.isTalkToHostEnable ?? false)
+                  ? Icons.mic
+                  : Icons.mic_off,
+              color: (participantStatus.isTalkToHostEnable ?? false)
+                  ? Colors.black
+                  : Colors.red,
+            ),
+          ),
+          onPressed: () {
+            final newAllowToTalkStatus =
+                !(participantStatus.isTalkToHostEnable ?? false);
+            updateAllowToTalkStatus(participantStatus, newAllowToTalkStatus);
+          },
+        ),
+      ),
+      if (isFromHandRaised && participantStatus.isHandRaised ?? false)
+        Tooltip(
+          message: 'Raised hand',
+          child: Container(
+           
+            padding: EdgeInsets.all(1), // Padding to make it a circle
+            child: const Icon(
+              Icons.pan_tool,
+              color: Colors.orange,
+            ),
+          ),
+        ),
+    ],
+  );
+}
 
-      final isLocal =
-          track.participant.identity == widget.localParticipant?.identity;
-      final participantName = track.participant.name ?? 'Unknown';
-      final displayName = isLocal ? '$participantName (you)' : participantName;
-
-      final isAudioOn = participantStatus.isAudioEnable;
-      final isVideoOn = participantStatus.isVideoEnable;
-      final role = track.participant.metadata != null
-          ? jsonDecode(track.participant.metadata!)['role']
-          : null;
-
-      final isAdmin = isLocal && role == Role.admin.toString();
-
-      return ListTile(
-        title: Text(displayName),
-        trailing: !isAdmin
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isAudioOn ? Icons.volume_up : Icons.volume_off,
-                      color: isAudioOn ? Colors.green : Colors.red,
-                    ),
-                    onPressed: isLocal
-                        ? null
-                        : () {
-                            updateAudioVideoStatus(
-                              participantStatus,
-                              !isAudioOn,
-                              isVideoOn,
-                            );
-                          },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      isVideoOn ? Icons.videocam : Icons.videocam_off,
-                      color: isVideoOn ? Colors.green : Colors.red,
-                    ),
-                    onPressed: isLocal
-                        ? null
-                        : () {
-                            updateAudioVideoStatus(
-                              participantStatus,
-                              isAudioOn,
-                              !isVideoOn,
-                            );
-                          },
-                  ),
-                ],
-              )
-            : null,
-        onTap: null,
-      );
-    }).toList();
-  }
+Row _getTogetherModeTrailingIcons(ParticipantStatus participantStatus) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Tooltip(
+        message: (participantStatus.isAudioEnable ?? false) ? 'Mute' : 'Unmute',
+        child: IconButton(
+          icon: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white, // White circle background
+            ),
+            padding: EdgeInsets.all(1), // Add some padding to make it a circle
+            child: Icon(
+              (participantStatus.isAudioEnable ?? false)
+                  ? Icons.volume_up
+                  : Icons.volume_off,
+              color: participantStatus.isAudioEnable ?? false
+                  ? Colors.black
+                  : Colors.red,
+            ),
+          ),
+          onPressed: () {
+            final newAudioStatus = !(participantStatus.isAudioEnable ?? false);
+            updateAudioVideoStatus(
+                participantStatus, newAudioStatus, participantStatus.isVideoEnable);
+          },
+        ),
+      ),
+      Tooltip(
+        message: (participantStatus.isVideoEnable ?? false)
+            ? 'Turn off video'
+            : 'Turn on video',
+        child: IconButton(
+          icon: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white, // White circle background
+            ),
+            padding: EdgeInsets.all(1), // Add some padding to make it a circle
+            child: Icon(
+              (participantStatus.isVideoEnable ?? false)
+                  ? Icons.videocam
+                  : Icons.videocam_off,
+               color: participantStatus.isVideoEnable ?? false
+                  ? Colors.black
+                  : Colors.red,
+                  
+            ),
+          ),
+          onPressed: () {
+            final newVideoStatus = !(participantStatus.isVideoEnable ?? false);
+            updateAudioVideoStatus(participantStatus,
+                participantStatus.isAudioEnable, newVideoStatus);
+          },
+        ),
+      ),
+    ],
+  );
+}
 }

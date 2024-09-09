@@ -105,23 +105,52 @@ status == 'approved'
         ),
       );
 
-  Future<bool?> showDisconnectDialog() => showDialog<bool>(
-        context: this,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Disconnect'),
-          content: const Text('Are you sure to disconnect?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Disconnect'),
-            ),
-          ],
+Future<bool?> showDisconnectDialog() => showDialog<bool>(
+      context: this,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12), // Rounded corners
         ),
-      );
+        backgroundColor: Colors.grey[200], // Light grey background
+        title: const Text(
+          'Disconnect',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black, // Text color
+          ),
+        ),
+        content: const Text(
+          'Are you sure to disconnect?',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.black, // Content text color
+          ),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        actions: [
+          // Cancel button
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              backgroundColor: Colors.indigo[900], // Button text color
+            ),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+          ),
+          // Disconnect button
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo[900], // Button background color
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+
 
   Future<bool?> showReconnectDialog() => showDialog<bool>(
         context: this,

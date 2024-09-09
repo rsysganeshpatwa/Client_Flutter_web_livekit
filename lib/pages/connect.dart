@@ -20,15 +20,15 @@ class ConnectPage extends StatefulWidget {
 
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
-  Role _selectedRole = Role.participant;
+  Role _selectedRole = Role.admin;
 
   final ApiService _apiService = GetIt.I<ApiService>();
   final PermissionService _permissionService = GetIt.I<PermissionService>();
 
-  final _identityCtrl = TextEditingController();
-  final _roomCtrl = TextEditingController();
+  final _identityCtrl = TextEditingController( text: 'ganesh');
+  final _roomCtrl = TextEditingController( text: 'ganesh');
   final _welcomeMessageCtrl = TextEditingController(text: 'Welcome to the room!');
-
+  
   bool _busy = false;
   String? roomNameFromUrl;
   String? roomRoleFromUrl;
@@ -39,7 +39,6 @@ class _ConnectPageState extends State<ConnectPage> {
   void initState() {
     super.initState();
     _readPrefs();
-
     if (livekit.lkPlatformIs(livekit.PlatformType.android)) {
       _checkPermissions();
     }
