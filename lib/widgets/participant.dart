@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/theme.dart';
@@ -133,6 +134,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
     return Container(
       foregroundDecoration: BoxDecoration(
+        
         border: widget.participant.isSpeaking &&
                 audioPublication?.subscribed == true &&
                 !isScreenShare
@@ -142,17 +144,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
     
       child: Stack(
         children: [
-          if (isScreenShare)
-            // Display the screen share
-            Positioned.fill(
-              child: activeVideoTrack != null && !activeVideoTrack!.muted
-                  ? VideoTrackRenderer(
-                      activeVideoTrack!,
-                      fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                    )
-                  : const NoVideoWidget(),
-            )
-          else
+        
             // Display the regular video
             InkWell(
               onTap: () => setState(() => _visible = !_visible),

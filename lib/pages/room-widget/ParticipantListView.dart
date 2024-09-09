@@ -20,19 +20,15 @@ class ParticipantListView extends StatefulWidget {
 
 class _ParticipantListViewState extends State<ParticipantListView> {
   final PageController _pageController = PageController();
-  bool _showParticipants = true; // Default to true since this is now controlled by the drawer
+  bool _showParticipants = true;
 
   @override
   Widget build(BuildContext context) {
-    // Get screen size
     final screenSize = MediaQuery.of(context).size;
-    final double textScaleFactor = 1.0; // Scale text for smaller screens
-    print('Screen Size: $screenSize');
-    
-    // Participant List or Hidden Message
+    final double textScaleFactor = 1.0;
+
     return Column(
       children: [
-        // Participant List View
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(8.0),
@@ -40,18 +36,38 @@ class _ParticipantListViewState extends State<ParticipantListView> {
               builder: (context, constraints) {
                 final int numParticipants = widget.participantTracks.length;
                 final bool hasPagination = numParticipants > 4;
-                final double paginationHeight = 50.0; // Adjust as needed
-                final double adjustedListHeight = constraints.maxHeight - paginationHeight - 16.0; // Adjust for padding
+                final double paginationHeight = 50.0;
+                final double adjustedListHeight = constraints.maxHeight - paginationHeight - 16.0;
 
                 if (numParticipants <= 4) {
                   return ListView.builder(
                     itemCount: numParticipants,
                     itemBuilder: (context, index) {
-                      return Transform.scale(
-                        scale: textScaleFactor,
-                        child: ParticipantWidget.widgetFor(
-                          widget.participantTracks[index],
-                          showStatsLayer: false,
+                      return GestureDetector(
+                        onTap: () {
+                          // Add interaction logic here
+                        },
+                        child: Card(
+                          elevation: 4.0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(0),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(0),
+                              child: SizedBox(
+                                width: screenSize.width * 0.9, // Use screen width dynamically
+                                height: screenSize.height * 0.2, // Use screen height dynamically
+                                child: ParticipantWidget.widgetFor(
+                                  widget.participantTracks[index],
+                                  showStatsLayer: false,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       );
                     },
@@ -68,17 +84,39 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                           itemCount: pageCount,
                           itemBuilder: (context, pageIndex) {
                             final startIndex = pageIndex * itemsPerPage;
-                            final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
-                            final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
+                            final endIndex = math.min(
+                                startIndex + itemsPerPage, numParticipants);
+                            final pageParticipants = widget.participantTracks
+                                .sublist(startIndex, endIndex);
 
                             return ListView.builder(
                               itemCount: pageParticipants.length,
                               itemBuilder: (context, index) {
-                                return Transform.scale(
-                                  scale: textScaleFactor,
-                                  child: ParticipantWidget.widgetFor(
-                                    pageParticipants[index],
-                                    showStatsLayer: false,
+                                return GestureDetector(
+                                  onTap: () {
+                                    // Add interaction logic here
+                                  },
+                                  child: Card(
+                                    elevation: 4.0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(0),
+                                    ),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(0),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(0),
+                                        child: SizedBox(
+                                          width: screenSize.width * 0.9, // Use screen width dynamically
+                                          height: screenSize.height * 0.2, // Use screen height dynamically
+                                          child: ParticipantWidget.widgetFor(
+                                            widget.participantTracks[index],
+                                            showStatsLayer: false,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 );
                               },
