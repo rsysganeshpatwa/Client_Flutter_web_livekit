@@ -20,6 +20,8 @@ import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
+
+import 'package:video_meeting_room/widgets/room-header.dart';
 import 'package:video_meeting_room/widgets/thank_you.dart';
 
 import '../exts.dart';
@@ -136,7 +138,6 @@ class _RoomPageState extends State<RoomPage> {
           handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
-
       _sortParticipants();
     })
     ..on<RoomRecordingStatusChanged>((event) {
@@ -249,7 +250,7 @@ class _RoomPageState extends State<RoomPage> {
       // get Room Data from server
       final roomSID = await widget.room.getSid();
       final data = await _roomDataManageService.getLatestData(roomSID);
-       final List<ParticipantStatus> participantsStatusList;
+      final List<ParticipantStatus> participantsStatusList;
       if (data != null) {
         final participantsStatusList = (data as List)
             .map((item) => ParticipantStatus(
@@ -262,27 +263,22 @@ class _RoomPageState extends State<RoomPage> {
                   role: item['role'],
                 ))
             .toList();
-            setState(() {
-         participantsManager.addAll(participantsStatusList);
-            });
-         
-      
-       
+        setState(() {
+          participantsManager.addAll(participantsStatusList);
+        });
       }
 
-       setState(() {
-          participantsManager.add(localStatus);
-          
-       
-          _updateRoomData(participantsManager);
-          _sortParticipants();
-        });
+      setState(() {
+        participantsManager.add(localStatus);
+
+        _updateRoomData(participantsManager);
+        _sortParticipants();
+      });
     }
   }
 
   void _addNewParticipantStatus(ParticipantConnectedEvent event) {
     setState(() {
-      
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
 
@@ -343,7 +339,7 @@ class _RoomPageState extends State<RoomPage> {
           }
         }
       } catch (error) {
-       // print('Error fetching pending requests: $error');
+        // print('Error fetching pending requests: $error');
       }
       await Future.delayed(
           const Duration(seconds: 5)); // Check every 10 seconds
@@ -406,9 +402,8 @@ class _RoomPageState extends State<RoomPage> {
 
     setState(() {
       participantsManager = participantsStatus;
-         _updateRoomData(participantsManager);
+      _updateRoomData(participantsManager);
       _sortParticipants();
-   
     });
   }
 
@@ -429,7 +424,6 @@ class _RoomPageState extends State<RoomPage> {
                 role: item['role'],
               ))
           .toList();
-
 
       // Update the state with the new participants status list
       setState(() {
@@ -486,18 +480,17 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   _getParticipantStatus(String identity) {
-     final list = participantsManager.firstWhere(
-        (status) => status.identity == identity,
-        orElse: () => ParticipantStatus(
-              identity: '',
-              isAudioEnable: false,
-              isVideoEnable: false,
-              isHandRaised: false,
-              isTalkToHostEnable: false,
-              handRaisedTimeStamp: 0,
-              role: '',
-            )
-        );
+    final list =
+        participantsManager.firstWhere((status) => status.identity == identity,
+            orElse: () => ParticipantStatus(
+                  identity: '',
+                  isAudioEnable: false,
+                  isVideoEnable: false,
+                  isHandRaised: false,
+                  isTalkToHostEnable: false,
+                  handRaisedTimeStamp: 0,
+                  role: '',
+                ));
 
     return list;
   }
@@ -515,7 +508,7 @@ class _RoomPageState extends State<RoomPage> {
 
       final participantStatus = _getParticipantStatus(participant.identity);
       if (participantStatus.identity.isEmpty) {
-       continue;
+        continue;
       }
       final isRemoteParticipantHost =
           _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
@@ -523,6 +516,11 @@ class _RoomPageState extends State<RoomPage> {
       final isVideo = participantStatus.isVideoEnable;
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
+      if (isRemoteParticipantHost) {
+        print('isRemoteParticipantHost ${participantStatus.toJson()}');
+      }
+      // print('Starting  for  participantStatus${ participantStatus.toJson()}');
+      // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
           (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
               (isAudio &&
@@ -626,7 +624,6 @@ class _RoomPageState extends State<RoomPage> {
         participantStatus.isTalkToHostEnable = !muteAll;
       }
 
-      
       // Trigger the callback with the updated list
       sendParticipantsStatus(participantsManager);
     });
@@ -702,6 +699,7 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Future<void> _copyInviteLinkToClipboard(BuildContext context) async {
+    //showCopyInviteDialog(context);
     CopyInviteLinkDialog.show(context, widget.room.name!);
   }
 
@@ -721,6 +719,7 @@ class _RoomPageState extends State<RoomPage> {
 
   void _openEndDrawer() {
     //_initializeAllowedToTalk();
+    print('rohit openEndDrawer');
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
@@ -740,8 +739,9 @@ class _RoomPageState extends State<RoomPage> {
 
     return Scaffold(
       key: _scaffoldKey,
+      backgroundColor: Color(0xFF1F2A38),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
             ParticipantGridView(
                 participantTracks: participantTracks,
@@ -752,40 +752,72 @@ class _RoomPageState extends State<RoomPage> {
                 isScreenShareMode: _isScreenShareMode,
               ),
             if (widget.room.localParticipant != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: SafeArea(
-                  top: false,
-                  child: ControlsWidget(
-                    _toggleMuteAll,
-                    _handleToggleRaiseHand,
-                    _muteAll,
-                    _isHandleRaiseHand,
-                    localParticipantRole,
-                    widget.room,
-                    widget.room.localParticipant!,
-                    participantsManager,
-                  ),
-                ),
-              ),
+              RoomHeader(
+                  room: widget.room,
+                  participantsStatusList: participantsManager,
+                  onToggleRaiseHand: _handleToggleRaiseHand,isHandRaisedStatusChanged: _isHandleRaiseHand,isAdmin: localParticipantRole == Role.admin.toString()),
+
+            // Expanded Grid View (between header and footer)
+            Expanded(
+                child: Padding(
+              padding: const EdgeInsets.all(8.0), // Add padding
+              child: participantTracks.any((track) =>
+                          track.type == ParticipantTrackType.kScreenShare) &&
+                      _isScreenShareMode
+                  ? Stack(
+                      children: [
+                        // Display the screen share participant prominently
+                        Positioned.fill(
+                          child: ParticipantWidget.widgetFor(
+                            participantTracks.firstWhere((track) =>
+                                track.participant.isScreenShareEnabled()),
+                            showStatsLayer: false,
+                          ),
+                        ),
+                        // Display other participants in a side panel (if needed)
+                      ],
+                    )
+                  : ParticipantGridView(
+                       participantTracks: participantTracks,
+                currentPage: _currentPage,
+                onPreviousPage: _previousPage,
+                onNextPage: _nextPage,
+                participantScreenShared: isparticipantScreenShared,
+                isScreenShareMode: _isScreenShareMode,
+                    ),
+            )),
+
+            // Control Footer
+            ControlsWidget(
+              _toggleMuteAll,
+              _handleToggleRaiseHand,
+              _openEndDrawer,
+              () => _copyInviteLinkToClipboard(context),
+              _muteAll,
+              _isHandleRaiseHand,
+              localParticipantRole,
+              widget.room,
+              widget.room.localParticipant!,
+              participantsManager,
+            ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButtonBar(
-        localParticipantRole: localParticipantRole!,
-        isMobile: isMobile,
-        context: context,
-        copyInviteLinkToClipboard: _copyInviteLinkToClipboard,
-        showParticipantSelectionDialog: _showParticipantSelectionDialog,
-        openEndDrawer: _openEndDrawer,
-        isScreenShare: participantTracks
-            .any((track) => track.type == ParticipantTrackType.kScreenShare),
-        toggleViewMode: _toggleViewMode,
-        isScreenShareMode: _isScreenShareMode,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      // floatingActionButton: FloatingActionButtonBar(
+      //   localParticipantRole: localParticipantRole!,
+      //   isMobile: isMobile,
+      //   context: context,
+      //   copyInviteLinkToClipboard: _copyInviteLinkToClipboard,
+      //   showParticipantSelectionDialog: _showParticipantSelectionDialog,
+      //   openEndDrawer: _openEndDrawer,
+      //   isScreenShare: participantTracks
+      //       .any((track) => track.type == ParticipantTrackType.kScreenShare),
+      //   toggleViewMode: _toggleViewMode,
+      //   isScreenShareMode: _isScreenShareMode,
+      // ),
+      // floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+
+      // endDrawer: ParticipantDrawerNew(),
       endDrawer: ParticipantDrawer(
         searchQuery: searchQuery,
         onSearchChanged: (value) {

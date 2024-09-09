@@ -115,26 +115,31 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
     super.didUpdateWidget(oldWidget);
   }
 
-  void _onParticipantChanged() => setState(() {
-      
-  });
+  void _onParticipantChanged() => setState(() {});
 
   List<Widget> extraWidgets(bool isScreenShare) => [];
 
   @override
   Widget build(BuildContext ctx) {
+    String formatName(String name) {
+      if (name.isEmpty) return name;
+      return name
+          .split(' ')
+          .map((word) => word.isNotEmpty
+              ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+              : '')
+          .join(' ');
+    }
+
     return Container(
       foregroundDecoration: BoxDecoration(
-        border: widget.participant.isSpeaking && audioPublication?.subscribed == false && !isScreenShare
-            ? Border.all(
-                width: 5,
-                color: LKColors.lkBlue,
-              )
+        border: widget.participant.isSpeaking &&
+                audioPublication?.subscribed == true &&
+                !isScreenShare
+            ? Border.all(width: 5, color: Colors.green)
             : null,
       ),
-      decoration: BoxDecoration(
-        color: Theme.of(ctx).cardColor,
-      ),
+    
       child: Stack(
         children: [
           if (isScreenShare)
@@ -156,7 +161,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                       activeVideoTrack!,
                       fit: MediaQuery.of(ctx).size.width < 600
                           ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                          : RTCVideoViewObjectFit.values[widget.quality.index],
                     )
                   : const NoVideoWidget(),
             ),
@@ -167,27 +172,87 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 child: ParticipantStatsWidget(
                   participant: widget.participant,
                 )),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-               // ...extraWidgets(isScreenShare),
-                ParticipantInfoWidget(
-                  title: widget.participant.name.isNotEmpty
-                      ? '${widget.participant.name} (${widget.participant.identity})'
-                      : widget.participant.identity,
-                  audioAvailable: audioPublication?.muted == false,
-                  publicAudioDisabled: audioPublication?.subscribed == false,
-                  connectionQuality: widget.participant.connectionQuality,
-                  isScreenShare: isScreenShare,
-                  enabledE2EE: widget.participant.isEncrypted,
+
+          // Overlay with text and button
+
+          Positioned(
+            bottom: 8.0,
+            left: 8.0,
+            child: Container(
+              padding: EdgeInsets.all(8.0), // Equivalent to var(--space-sm)
+              decoration: BoxDecoration(
+                color: Color(0xFF000000)
+                    .withOpacity(0.5), // Equivalent to var(--black_900_7f)
+                borderRadius: BorderRadius.circular(
+                    4.0), // Equivalent to var(--radius-xs)
+              ),
+              child: Text(
+                widget.participant.name.isNotEmpty
+                    ? formatName(widget.participant.name)
+                    : widget.participant.identity,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-              ],
+              ),
             ),
           ),
-          // Optionally, you could add other participants' video feeds here if needed
+
+          // Positioned(
+          //   top: 0,
+          //   right: 8.0,
+          //   child: Row(
+          //     children: [
+          //      ElevatedButton(
+          //         style: ElevatedButton.styleFrom(
+          //           backgroundColor: Colors.grey,
+          //           shape: CircleBorder(),
+          //           padding: EdgeInsets.all(8),
+          //           minimumSize: Size(48, 48),
+          //         ),
+          //         onPressed: () {},
+          //         child: Icon(
+          //           Icons.push_pin,
+          //           color: Colors.white,
+          //         ),
+          //       ),
+          //       SizedBox(width: 8.0),
+          //       ElevatedButton(
+          //         style: ElevatedButton.styleFrom(
+          //           backgroundColor: Colors.deepOrange,
+          //           shape: CircleBorder(),
+          //           padding: EdgeInsets.all(8),
+          //           minimumSize: Size(48, 48),
+          //         ),
+          //         onPressed: () {},
+          //         child: Icon(
+          //           Icons.mic_off,
+          //           color: Colors.white,
+          //         ),
+          //       ),
+          //     ],
+          //   ),
+          // ),
+
+          Positioned(
+        
+            top: 0,
+            right: 8.0,
+            child: 
+                  ParticipantInfoWidget(
+                    title: widget.participant.name.isNotEmpty
+                        ? '${widget.participant.name} (${widget.participant.identity})'
+                        : widget.participant.identity,
+                    audioAvailable: audioPublication?.muted == false,
+                    publicAudioDisabled: audioPublication?.subscribed == false,
+                    connectionQuality: widget.participant.connectionQuality,
+                    isScreenShare: isScreenShare,
+                    enabledE2EE: widget.participant.isEncrypted,
+                  ),
+             
+          ),
+          //    Optionally, you could add other participants' video feeds here if needed
         ],
       ),
     );
@@ -207,7 +272,6 @@ class _LocalParticipantWidgetState
       widget.participant.audioTrackPublications
           .where((element) => element.source == widget.type.lkAudioSourceType)
           .firstOrNull;
-          
 
   @override
   VideoTrack? get activeVideoTrack => videoPublication?.track;

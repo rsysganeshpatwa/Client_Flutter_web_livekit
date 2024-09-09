@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
@@ -20,10 +21,15 @@ class ControlsWidget extends StatefulWidget {
   final bool isHandleRaiseHand;
   final bool isHandleMuteAll;
   final List<ParticipantStatus> participantsStatusList;
+  final VoidCallback openParticipantDrawer;
+  final VoidCallback openCopyInviteLinkDialog;
+  
 
   const ControlsWidget(
     this.onToggleParticipants,
     this.onToggleRaiseHand,
+    this.openParticipantDrawer,
+    this.openCopyInviteLinkDialog,
     this.isHandleMuteAll,
     this.isHandleRaiseHand,
     this.role,
@@ -362,6 +368,14 @@ class _ControlsWidgetState extends State<ControlsWidget> {
     }
   }
 
+  void _handleParticipantDrawer() {
+    widget.openParticipantDrawer();
+  }
+
+  void _handleCopyInviteLink() {
+    widget.openCopyInviteLinkDialog();
+  }
+
   Future<void> _showMicrophoneOptions(BuildContext context) async {
     showModalBottomSheet(
       context: context,
@@ -437,234 +451,147 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 15,
-        horizontal: 15,
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 5,
-        runSpacing: 5,
-        children: [
-          Visibility(
-            visible: false,
-            child: IconButton(
-              onPressed: _unpublishAll,
-              icon: const Icon(Icons.cancel),
-              tooltip: 'Unpublish all',
-            ),
+Widget build(BuildContext context) {
+  return Container(
+    padding: EdgeInsets.all(8),
+    color: Colors.black.withOpacity(0.8),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Left-aligned button
+        Tooltip(
+          message: 'Disconnect',
+          child: _buildControlButton(
+            Icons.call_end,
+            Colors.deepOrange,
+            _onTapDisconnect,
+            Colors.white,
           ),
-          Visibility(
-            visible: widget.role == Role.admin.toString() ? true : false,
-            child: IconButton(
-              onPressed: _toggleMuteAll,
-              icon: Icon(
-                _allMuted ? Icons.volume_off : Icons.volume_up,
-              ),
-              tooltip: _allMuted ? 'Unmute all' : 'Mute all',
-            ),
-          ),
-          if (participant.isMicrophoneEnabled())
-            Visibility(
-              visible: true,
-              child: IconButton(
-                onPressed: _disableAudio,
-                icon: const Icon(Icons.mic),
-                tooltip: 'Mute audio',
-              ),
-            )
-          else
-            Visibility(
-              visible: true,
-              child: IconButton(
-                onPressed: _enableAudio,
-                icon: const Icon(Icons.mic_off),
-                tooltip: 'Un-mute audio',
-              ),
-            ),
-          if (!lkPlatformIs(PlatformType.iOS))
-            Visibility(
-              visible: false,
-              child: PopupMenuButton<MediaDevice>(
-                icon: const Icon(Icons.volume_up),
-                itemBuilder: (BuildContext context) {
-                  return [
-                    const PopupMenuItem<MediaDevice>(
-                      value: null,
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.speaker,
-                          color: Colors.white,
-                        ),
-                        title: Text('Select Audio Output'),
-                      ),
+        ),
+        // Center-aligned buttons
+        Expanded(
+          child: Align(
+            alignment: Alignment.center,
+            child: Wrap(
+              spacing: 8, // Horizontal space between buttons
+              runSpacing: 8, // Vertical space between rows of buttons
+              alignment: WrapAlignment.center, // Center buttons within this area
+              children: [
+
+            
+                if (widget.role == Role.admin.toString())
+                  Tooltip(
+                    message: _allMuted ? 'Unmute All Participants' : 'Mute All Participants',
+                    child: _buildControlButton(
+                      _allMuted ? Icons.volume_off : Icons.volume_up,
+                      Colors.white,
+                      _toggleMuteAll,
+                      Colors.black,
                     ),
-                    if (_audioOutputs != null)
-                      ..._audioOutputs!.map((device) {
-                        return PopupMenuItem<MediaDevice>(
-                          value: device,
-                          child: ListTile(
-                            leading: (device.deviceId ==
-                                    widget.room.selectedAudioOutputDeviceId)
-                                ? const Icon(
-                                    Icons.check_box_outlined,
-                                    color: Colors.white,
-                                  )
-                                : const Icon(
-                                    Icons.check_box_outline_blank,
-                                    color: Colors.white,
-                                  ),
-                            title: Text(device.label),
-                          ),
-                          onTap: () => _selectAudioOutput(device),
-                        );
-                      })
-                  ];
-                },
-              ),
-            ),
-          if (!kIsWeb && lkPlatformIs(PlatformType.iOS))
-            Visibility(
-              visible: false,
-              child: IconButton(
-                disabledColor: Colors.grey,
-                onPressed: Hardware.instance.canSwitchSpeakerphone
-                    ? _setSpeakerphoneOn
-                    : null,
-                icon: Icon(_speakerphoneOn
-                    ? Icons.speaker_phone
-                    : Icons.phone_android),
-                tooltip: 'Switch SpeakerPhone',
-              ),
-            ),
-          if (participant.isCameraEnabled())
-            Visibility(
-              visible: true,
-              child: IconButton(
-                onPressed: _disableVideo,
-                icon: const Icon(Icons.videocam_sharp),
-                tooltip: 'Mute video',
-              ),
-            )
-          else
-            Visibility(
-              visible: true,
-              child: IconButton(
-                onPressed: _enableVideo,
-                icon: const Icon(Icons.videocam_off),
-                tooltip: 'Un-mute video',
-              ),
-            ),
-          Visibility(
-            visible: false,
-            child: IconButton(
-              icon: Icon(position == CameraPosition.back
-                  ? Icons.video_camera_back
-                  : Icons.video_camera_front),
-              onPressed: () => _toggleCamera(),
-              tooltip: 'toggle camera',
-            ),
-          ),
-          if (participant.isScreenShareEnabled())
-            Visibility(
-              visible: widget.role == Role.admin.toString(),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.monitor_outlined,
-                  color: Colors.red,
+                  ),
+                Tooltip(
+                  message: participant.isMicrophoneEnabled()
+                      ? 'Mute Microphone'
+                      : 'Unmute Microphone',
+                  child: _buildControlButton(
+                    participant.isMicrophoneEnabled()
+                        ? Icons.mic
+                        : Icons.mic_off,
+                    !participant.isMicrophoneEnabled()
+                        ? Colors.deepOrange
+                        : Colors.white,
+                    participant.isMicrophoneEnabled()
+                        ? _disableAudio
+                        : _enableAudio,
+                    !participant.isMicrophoneEnabled()
+                        ? Colors.white
+                        : Colors.black,
+                  ),
                 ),
-                onPressed: () => _disableScreenShare(),
-                tooltip: 'Stop Screen Share',
-              ),
-            )
-          else
-            Visibility(
-              visible: widget.role == Role.admin.toString(),
-              child: IconButton(
-                icon: const Icon(Icons.monitor),
-                onPressed: () => _enableScreenShare(),
-                tooltip: 'Start Screen Share ',
-              ),
-            ),
-          Visibility(
-            visible: false,
-            child: IconButton(
-              onPressed: _onTapSendData,
-              icon: const Icon(Icons.message),
-              tooltip: 'send demo data',
-            ),
-          ),
-          Visibility(
-            visible: false,
-            child: IconButton(
-              onPressed: _onTapUpdateSubscribePermission,
-              icon: const Icon(Icons.settings),
-              tooltip: 'Subscribe permission',
-            ),
-          ),
-          Visibility(
-            visible: false,
-            child: IconButton(
-              onPressed: _onTapSimulateScenario,
-              icon: const Icon(Icons.bug_report),
-              tooltip: 'Simulate scenario',
-            ),
-          ),
-          Visibility(
-            visible: widget.role == Role.admin.toString() ? false : true,
-            child: // New Raise Hand Button
-                IconButton(
-              icon: Icon(
-                _isHandRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
-                color: _isHandRaised ? Colors.amber : Colors.white,
-              ),
-              onPressed: _toggleRaiseHand,
-            ),
-          ),
-          Visibility(
-            visible: true,
-            child: PopupMenuButton<String>(
-              icon: const Icon(Icons.settings),
-              tooltip: 'Settings',
-              onSelected: (String value) {
-                if (value == 'Microphone') {
-                  _showMicrophoneOptions(context);
-                } else if (value == 'Camera') {
-                  _showVideoOptions(context);
-                }
-              },
-              itemBuilder: (BuildContext context) {
-                return [
-                  const PopupMenuItem<String>(
-                    value: 'Microphone',
-                    child: ListTile(
-                      leading: Icon(Icons.mic),
-                      title: Text('Microphone'),
-                    ),
+                Tooltip(
+                  message: participant.isCameraEnabled()
+                      ? 'Turn Off Camera'
+                      : 'Turn On Camera',
+                  child: _buildControlButton(
+                    participant.isCameraEnabled()
+                        ? Icons.videocam
+                        : Icons.videocam_off,
+                    !participant.isCameraEnabled()
+                        ? Colors.deepOrange
+                        : Colors.white,
+                    participant.isCameraEnabled()
+                        ? _disableVideo
+                        : _enableVideo,
+                    !participant.isCameraEnabled()
+                        ? Colors.white
+                        : Colors.black,
                   ),
-                  const PopupMenuItem<String>(
-                    value: 'Camera',
-                    child: ListTile(
-                      leading: Icon(Icons.videocam),
-                      title: Text('Camera'),
-                    ),
-                  ),
-                ];
-              },
+                ),
+              ],
             ),
           ),
-          Visibility(
-            visible: true,
-            child: IconButton(
-              onPressed: _onTapDisconnect,
-              icon: const Icon(Icons.close_sharp),
-              tooltip: 'disconnect',
+        ),
+        // Right-aligned buttons
+        if (widget.role == Role.admin.toString())
+        Row(
+          children: [
+            Tooltip(
+              message: participant.isScreenShareEnabled()
+                  ? 'Stop Screen Share'
+                  : 'Start Screen Share',
+              child: _buildControlButton(
+                participant.isScreenShareEnabled()
+                    ? Icons.stop_screen_share
+                    : Icons.screen_share,
+                Colors.white,
+                participant.isScreenShareEnabled()
+                    ? _disableScreenShare
+                    : _enableScreenShare,
+                Colors.black,
+              ),
             ),
-          ),
-        ],
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'View Participants',
+              child: _buildControlButton(
+                Icons.people_alt,
+                Colors.white,
+                () => _handleParticipantDrawer(),
+                Colors.black,
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Copy Invite Link',
+              child: _buildControlButton(
+                Icons.link,
+                Colors.white,
+                () => _handleCopyInviteLink(),
+                Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _buildControlButton(IconData iconImage, Color color,
+      VoidCallback onPressed, Color iconColor) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        shape: CircleBorder(),
+        padding: EdgeInsets.all(8),
+        minimumSize: Size(48, 48),
+      ),
+      onPressed: onPressed,
+      child: Icon(
+        iconImage,
+        color: iconColor,
       ),
     );
   }
+ 
 }

@@ -29,7 +29,18 @@ void main() async {
   await dotenv.load();
   setup();
 
- 
+  // ErrorWidget.builder = (FlutterErrorDetails details) {
+  //   print('Error: ${details.exception} ${details.stack} ${details.library}');
+  //   return Container(
+  //     color: Colors.white,
+  //     child: Center(
+  //       child: Text(
+  //         'An error occurred. Please restart the app.',
+  //         style: TextStyle(color: Colors.red),
+  //       ),
+  //     ),
+  //   );
+  // };
 
   runApp(const LiveKitExampleApp());
 }
@@ -38,7 +49,6 @@ class LiveKitExampleApp extends StatelessWidget {
   const LiveKitExampleApp({
     super.key,
   });
-  
 
   // ThemeData _buildThemeData(BuildContext context) {
   //   final themeManager = ThemeManager();
@@ -50,14 +60,14 @@ class LiveKitExampleApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: 'R Systems Connect',
         theme: LiveKitTheme().buildThemeData(context),
-        
         home: Scaffold(
           body: Stack(
             children: [
               // Main content (LoginPage) on top of the background
               Positioned.fill(
                 child: Container(
-                  color: Colors.transparent, // Ensure the container is transparent
+                  color:
+                      Colors.transparent, // Ensure the container is transparent
                   child: LoginPage(),
                 ),
               ),
