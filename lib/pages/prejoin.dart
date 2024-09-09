@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get_it/get_it.dart';
@@ -307,6 +308,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
           title: const Text(
@@ -325,9 +327,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
         body: Container(
             alignment: Alignment.center,
             color : Colors.white,
+            // decoration: BoxDecoration(border:Border.all(color: Colors.black,width: 1) ),
             
             child: SingleChildScrollView(
                 child: Container(
+                  color: Colors.white,
               padding: const EdgeInsets.symmetric(
                 horizontal: 20,
                 vertical: 20,
@@ -395,8 +399,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           hint: const Text(
                             'Select Camera',
                           ),
-                          items: _enableVideo
-                              ? _videoInputs
+                          items: _videoInputs
                                   .map((MediaDevice item) =>
                                       DropdownMenuItem<MediaDevice>(
                                         value: item,
@@ -404,11 +407,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           item.label,
                                           style: const TextStyle(
                                             fontSize: 14,
+                                            color: Colors.black,
+                                            backgroundColor: Colors.white,
                                           ),
                                         ),
                                       ))
-                                  .toList()
-                              : [],
+                                  .toList(),
                           value: _selectedVideoDevice,
                           onChanged: (MediaDevice? value) async {
                             if (value != null) {
@@ -421,6 +425,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             padding: EdgeInsets.symmetric(horizontal: 16),
                             height: 40,
                             width: 140,
+                  
                           ),
                           menuItemStyleData: const MenuItemStyleData(
                             height: 40,
@@ -451,6 +456,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                         '${item.dimensions.width}x${item.dimensions.height}',
                                         style: const TextStyle(
                                           fontSize: 14,
+                                          color: Colors.black,
+                                          backgroundColor: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                
                                         ),
                                       ),
                                     ))
@@ -469,9 +478,16 @@ class _PreJoinPageState extends State<PreJoinPage> {
                               width: 140,
               
                             ),
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 16,
+                            ),
+                            
                             menuItemStyleData: const MenuItemStyleData(
                               height: 40,
                             ),
+                      
+
                   
                           ),
                         ),
@@ -509,7 +525,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           item.label,
                                           style: const TextStyle(
                                             fontSize: 14,
-                                            color: Colors.black
+                                            color: Colors.black,
+                                            backgroundColor: Colors.white,
                                           ),
                                         ),
                                       ))
@@ -525,6 +542,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           },
                           buttonStyleData: const ButtonStyleData(
                             padding: EdgeInsets.symmetric(horizontal: 16),
+                          
                             height: 40,
                             width: 140,
                           ),
