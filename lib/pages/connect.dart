@@ -20,25 +20,28 @@ class ConnectPage extends StatefulWidget {
 
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
-  Role _selectedRole = Role.admin;
+  Role _selectedRole = Role.participant;
 
   final ApiService _apiService = GetIt.I<ApiService>();
   final PermissionService _permissionService = GetIt.I<PermissionService>();
 
-  final _identityCtrl = TextEditingController( text: 'ganesh');
-  final _roomCtrl = TextEditingController( text: 'ganesh');
+  final _identityCtrl = TextEditingController();
+  final _roomCtrl = TextEditingController();
   final _welcomeMessageCtrl = TextEditingController(text: 'Welcome to the room!');
-  
+
   bool _busy = false;
   String? roomNameFromUrl;
   String? roomRoleFromUrl;
   String? welcomeMessage = "";
   bool _isRoomNameInUrl = false;
 
+  String? selectedRoom;
+
   @override
   void initState() {
     super.initState();
     _readPrefs();
+
     if (livekit.lkPlatformIs(livekit.PlatformType.android)) {
       _checkPermissions();
     }
@@ -163,7 +166,7 @@ class _ConnectPageState extends State<ConnectPage> {
         return Container(
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.white,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
@@ -176,7 +179,7 @@ class _ConnectPageState extends State<ConnectPage> {
                 child: Text(
                   'Active Rooms',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color.fromARGB(255, 39, 38, 104),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -194,26 +197,34 @@ class _ConnectPageState extends State<ConnectPage> {
                         ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     } else {
-                      final roomList = snapshot.data;
-                      return ListView.builder(
-                        itemCount: roomList?.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            title: Text(
-                              roomList![index],
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                            onTap: () {
-                              setState(() {
-                                _roomCtrl.text = roomList[index];
-                                Navigator.pop(context); // Close the modal
-                                _isRoomNameInUrl = false;
-                              });
-                            },
-                          );
-                        },
-                      );
-                    }
+                        final roomList = snapshot.data;
+                        return ListView.builder(
+                          itemCount: roomList?.length,
+                          itemBuilder: (context, index) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color.fromARGB(255, 217, 219, 221),
+                                borderRadius: BorderRadius.circular(10), // Rounded corners
+                              ),
+                              child: ListTile(
+                                title: Text(
+                                  roomList![index],
+                                  style: const TextStyle(color: Colors.black),
+                                ),
+                                onTap: () {
+                                  setState(() {
+                                    selectedRoom = roomList![index];
+                                    _roomCtrl.text = roomList[index];
+                                    Navigator.pop(context); // Close the modal
+                                    _isRoomNameInUrl = false;
+                                  });
+                                },
+                              ),
+                            );
+                          },
+                        );
+                      }
                   },
                 ),
               ),
@@ -229,10 +240,10 @@ class _ConnectPageState extends State<ConnectPage> {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      appBar: AppBar(
+      /*appBar: AppBar(
         title: const Text('POC Health Care Monitoring'),
         backgroundColor: Theme.of(context).indicatorColor,
-      ),
+      ),*/
       body: Stack(
         children: [
           buildMainContent(),
@@ -244,148 +255,136 @@ class _ConnectPageState extends State<ConnectPage> {
   }
 
   Widget buildMainContent() {
-    return Container(
-      alignment: Alignment.center,
-      child: SingleChildScrollView(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-               // Welcome message
-    Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Text(
-           welcomeMessage!,
-           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-           textAlign: TextAlign.center,
-           ),
-          ),
-              if (!_isRoomNameInUrl) buildRoleSelection(),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 25),
-                child: LKTextField(
-                  label: 'Name',
-                  ctrl: _identityCtrl,
-                ),
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 217, 219, 221),
+      body: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Existing vertical box
+            Container(
+              width: screenWidth * 0.15, // Make width a percentage of screen width
+              height: screenHeight * 0.7, // Set height as a percentage of screen height
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 39, 38, 104), // Background color of the vertical box
+                borderRadius: BorderRadius.circular(10), // Set the radius for rounded corners
               ),
-              buildConnectButton(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildRoleSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 25),
-          child: ListTile(
-            title: const Text(
-              'Host',
-              style: TextStyle(color: Colors.white),
-            ),
-            leading: Radio<Role>(
-              value: Role.admin,
-              groupValue: _selectedRole,
-              onChanged: (Role? value) {
-                setState(() {
-                  _selectedRole = value!;
-                });
-              },
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 25),
-          child: ListTile(
-            title: const Text(
-              'Participant',
-              style: TextStyle(color: Colors.white),
-            ),
-            leading: Radio<Role>(
-              value: Role.participant,
-              groupValue: _selectedRole,
-              onChanged: (Role? value) {
-                setState(() {
-                  _selectedRole = value!;
-                });
-              },
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 25),
-          child: LKTextField(
-            label: 'Room Name',
-            ctrl: _roomCtrl,
-          ),
-        ),
-        if (_selectedRole == Role.admin)
-         Padding(
-          padding: const EdgeInsets.only(bottom: 25),
-          child: LKTextField(
-            label: 'Welcome Message',
-            ctrl: _welcomeMessageCtrl,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget buildConnectButton() {
-    return ElevatedButton(
-      onPressed: _busy ? null : () => _connect(context),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_busy)
-            const Padding(
-              padding: EdgeInsets.only(right: 10),
-              child: SizedBox(
-                height: 15,
-                width: 15,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
+              padding: EdgeInsets.all(screenHeight * 0.02), // Dynamic padding based on screen height
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Logo
+                  Image.asset(
+                    'images/Rsi_logo.png',
+                    semanticLabel: 'Rsilogo',
+                    height: screenHeight * 0.07, // Adjust height relative to screen height
+                  ),
+                  SizedBox(height: screenHeight * 0.15), // Spacer between logo and text
+                  // Welcome Text
+                  Align(
+                    alignment: Alignment.center, // Center text horizontally
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Hello, Welcome',
+                            style: TextStyle(
+                              color: Colors.white, // Set text color to white
+                              fontSize: screenHeight * 0.03, // Dynamic font size
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.06), // Spacer between welcome text and heading
+                  // Heading
+                  Align(
+                    alignment: Alignment.center, // Center text horizontally
+                    child: Text(
+                      'POC Health Care\nMonitoring',
+                      style: TextStyle(
+                        fontSize: screenHeight * 0.03, // Dynamic font size
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white, // Set heading color to white
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          const Text('CONNECT'),
-        ],
+              // New vertical box for login form
+              Container(
+                width: screenWidth * 0.2, // Adjust width relative to screen width
+                height: _selectedRole == Role.admin
+                  ? screenHeight * 0.6 // Height when the role is 'admin'
+                  : screenHeight * 0.5, // Default height for other roles
+                decoration: BoxDecoration(
+                  color: Colors.white, // Background color of the vertical box
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(10), // Adjust the radius as needed
+                    bottomRight: Radius.circular(10), // Adjust the radius as needed
+                  ),
+                ),
+                padding: EdgeInsets.all(screenHeight * 0.02), // Dynamic padding
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch, // Align children to stretch
+                  children: [                    
+                    if (!_isRoomNameInUrl)...[
+                      // Row for selecting "Host" or "Participant"
+                      buildRoleSelection(),
+                    ],
+                    if (_isRoomNameInUrl)...[
+                      //Welcome message
+                      Text(
+                        welcomeMessage!,
+                        textAlign: TextAlign.center, // Center align text
+                        style: TextStyle(
+                          fontSize: screenHeight * 0.05, // Dynamic font size
+                          fontWeight: FontWeight.bold,
+                          color: const Color.fromARGB(255, 39, 38, 104), // Set color to blue
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: screenHeight * 0.02),
+                    // Name Field
+                    buildNameField(),
+                    // Connect Button
+                    buildConnectButton(),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget buildSidebar() {
     if (!_isRoomNameInUrl) {
+      final double screenWidth = MediaQuery.of(context).size.width;
       return Positioned(
         right: 0,
         top: 0,
         bottom: 0,
         child: Container(
-          width: 200,
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              bottomLeft: Radius.circular(20),
-            ),
-          ),
+          width: screenWidth * 0.15,
+          color: Colors.white,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
                   'Active Rooms',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
+                    color: const Color.fromARGB(255, 39, 38, 104),
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -396,27 +395,45 @@ class _ConnectPageState extends State<ConnectPage> {
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return const Center(
-                          child: Text('Error loading rooms',
-                              style: TextStyle(color: Colors.white)));
-                    } else if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
+                        child: Text(
+                          'Error loading rooms',
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      );
+                    } else if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     } else {
-                      final roomList = snapshot.data;
+                      final roomList = snapshot.data;                      
                       return ListView.builder(
                         itemCount: roomList?.length,
                         itemBuilder: (context, index) {
-                          return ListTile(
-                            title: Text(
-                              roomList![index],
-                              style: const TextStyle(color: Colors.white),
-                            ),
+                          return GestureDetector(
                             onTap: () {
                               setState(() {
+                                selectedRoom = roomList[index];
                                 _roomCtrl.text = roomList[index];
                                 _isRoomNameInUrl = false;
                               });
                             },
+                            child: Container(
+                              height: 30,
+                              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                              decoration: BoxDecoration(
+                                //color: const Color.fromARGB(255, 217, 219, 221),
+                                color: selectedRoom == roomList![index]
+                                ? const Color.fromARGB(255, 39, 38, 104) // Change color to blue for the selected room
+                                : const Color.fromARGB(255, 217, 219, 221), // Default color
+                                borderRadius: BorderRadius.circular(10), // Curved corners
+                              ),
+                              child: Text(
+                                roomList[index],
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           );
                         },
                       );
@@ -445,4 +462,237 @@ class _ConnectPageState extends State<ConnectPage> {
     }
     return Container();
   }
+
+  Widget buildConnectButton() {
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double buttonHeight = _selectedRole == Role.admin 
+      ? screenHeight * 0.02 // Height when the role is 'admin'
+      : screenHeight * 0.03; // Default height for other roles
+    // Login Button
+    return Align(
+      alignment: Alignment.center,
+      child: ElevatedButton(
+        onPressed: _busy ? null : () => _connect(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color.fromARGB(255, 39, 38, 104),
+          padding: EdgeInsets.symmetric(
+            vertical: buttonHeight, horizontal: screenHeight * 0.03), // Dynamic padding
+          minimumSize: Size(80, screenHeight * 0.05), // Dynamic size
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30.0), // Set corner radius for more rounded corners
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // Make the button's width wrap its content
+            children: [
+              Text(
+                'Connect',
+                style: TextStyle(
+                  fontSize: screenHeight * 0.02, // Dynamic font size
+                  color: Colors.white, // Ensure text color is visible
+                ),
+              ),
+              SizedBox(width: screenHeight * 0.01), // Spacing between text and arrow
+              Icon(
+                Icons.arrow_forward, // Add forward arrow icon
+                size: screenHeight * 0.02, // Dynamic icon size
+                color: Colors.white, // Set arrow color
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
+  Widget buildNameField() {
+    final double screenHeight = MediaQuery.of(context).size.height;
+    return Padding(
+                      padding: EdgeInsets.only(bottom: screenHeight * 0.03), // Dynamic padding
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Name',
+                            style: TextStyle(
+                              fontSize: screenHeight * 0.018, // Dynamic font size
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black, // Set color to black
+                            ),
+                          ),
+                          SizedBox(height: screenHeight * 0.01), // Dynamic spacing
+                          TextField(
+                            controller: _identityCtrl,
+                            style: TextStyle(color: Colors.black),
+                            decoration: InputDecoration(
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Colors.black, // Border color
+                                  width: 1.0, // Border width
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: const Color.fromARGB(255, 39, 38, 104), // Focused border color
+                                  width: 2.0,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: screenHeight * 0.01),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                  }
+
+  /*Widget buildRoomNameField() {
+    final double screenHeight = MediaQuery.of(context).size.height;
+      return Padding(
+                  padding: const EdgeInsets.only(bottom: 25),
+                  child: Text(
+                    'Room Name: ${_roomCtrl.text}',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+  }*/
+
+  Widget buildRoleSelection() {
+    final double screenHeight = MediaQuery.of(context).size.height;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            // Host Option
+            Row(
+              children: [
+                Radio<Role>(
+                  value: Role.admin,
+                  groupValue: _selectedRole,
+                  onChanged: (Role? value) {
+                    setState(() {
+                      _selectedRole = value!;
+                    });
+                  },
+                  activeColor: const Color.fromARGB(255, 39, 38, 104),
+                ),
+                Text(
+                  'Host',
+                  style: TextStyle(
+                    fontSize: screenHeight * 0.02,
+                    fontWeight: FontWeight.bold,
+                    color: const Color.fromARGB(255, 39, 38, 104),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(width: screenHeight * 0.03), // Spacer between options
+            // Participant Option
+            Row(
+              children: [
+                Radio<Role>(
+                  value: Role.participant,
+                  groupValue: _selectedRole,
+                  onChanged: (Role? value) {
+                    setState(() {
+                      _selectedRole = value!;
+                    });
+                  },
+                  activeColor: const Color.fromARGB(255, 39, 38, 104),
+                ),
+                Text(
+                  'Participants',
+                  style: TextStyle(
+                    fontSize: screenHeight * 0.02,
+                    fontWeight: FontWeight.bold,
+                    color: const Color.fromARGB(255, 39, 38, 104),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        SizedBox(height: screenHeight * 0.02), // Add spacing between role selection and room name field
+        
+        // Room Name Field
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Room Name',
+              style: TextStyle(
+                fontSize: screenHeight * 0.018, // Dynamic font size
+                fontWeight: FontWeight.bold,
+                color: Colors.black, // Set color to black
+              ),
+            ),
+            SizedBox(height: screenHeight * 0.01), // Dynamic spacing
+            TextField(
+              controller: _roomCtrl,
+              style: TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: Colors.black, // Border color
+                    width: 1.0, // Border width
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: const Color.fromARGB(255, 39, 38, 104), // Focused border color
+                    width: 2.0,
+                  ),
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: screenHeight * 0.01,
+                  horizontal: screenHeight * 0.01),
+              ),
+            ),
+          ],
+        ),
+        if (_selectedRole == Role.admin) ...[
+        SizedBox(height: screenHeight * 0.02), // Spacing before Welcome Message field
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Welcome Message',
+              style: TextStyle(
+                fontSize: screenHeight * 0.018, // Dynamic font size
+                fontWeight: FontWeight.bold,
+                color: Colors.black, // Set color to black
+              ),
+            ),
+            SizedBox(height: screenHeight * 0.01), // Dynamic spacing
+            TextField(
+              controller: _welcomeMessageCtrl,
+              style: TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: Colors.black, // Border color
+                    width: 1.0, // Border width
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: const Color.fromARGB(255, 39, 38, 104), // Focused border color
+                    width: 2.0,
+                  ),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: screenHeight * 0.01),
+              ),
+            ),
+          ],
+        ),
+      ],
+      ],
+    );
+  }
+
 }
