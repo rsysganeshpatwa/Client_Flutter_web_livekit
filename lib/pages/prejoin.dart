@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -306,31 +308,47 @@ class _PreJoinPageState extends State<PreJoinPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
         appBar: AppBar(
+          backgroundColor: Colors.white,
           title: const Text(
-            'Select Devices',
+            'Back',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
             ),
           ),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
             onPressed: () => _actionBack(context),
           ),
         ),
+        
         body: Container(
             alignment: Alignment.center,
+            color : Colors.white,
+            // decoration: BoxDecoration(border:Border.all(color: Colors.black,width: 1) ),
+            
             child: SingleChildScrollView(
                 child: Container(
+                  color: Colors.white,
               padding: const EdgeInsets.symmetric(
                 horizontal: 20,
                 vertical: 20,
               ),
+              
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text('      Select Devices',
+                        style: TextStyle(fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color:Colors.black),)
+                    ),
                     Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: SizedBox(
@@ -350,10 +368,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                       child: LayoutBuilder(
                                         builder: (ctx, constraints) => Icon(
                                           Icons.videocam_off,
-                                          color: LKColors.lkBlue,
+                                          color: Colors.white,
                                           size: math.min(constraints.maxHeight,
                                                   constraints.maxWidth) *
-                                              0.3,
+                                              0.5,
                                         ),
                                       ),
                                     ),
@@ -363,7 +381,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Camera:'),
+                          const Text('Camera:',
+                          style: TextStyle(color:Colors.black,fontWeight: FontWeight.bold),),
                           Switch(
                             value: _enableVideo,
                             onChanged: (value) => _setEnableVideo(value),
@@ -380,8 +399,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           hint: const Text(
                             'Select Camera',
                           ),
-                          items: _enableVideo
-                              ? _videoInputs
+                          items: _videoInputs
                                   .map((MediaDevice item) =>
                                       DropdownMenuItem<MediaDevice>(
                                         value: item,
@@ -389,11 +407,13 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           item.label,
                                           style: const TextStyle(
                                             fontSize: 14,
+                                            color: Colors.black,
+                                            backgroundColor: Colors.white,
                                           ),
                                         ),
+                      
                                       ))
-                                  .toList()
-                              : [],
+                                  .toList(),
                           value: _selectedVideoDevice,
                           onChanged: (MediaDevice? value) async {
                             if (value != null) {
@@ -406,6 +426,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             padding: EdgeInsets.symmetric(horizontal: 16),
                             height: 40,
                             width: 140,
+                  
                           ),
                           menuItemStyleData: const MenuItemStyleData(
                             height: 40,
@@ -421,6 +442,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             isExpanded: true,
                             hint: const Text(
                               'Select Video Dimensions',
+                              style: TextStyle(color:Colors.black),
                             ),
                             items: [
                               VideoParametersPresets.h480_43,
@@ -435,6 +457,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                         '${item.dimensions.width}x${item.dimensions.height}',
                                         style: const TextStyle(
                                           fontSize: 14,
+                                          color: Colors.black,
+                                          backgroundColor: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                
                                         ),
                                       ),
                                     ))
@@ -451,10 +477,19 @@ class _PreJoinPageState extends State<PreJoinPage> {
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               height: 40,
                               width: 140,
+              
                             ),
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 16,
+                            ),
+                            
                             menuItemStyleData: const MenuItemStyleData(
                               height: 40,
                             ),
+                      
+
+                  
                           ),
                         ),
                       ),
@@ -463,7 +498,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Micriphone:'),
+                          const Text('Micriphone:',
+                          style: TextStyle(color:Colors.black,fontWeight: FontWeight.bold),),
                           Switch(
                             value: _enableAudio,
                             onChanged: (value) => _setEnableAudio(value),
@@ -476,9 +512,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton2<MediaDevice>(
                           isExpanded: true,
-                          disabledHint: const Text('Disable Microphone'),
+                          disabledHint: const Text('Disable Microphone',style: TextStyle(color:Colors.black),),
                           hint: const Text(
                             'Select Micriphone',
+                            style: TextStyle(color:Colors.black),
                           ),
                           items: _enableAudio
                               ? _audioInputs
@@ -489,6 +526,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           item.label,
                                           style: const TextStyle(
                                             fontSize: 14,
+                                            color: Colors.black,
+                                            backgroundColor: Colors.white,
                                           ),
                                         ),
                                       ))
@@ -504,6 +543,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           },
                           buttonStyleData: const ButtonStyleData(
                             padding: EdgeInsets.symmetric(horizontal: 16),
+                          
                             height: 40,
                             width: 140,
                           ),
@@ -530,7 +570,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                 ),
                               ),
                             ),
-                          const Text('JOIN'),
+                          const Text('JOIN', style: TextStyle(color:Colors.white,fontWeight: FontWeight.bold),),
                         ],
                       ),
                     ),
