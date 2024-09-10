@@ -19,6 +19,7 @@ import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantListView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
+import 'package:video_meeting_room/pages/room-widget/NewParticipantDialog.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
 
@@ -127,6 +128,13 @@ class _RoomPageState extends State<RoomPage> {
           _checkForPendingRequests();
         }
       });
+      if (localParticipantRole == Role.participant.toString()) {
+        Future.delayed(Duration.zero, () {
+          if (mounted) {
+            NewParticipantDialog.show(context,localParticipant.name);
+          }
+        });
+      }
     }
   }
 
