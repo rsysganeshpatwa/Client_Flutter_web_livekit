@@ -139,13 +139,22 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 audioPublication?.subscribed == true &&
                 !isScreenShare
             ? Border.all(width: 5, color: Colors.green)
+            
             : null,
+
+          
+      ),
+      decoration: BoxDecoration(
+        color: Color(0xFF747474),
+       
       ),
     
       child: Stack(
+      
         children: [
         
             // Display the regular video
+
             InkWell(
               onTap: () => setState(() => _visible = !_visible),
               child: activeVideoTrack != null && !activeVideoTrack!.muted
@@ -153,7 +162,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                       activeVideoTrack!,
                       fit: MediaQuery.of(ctx).size.width < 600
                           ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                          : RTCVideoViewObjectFit.values[widget.quality.index],
+                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
                     )
                   : const NoVideoWidget(),
             ),
@@ -183,7 +192,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                     ? formatName(widget.participant.name)
                     : widget.participant.identity,
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize:  20 * 0.65, // Equivalent to var(--text-lg)
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),

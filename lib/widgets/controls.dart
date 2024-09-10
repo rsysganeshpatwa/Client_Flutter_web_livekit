@@ -232,7 +232,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
             const androidConfig = FlutterBackgroundAndroidConfig(
               notificationTitle: 'Screen Sharing',
               notificationText: 'LiveKit Example is sharing the screen.',
-              notificationImportance: AndroidNotificationImportance.Default,
+          //    notificationImportance: AndroidNotificationImportance.Default,
               notificationIcon: AndroidResource(
                   name: 'livekit_ic_launcher', defType: 'mipmap'),
             );
