@@ -283,30 +283,11 @@ class _ConnectPageState extends State<ConnectPage> {
                     height: screenHeight * 0.07, // Adjust height relative to screen height
                   ),
                   SizedBox(height: screenHeight * 0.15), // Spacer between logo and text
-                  // Welcome Text
-                  Align(
-                    alignment: Alignment.center, // Center text horizontally
-                    child: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Hello, Welcome',
-                            style: TextStyle(
-                              color: Colors.white, // Set text color to white
-                              fontSize: screenHeight * 0.03, // Dynamic font size
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: screenHeight * 0.06), // Spacer between welcome text and heading
                   // Heading
                   Align(
-                    alignment: Alignment.center, // Center text horizontally
+                    alignment: Alignment.centerLeft, // Center text horizontally
                     child: Text(
-                      'POC Health Care\nMonitoring',
+                      'Revolutionizing Virtual Classrooms\nand Lectures',
                       style: TextStyle(
                         fontSize: screenHeight * 0.03, // Dynamic font size
                         fontWeight: FontWeight.bold,
