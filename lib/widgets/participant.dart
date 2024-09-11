@@ -236,7 +236,6 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
           //   ),
           // ),
            Positioned(
-          // padding: EdgeInsets.only(right:500),
           top:2,
           left:10,
           child: Icon(
