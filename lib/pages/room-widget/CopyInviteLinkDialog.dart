@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_meeting_room/utils.dart';
+import 'package:video_meeting_room/utils.dart'; // Ensure this import is correct
 
 class CopyInviteLinkDialog {
   static Future<void> show(BuildContext context, String roomName) async {
@@ -40,67 +40,65 @@ class CopyInviteLinkDialog {
       context: context,
       builder: (BuildContext context) {
         return Center(
-          // Ensures the dialog content is centered
           child: Dialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            backgroundColor: Colors.white, // Set background color to white 700
+            backgroundColor: Colors.white,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: ConstrainedBox(
-                // Constrain the box width based on content
                 constraints: BoxConstraints(
-                  minWidth: 200, // Minimum width
-                  maxWidth: 400, // Maximum width to control content stretching
+                  minWidth: 200,
+                  maxWidth: 400,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
-                    // Header with title and close button
-                    // Header with title and close button
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center, // Centers the text
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Copy Invite Link',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black, // Set text color to grey 600
-                          ),
+                        // Header with title and close button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Copy Invite Link',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        // Host link row
+                        _buildLinkRow(
+                          'Host Link',
+                          'https://dhws-production.s3.ap-south-1.amazonaws.com/66daabcf132e0c0023f12804/66daac278309bf001b0f4695/66daaca38309bf001b0f4fbb/appSource/images/img_television_gray_600_01_1.svg',
+                          'Copy',
+                          () => Navigator.pop(context, hostInviteLink),
+                        ),
+                        const SizedBox(height: 20),
+                        // Participant link row
+                        _buildLinkRow(
+                          'Participants Link',
+                          'https://dhws-production.s3.ap-south-1.amazonaws.com/66daabcf132e0c0023f12804/66daac278309bf001b0f4695/66daaca38309bf001b0f4fbb/appSource/images/img_television_gray_600_01_1.svg',
+                          'Copy',
+                          () => Navigator.pop(context, participantInviteLink),
                         ),
                       ],
                     ),
                     Positioned(
                       right: 0,
+                      top: 0,
                       child: IconButton(
                         icon: Icon(Icons.close),
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
                       ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Host link row
-                    _buildLinkRow(
-                      'Host Link',
-                      'https://dhws-production.s3.ap-south-1.amazonaws.com/66daabcf132e0c0023f12804/66daac278309bf001b0f4695/66daaca38309bf001b0f4fbb/appSource/images/img_television_gray_600_01_1.svg',
-                      'Copy',
-                      () => Navigator.pop(context, hostInviteLink),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Participant link row
-                    _buildLinkRow(
-                      'Participants Link',
-                      'https://dhws-production.s3.ap-south-1.amazonaws.com/66daabcf132e0c0023f12804/66daac278309bf001b0f4695/66daaca38309bf001b0f4fbb/appSource/images/img_television_gray_600_01_1.svg',
-                      'Copy',
-                      () => Navigator.pop(context, participantInviteLink),
                     ),
                   ],
                 ),
@@ -123,64 +121,64 @@ class CopyInviteLinkDialog {
   }
 
   // Reusable function to build each link row
-static Widget _buildLinkRow(
-    String labelText, String imageUrl, String buttonText, VoidCallback onCopy) {
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.grey[200], // Background color of the row (light grey)
-      borderRadius: BorderRadius.circular(8),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.5), // Shadow color
-          spreadRadius: 2,
-          blurRadius: 5,
-          offset: const Offset(0, 3), // Shadow position
-        ),
-      ],
-    ),
-    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-    child: Row(
-      children: [
-        // Icon or Image
-        Icon(
-          Icons.link,
-          size: 40,
-          color: Colors.grey[600],
-        ),
-        const VerticalDivider(
-          color: Colors.black, // Divider color
-          thickness: 10, // Divider thickness
-          width: 20, // Space between icon and label
-        ),
-        // Label and Line
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                labelText,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black,
+  static Widget _buildLinkRow(
+    String labelText,
+    String imageUrl,
+    String buttonText,
+    VoidCallback onCopy,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+      child: Row(
+        children: [
+          Icon(
+            Icons.link,
+            size: 40,
+            color: Colors.grey[600],
+          ),
+          const VerticalDivider(
+            color: Colors.black,
+            thickness: 10,
+            width: 20,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  labelText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              Divider(thickness: 1, color: Colors.grey[400]), // Line below label
-            ],
+                const SizedBox(height: 5),
+                Divider(thickness: 1, color: Colors.grey[400]),
+              ],
+            ),
           ),
-        ),
-
-        // Copy button
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.indigo[900],
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo[900],
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+            ),
+            onPressed: onCopy,
+            child: Text(buttonText),
           ),
-          onPressed: onCopy,
-          child: Text(buttonText),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }

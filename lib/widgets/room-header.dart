@@ -222,6 +222,19 @@ class _RoomHeaderState extends State<RoomHeader> {
                     ),
                   ),
                 ),
+                  PopupMenuItem<String>(
+                  value: 'codec',
+                  child: ListTile(
+                    leading: Icon(Icons.info, color: Colors.black),
+                    title: Text(
+                      'Codec Stats (in testing)',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
               ];
             },
           ),

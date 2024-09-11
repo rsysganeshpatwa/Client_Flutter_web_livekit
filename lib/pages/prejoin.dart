@@ -394,6 +394,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       padding: const EdgeInsets.only(bottom: 25),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton2<MediaDevice>(
+                     
                           isExpanded: true,
                           disabledHint: const Text('Disable Camera'),
                           hint: const Text(
@@ -408,7 +409,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             color: Colors.black,
-                                            backgroundColor: Colors.white,
+                                           
                                           ),
                                         ),
                       
@@ -430,6 +431,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           ),
                           menuItemStyleData: const MenuItemStyleData(
                             height: 40,
+                          ),
+                          dropdownStyleData: const DropdownStyleData(
+                            decoration: BoxDecoration(
+                              color: Colors.white, // Set the dropdown background color to white
+                            ),
                           ),
                         ),
                       ),
@@ -458,7 +464,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: Colors.black,
-                                          backgroundColor: Colors.white,
+                  
                                           fontWeight: FontWeight.bold,
                 
                                         ),
@@ -487,6 +493,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             menuItemStyleData: const MenuItemStyleData(
                               height: 40,
                             ),
+                            dropdownStyleData: const DropdownStyleData(
+                            decoration: BoxDecoration(
+                              color: Colors.white, // Set the dropdown background color to white
+                            ),
+                          ),
                       
 
                   
@@ -527,7 +538,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             color: Colors.black,
-                                            backgroundColor: Colors.white,
+                                         
                                           ),
                                         ),
                                       ))
@@ -549,6 +560,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           ),
                           menuItemStyleData: const MenuItemStyleData(
                             height: 40,
+                          ),
+                          dropdownStyleData: const DropdownStyleData(
+                            decoration: BoxDecoration(
+                              color: Colors.white, // Set the dropdown background color to white
+                            ),
                           ),
                         ),
                       ),
