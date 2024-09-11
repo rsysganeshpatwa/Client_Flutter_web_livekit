@@ -226,6 +226,16 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
           //     ],
           //   ),
           // ),
+           Positioned(
+          // padding: EdgeInsets.only(right:500),
+          top:2,
+          left:10,
+          child: Icon(
+            widget.participant.handRaised ? Icons.pan_tool : null,
+            color:widget.participant.handRaised ? Colors.orange : Colors.white,
+            size: 30,
+          )
+       ),
 
           Positioned(
         
@@ -241,6 +251,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                     connectionQuality: widget.participant.connectionQuality,
                     isScreenShare: isScreenShare,
                     enabledE2EE: widget.participant.isEncrypted,
+                    isHandRaised: widget.participant.handRaised,
                   ),
              
           ),

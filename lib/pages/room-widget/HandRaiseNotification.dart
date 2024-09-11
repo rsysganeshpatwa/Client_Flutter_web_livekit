@@ -4,6 +4,7 @@ import 'package:livekit_client/livekit_client.dart';
 class HandRaiseNotification {
   static void show(BuildContext context, Participant participant, void Function(Participant) allowSpeak, void Function(Participant) denySpeak) {
     final participantName = participant.name ?? 'Unknown';
+    participant.handRaised = true;
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     scaffoldMessenger.showSnackBar(
@@ -15,6 +16,7 @@ class HandRaiseNotification {
             TextButton(
               onPressed: () {
                 allowSpeak(participant);
+                participant.handRaised = false;
                 scaffoldMessenger.hideCurrentSnackBar();
               },
               child: const Text('Allow Speak', style: TextStyle(color: Colors.blue)),
@@ -23,6 +25,7 @@ class HandRaiseNotification {
               onPressed: () {
                 // Handle cancel action
                 denySpeak(participant);
+                participant.handRaised = false;
                 scaffoldMessenger.hideCurrentSnackBar();
               },
               child: const Text('No', style: TextStyle(color: Colors.red)),

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -30,6 +32,7 @@ class ParticipantInfoWidget extends StatelessWidget {
   final bool audioAvailable;
   final bool publicAudioDisabled;
   final ConnectionQuality connectionQuality;
+  final bool isHandRaised;
   final bool isScreenShare;
   final bool enabledE2EE;
 
@@ -39,6 +42,7 @@ class ParticipantInfoWidget extends StatelessWidget {
     this.publicAudioDisabled = false,
     this.connectionQuality = ConnectionQuality.unknown,
     this.isScreenShare = false,
+    this.isHandRaised = false,
     this.enabledE2EE = false,
     super.key,
   });
@@ -109,6 +113,8 @@ class ParticipantInfoWidget extends StatelessWidget {
       //   ),
     ],
   ),
+  
+
 );
 
 }

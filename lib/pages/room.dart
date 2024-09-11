@@ -476,6 +476,12 @@ class _RoomPageState extends State<RoomPage> {
       if (isHandRaised && localParticipantRole == Role.admin.toString()) {
         _showHandRaiseNotification(context, participant);
       }
+
+      if(!isHandRaised && localParticipantRole == Role.admin.toString()){
+        participant.handRaised = false;
+      }
+
+
       _sortParticipants();
     });
   }
