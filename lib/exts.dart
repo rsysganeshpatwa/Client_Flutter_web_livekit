@@ -4,36 +4,55 @@ extension LKExampleExt on BuildContext {
   //
 
   void showApprovalStatusDialog( String status) {
-  showDialog(
-    context: this,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text('Approval Status'),
-        content: Text(
-status == 'approved'
-    ? 'Your request has been approved! You can now join the room.'
-    : status == 'rejected'
-        ? 'Your request has been rejected. You cannot join the room at this time.'
-        : 'No host is available at the moment. Please try again .',
-
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Navigate back or close the dialog based on the status
-              if (status == 'rejected') {
-                // Optionally, handle rejection (e.g., navigate back or show a message)
-                Navigator.of(context).pop(); // Or navigate to another page
-              }
-            },
-            child: const Text('OK'),
+    showDialog(
+      context: this,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text(
+            'Approval Status',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold, // Set the font to bold
+            ),
           ),
-        ],
-      );
-    },
-  );
-}
+          content: Text(
+            status == 'approved'
+                ? 'Your request has been approved! You can now join the room.'
+                : status == 'rejected'
+                    ? 'Your request has been rejected. You cannot join the room at this time.'
+                    : 'No host is available at the moment. Please try again .',
+            style: const TextStyle(color: Colors.black),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate back or close the dialog based on the status
+                if (status == 'rejected') {
+                  // Optionally, handle rejection (e.g., navigate back or show a message)
+                  Navigator.of(context).pop(); // Or navigate to another page
+                }
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                    vertical: 12, horizontal: 20),
+                // backgroundColor: Colors.green, // Button color
+                 backgroundColor: Colors.indigo[900],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'OK',
+                style: TextStyle(color: Colors.white), // Set button text color to green
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<bool?> showPublishDialog() => showDialog<bool>(
         context: this,
