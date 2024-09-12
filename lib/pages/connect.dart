@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart' as livekit;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_meeting_room/app_config.dart';
 import 'package:video_meeting_room/exts.dart';
 import 'package:video_meeting_room/pages/prejoin.dart';
 import 'package:video_meeting_room/utils.dart';
@@ -134,7 +134,7 @@ class _ConnectPageState extends State<ConnectPage> {
         MaterialPageRoute(
           builder: (_) => PreJoinPage(
             args: JoinArgs(
-              url: dotenv.env['API_LIVEKIT_HTTPS_URL'] ?? '',
+              url: AppConfig.apiLiveKitHttpsUrl,//dotenv.env['API_LIVEKIT_HTTPS_URL'] ?? '',
               token: token,
               simulcast: true,
               adaptiveStream: true,

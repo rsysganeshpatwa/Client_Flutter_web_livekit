@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:logging/logging.dart';
@@ -26,7 +25,6 @@ void main() async {
       return true;
     });
   }
-  await dotenv.load();
   setup();
 
   // ErrorWidget.builder = (FlutterErrorDetails details) {
