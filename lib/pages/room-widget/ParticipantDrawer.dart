@@ -112,6 +112,8 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       isTalkToHostEnable: isAllowToTalk,
       isHandRaised: false,
     );
+    widget.localParticipant?.handRaised = false;
+    
     print('Allow to talk status updated: ${updatedStatus.toJson()}');
     _triggerParticipantsStatusUpdate(updatedStatus);
   }

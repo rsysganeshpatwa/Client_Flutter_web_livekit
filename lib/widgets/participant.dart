@@ -235,8 +235,8 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
           //     ],
           //   ),
           // ),
-           Positioned(
-          top:2,
+          Positioned(
+          top:5,
           left:10,
           child: Icon(
             widget.participant.handRaised ? Icons.pan_tool : null,
