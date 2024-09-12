@@ -29,6 +29,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final double textScaleFactor = 1.0;
+    final isMobile = screenSize.width < 600;
 
     return Column(
       children: [
@@ -44,6 +45,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
 
                 if (numParticipants <= 4) {
                   return ListView.builder(
+                    scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
                     itemCount: numParticipants,
                     itemBuilder: (context, index) {
                       return GestureDetector(
@@ -62,8 +64,12 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(0),
                               child: SizedBox(
-                                width: screenSize.width * 0.9, // Use screen width dynamically
-                                height: screenSize.height * 0.2, // Use screen height dynamically
+                                width: isMobile
+                                    ? screenSize.width * 0.4 // Smaller width for horizontal scroll on mobile
+                                    : screenSize.width * 0.9, // Default width for vertical scroll
+                                height: isMobile
+                                    ? screenSize.height * 0.15 // Smaller height for horizontal scroll on mobile
+                                    : screenSize.height * 0.2, // Default height for vertical scroll
                                 child: ParticipantWidget.widgetFor(
                                   widget.participantTracks[index],
                                   widget.participantStatuses[index],
@@ -85,16 +91,16 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                     children: [
                       Positioned.fill(
                         child: PageView.builder(
+                          scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
                           controller: _pageController,
                           itemCount: pageCount,
                           itemBuilder: (context, pageIndex) {
                             final startIndex = pageIndex * itemsPerPage;
-                            final endIndex = math.min(
-                                startIndex + itemsPerPage, numParticipants);
-                            final pageParticipants = widget.participantTracks
-                                .sublist(startIndex, endIndex);
+                            final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
+                            final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
 
                             return ListView.builder(
+                              scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
                               itemCount: pageParticipants.length,
                               itemBuilder: (context, index) {
                                 return GestureDetector(
@@ -113,13 +119,17 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(0),
                                         child: SizedBox(
-                                          width: screenSize.width * 0.9, // Use screen width dynamically
-                                          height: screenSize.height * 0.2, // Use screen height dynamically
+                                          width: isMobile
+                                              ? screenSize.width * 0.4 // Smaller width for horizontal scroll on mobile
+                                              : screenSize.width * 0.9, // Default width for vertical scroll
+                                          height: isMobile
+                                              ? screenSize.height * 0.15 // Smaller height for horizontal scroll on mobile
+                                              : screenSize.height * 0.2, // Default height for vertical scroll
                                           child: ParticipantWidget.widgetFor(
-                                            widget.participantTracks[index],
-                                            widget.participantStatuses[index],
+                                            pageParticipants[index],
+                                            widget.participantStatuses[widget.participantTracks.indexOf(pageParticipants[index])],
                                             showStatsLayer: false,
-                                            participantIndex: index,  
+                                            participantIndex: index,
                                           ),
                                         ),
                                       ),

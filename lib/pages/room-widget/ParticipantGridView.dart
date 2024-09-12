@@ -62,12 +62,23 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                       final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
                       final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
                       
-                      return ParticipantGrid(
-                        participantTracks: pageParticipants,
-                        gridWidth: adjustedGridWidth,
-                        gridHeight: adjustedGridHeight,
-                        participantStatuses: widget.participantStatuses,
-                      );
+                     return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availableWidth = constraints.maxWidth;
+        final double availableHeight = constraints.maxHeight;
+
+        // Calculate grid dimensions based on available space
+        final double gridWidth = availableWidth;
+        final double gridHeight = availableHeight;
+
+        return ParticipantGrid(
+          participantTracks: pageParticipants,
+          gridWidth: gridWidth,
+          gridHeight: gridHeight,
+          participantStatuses: widget.participantStatuses,
+        );
+      },
+    );
                     },
                   ),
                 ),

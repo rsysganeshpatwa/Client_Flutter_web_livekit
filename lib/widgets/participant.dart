@@ -143,7 +143,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   @override
   Widget build(BuildContext ctx) {
-    print(widget.participantStatus.toJson());
+   // print(widget.participantStatus.toJson());
     String formatName(String name) {
       if (name.isEmpty) return name;
       return name
@@ -164,6 +164,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
       ),
       decoration: BoxDecoration(
         color: Color(0xFF747474),
+      
       ),
       child: Stack(
         children: [

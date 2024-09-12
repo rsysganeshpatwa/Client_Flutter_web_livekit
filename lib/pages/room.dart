@@ -525,7 +525,7 @@ class _RoomPageState extends State<RoomPage> {
       final isVideo = participantStatus.isVideoEnable;
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
-      
+
       // print('Starting  for  participantStatus${ participantStatus.toJson()}');
       // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
@@ -621,15 +621,14 @@ class _RoomPageState extends State<RoomPage> {
           b.participant.joinedAt.millisecondsSinceEpoch;
     });
 
-userMediaTracks
-    .sort((a, b) {
+    userMediaTracks.sort((a, b) {
       final statusA = _getParticipantStatus(a.participant.identity);
       final statusB = _getParticipantStatus(b.participant.identity);
-      
+
       // Check if both participants have raised their hands
       final isHandRaisedA = statusA?.isHandRaised ?? false;
       final isHandRaisedB = statusB?.isHandRaised ?? false;
-      
+
       if (!isHandRaisedA && !isHandRaisedB) {
         // Neither have raised hands, keep them in the same order
         return 0;
@@ -640,13 +639,12 @@ userMediaTracks
         // B hasn't raised hand, so move B down
         return -1;
       }
-      
+
       // If both have raised hands, sort by handRaisedTimeStamp
       // Earlier timestamps (raised first) should come first
-      return (statusA?.handRaisedTimeStamp ?? 0) - 
-             (statusB?.handRaisedTimeStamp ?? 0);
+      return (statusA?.handRaisedTimeStamp ?? 0) -
+          (statusB?.handRaisedTimeStamp ?? 0);
     });
-
 
     // Add the local participant to the user media tracks list
     if (localParticipant != null) {
@@ -867,7 +865,23 @@ userMediaTracks
                               ),
                       ),
                     ),
-
+                    if (widget.room.localParticipant != null &&
+                        isParticipantScreenShared &&
+                        isMobile)
+                        
+                      SizedBox(
+                     //   Sidebar width  
+                        height: 150,
+                      
+                        child: ParticipantListView(
+                          participantTracks: participantTracks.where((track) {
+                            return track.type !=
+                                ParticipantTrackType.kScreenShare;
+                          }).toList(),
+                          participantStatuses: participantsManager,
+                        ),
+                        ),
+                        
                     // Control Footer
                     ControlsWidget(
                       _toggleMuteAll,
@@ -885,7 +899,8 @@ userMediaTracks
                 ),
               ),
             if (widget.room.localParticipant != null &&
-                isParticipantScreenShared)
+                isParticipantScreenShared &&
+                !isMobile)
               Container(
                 width: 300, // Sidebar width
                 color: Color(0xFF404040),

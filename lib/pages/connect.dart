@@ -20,13 +20,13 @@ class ConnectPage extends StatefulWidget {
 
 class _ConnectPageState extends State<ConnectPage> {
   static const _storeKeyIdentity = 'identity';
-  Role _selectedRole = Role.participant;
+  Role _selectedRole = Role.admin;
 
   final ApiService _apiService = GetIt.I<ApiService>();
   final PermissionService _permissionService = GetIt.I<PermissionService>();
 
   final _identityCtrl = TextEditingController();
-  final _roomCtrl = TextEditingController();
+  final _roomCtrl = TextEditingController(text: 'ganesh');
   final _welcomeMessageCtrl = TextEditingController(text: 'Welcome to the room!');
 
   bool _busy = false;
@@ -254,97 +254,174 @@ class _ConnectPageState extends State<ConnectPage> {
     );
   }
 
-  Widget buildMainContent() {
-    final double screenHeight = MediaQuery.of(context).size.height;
-    final double screenWidth = MediaQuery.of(context).size.width;
+Widget buildMainContent() {
+  final double screenHeight = MediaQuery.of(context).size.height;
+  final double screenWidth = MediaQuery.of(context).size.width;
+  
+  // Define mobile threshold
+  bool isMobile = screenWidth < 600;
 
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 217, 219, 221),
-      body: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Existing vertical box
-            Container(
-              width: screenWidth * 0.15, // Make width a percentage of screen width
-              height: screenHeight * 0.7, // Set height as a percentage of screen height
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 39, 38, 104), // Background color of the vertical box
-                borderRadius: BorderRadius.circular(10), // Set the radius for rounded corners
-              ),
-              padding: EdgeInsets.all(screenHeight * 0.02), // Dynamic padding based on screen height
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Logo
-                  Image.asset(
-                    'images/Rsi_logo.png',
-                    semanticLabel: 'Rsilogo',
-                    height: screenHeight * 0.07, // Adjust height relative to screen height
+  return Scaffold(
+    backgroundColor: const Color.fromARGB(255, 217, 219, 221),
+    body: Center(
+      child: isMobile
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Existing vertical box (left panel for mobile)
+                Container(
+                  width: screenWidth * 0.9, // Make the container take up 90% of the width for mobile
+                  height: screenHeight * 0.3, // Adjust height based on screen height
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 39, 38, 104), // Background color of the vertical box
+                    borderRadius: BorderRadius.circular(10), // Rounded corners
                   ),
-                  SizedBox(height: screenHeight * 0.15), // Spacer between logo and text
-                  // Heading
-                  Align(
-                    alignment: Alignment.centerLeft, // Center text horizontally
-                    child: Text(
-                      'Revolutionizing Virtual Classrooms\nand Lectures',
-                      style: TextStyle(
-                        fontSize: screenHeight * 0.03, // Dynamic font size
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white, // Set heading color to white
+                  padding: EdgeInsets.all(screenHeight * 0.02), // Dynamic padding
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Logo
+                      Image.asset(
+                        'images/Rsi_logo.png',
+                        semanticLabel: 'Rsilogo',
+                        height: screenHeight * 0.06, // Adjust height relative to screen height for mobile
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-              // New vertical box for login form
-              Container(
-                width: screenWidth * 0.2, // Adjust width relative to screen width
-                height: _selectedRole == Role.admin
-                  ? screenHeight * 0.6 // Height when the role is 'admin'
-                  : screenHeight * 0.5, // Default height for other roles
-                decoration: BoxDecoration(
-                  color: Colors.white, // Background color of the vertical box
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(10), // Adjust the radius as needed
-                    bottomRight: Radius.circular(10), // Adjust the radius as needed
-                  ),
-                ),
-                padding: EdgeInsets.all(screenHeight * 0.02), // Dynamic padding
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch, // Align children to stretch
-                  children: [                    
-                    if (!_isRoomNameInUrl)...[
-                      // Row for selecting "Host" or "Participant"
-                      buildRoleSelection(),
-                    ],
-                    if (_isRoomNameInUrl)...[
-                      //Welcome message
-                      Text(
-                        welcomeMessage!,
-                        textAlign: TextAlign.center, // Center align text
-                        style: TextStyle(
-                          fontSize: screenHeight * 0.05, // Dynamic font size
-                          fontWeight: FontWeight.bold,
-                          color: const Color.fromARGB(255, 39, 38, 104), // Set color to blue
+                      SizedBox(height: screenHeight * 0.05), // Spacer between logo and text for mobile
+                      // Heading
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Revolutionizing Virtual Classrooms\nand Lectures',
+                          style: TextStyle(
+                            fontSize: screenHeight * 0.025, // Smaller font for mobile
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
-                    SizedBox(height: screenHeight * 0.02),
-                    // Name Field
-                    buildNameField(),
-                    // Connect Button
-                    buildConnectButton(),
-                  ],
+                  ),
                 ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+                SizedBox(height: screenHeight * 0.05), // Space between boxes for mobile
+                // New vertical box for login form (right panel for mobile)
+                Container(
+                  width: screenWidth * 0.9, // Make the form take up 90% of the width for mobile
+                  height: // Adjust height for 'admin'
+                      screenHeight * 0.60, // Adjust height for other roles
+                  decoration: BoxDecoration(
+                    color: Colors.white, // White background for the form
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: EdgeInsets.all(screenHeight * 0.02), // Dynamic padding
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!_isRoomNameInUrl) ...[
+                        // Row for selecting "Host" or "Participant"
+                        buildRoleSelection(),
+                      ],
+                      if (_isRoomNameInUrl) ...[
+                        // Welcome message
+                        Text(
+                          welcomeMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: screenHeight * 0.035, // Dynamic font size for mobile
+                            fontWeight: FontWeight.bold,
+                            color: const Color.fromARGB(255, 39, 38, 104), // Blue text color
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: screenHeight * 0.03),
+                      // Name Field
+                      buildNameField(),
+                      SizedBox(height: screenHeight * 0.03),
+                      // Connect Button
+                      buildConnectButton(),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Existing vertical box (left panel for larger screens)
+                Container(
+                  width: screenWidth * 0.2, // Adjust width for desktop
+                  height: screenHeight * 0.7,
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 39, 38, 104),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: EdgeInsets.all(screenHeight * 0.02),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Image.asset(
+                        'images/Rsi_logo.png',
+                        semanticLabel: 'Rsilogo',
+                        height: screenHeight * 0.07,
+                      ),
+                      SizedBox(height: screenHeight * 0.15),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Revolutionizing Virtual Classrooms\nand Lectures',
+                          style: TextStyle(
+                            fontSize: screenHeight * 0.03,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // New vertical box for login form (right panel for larger screens)
+                Container(
+                  width: screenWidth * 0.20,
+                  height:screenHeight * 0.65,
+                     
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
+                    ),
+                  ),
+                  padding: EdgeInsets.all(screenHeight * 0.03),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!_isRoomNameInUrl) ...[
+                        buildRoleSelection(),
+                      ],
+                      if (_isRoomNameInUrl) ...[
+                        Text(
+                          welcomeMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: screenHeight * 0.04,
+                            fontWeight: FontWeight.bold,
+                            color: const Color.fromARGB(255, 39, 38, 104),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: screenHeight * 0.03),
+                      buildNameField(),
+                      
+                      buildConnectButton(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    ),
+  );
+}
 
   Widget buildSidebar() {
     if (!_isRoomNameInUrl) {

@@ -55,6 +55,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   bool _speakerphoneOn = Hardware.instance.preferSpeakerOutput;
   bool _allMuted = true; // Track mute state for all participants
   bool _isHandRaised = false; // Track the "Raise Hand" state
+  bool _showMoreControls = true;
 
   @override
   void initState() {
@@ -452,6 +453,8 @@ class _ControlsWidgetState extends State<ControlsWidget> {
 
   @override
 Widget build(BuildContext context) {
+  bool isMobile = MediaQuery.of(context).size.width < 600; // Example breakpoint for mobile
+
   return Container(
     padding: EdgeInsets.all(8),
     color: Colors.black.withOpacity(0.8),
@@ -466,6 +469,7 @@ Widget build(BuildContext context) {
             Colors.deepOrange,
             _onTapDisconnect,
             Colors.white,
+             isMobile: isMobile
           ),
         ),
         // Center-aligned buttons
@@ -477,8 +481,6 @@ Widget build(BuildContext context) {
               runSpacing: 8, // Vertical space between rows of buttons
               alignment: WrapAlignment.center, // Center buttons within this area
               children: [
-
-            
                 if (widget.role == Role.admin.toString())
                   Tooltip(
                     message: _allMuted ? 'Unmute All Participants' : 'Mute All Participants',
@@ -487,6 +489,7 @@ Widget build(BuildContext context) {
                       Colors.white,
                       _toggleMuteAll,
                       Colors.black,
+                      isMobile: isMobile
                     ),
                   ),
                 Tooltip(
@@ -506,6 +509,7 @@ Widget build(BuildContext context) {
                     !participant.isMicrophoneEnabled()
                         ? Colors.white
                         : Colors.black,
+                         isMobile: isMobile
                   ),
                 ),
                 Tooltip(
@@ -525,16 +529,17 @@ Widget build(BuildContext context) {
                     !participant.isCameraEnabled()
                         ? Colors.white
                         : Colors.black,
+                         isMobile: isMobile
                   ),
                 ),
               ],
             ),
           ),
         ),
-        // Right-aligned buttons
-        if (widget.role == Role.admin.toString())
-        Row(
-          children: [
+        // Right-aligned buttons or More Controls icon
+        if (!isMobile) ...[
+          // Always visible on non-mobile devices
+          if (widget.role == Role.admin.toString()) ...[
             Tooltip(
               message: participant.isScreenShareEnabled()
                   ? 'Stop Screen Share'
@@ -571,20 +576,86 @@ Widget build(BuildContext context) {
               ),
             ),
           ],
-        ),
+        ] else ...[
+          // Mobile-specific More Controls icon
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'ScreenShare':
+                  participant.isScreenShareEnabled()
+                      ? _disableScreenShare()
+                      : _enableScreenShare();
+                  break;
+                case 'ViewParticipants':
+                  _handleParticipantDrawer();
+                  break;
+                case 'CopyLink':
+                  _handleCopyInviteLink();
+                  break;
+                case 'AnotherAction1':
+                  // Handle another action
+                  break;
+                case 'AnotherAction2':
+                  // Handle another action
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              if (widget.role == Role.admin.toString()) ...[
+                // PopupMenuItem(
+                //   value: 'ScreenShare',
+                //   child: ListTile(
+                //     leading: Icon(participant.isScreenShareEnabled()
+                //         ? Icons.stop_screen_share
+                //         : Icons.screen_share),
+                //     title: Text(participant.isScreenShareEnabled()
+                //         ? 'Stop Screen Share'
+                //         : 'Start Screen Share'),
+                //   ),
+                // ),
+                PopupMenuItem(
+                  value: 'ViewParticipants',
+                  child: ListTile(
+                    leading: Icon(Icons.people_alt),
+                    title: Text('View Participants'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'CopyLink',
+                  child: ListTile(
+                    leading: Icon(Icons.link),
+                    title: Text('Copy Invite Link'),
+                  ),
+                ),
+              ],
+             
+            ],
+              icon: Container(
+                 width: 40, // Set the desired width
+  height: 40, // Set the desired height
+              padding: EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.more_horiz_rounded, color: Colors.black),
+              ),
+          ),
+        ],
       ],
     ),
   );
 }
 
   Widget _buildControlButton(IconData iconImage, Color color,
-      VoidCallback onPressed, Color iconColor) {
+      VoidCallback onPressed, Color iconColor,{bool isMobile=false}) {
+      
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         shape: CircleBorder(),
         padding: EdgeInsets.all(8),
-        minimumSize: Size(48, 48),
+        minimumSize:isMobile ? Size(30, 30) : Size(40, 40),
       ),
       onPressed: onPressed,
       child: Icon(
