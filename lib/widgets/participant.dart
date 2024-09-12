@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/theme.dart';
 
 import 'no_video.dart';
@@ -11,18 +12,23 @@ import 'participant_stats.dart';
 
 abstract class ParticipantWidget extends StatefulWidget {
   // Convenience method to return relevant widget for participant
-  static ParticipantWidget widgetFor(ParticipantTrack participantTrack,
+  static ParticipantWidget widgetFor(ParticipantTrack participantTrack,ParticipantStatus participantStatus,
       {bool showStatsLayer = false}) {
     if (participantTrack.participant is LocalParticipant) {
       return LocalParticipantWidget(
           participantTrack.participant as LocalParticipant,
           participantTrack.type,
-          showStatsLayer);
+          showStatsLayer,
+          participantStatus,
+        
+          );
     } else if (participantTrack.participant is RemoteParticipant) {
       return RemoteParticipantWidget(
           participantTrack.participant as RemoteParticipant,
           participantTrack.type,
-          showStatsLayer);
+          showStatsLayer,
+          participantStatus
+          );
     }
     throw UnimplementedError('Unknown participant type');
   }
@@ -32,6 +38,7 @@ abstract class ParticipantWidget extends StatefulWidget {
   abstract final ParticipantTrackType type;
   abstract final bool showStatsLayer;
   final VideoQuality quality;
+  abstract final ParticipantStatus participantStatus;
 
   const ParticipantWidget({
     this.quality = VideoQuality.MEDIUM,
@@ -46,11 +53,16 @@ class LocalParticipantWidget extends ParticipantWidget {
   final ParticipantTrackType type;
   @override
   final bool showStatsLayer;
+  
+  @override
+  final ParticipantStatus participantStatus;
 
   const LocalParticipantWidget(
     this.participant,
     this.type,
-    this.showStatsLayer, {
+    this.showStatsLayer, 
+    this.participantStatus,
+    {
     super.key,
   });
 
@@ -65,11 +77,15 @@ class RemoteParticipantWidget extends ParticipantWidget {
   final ParticipantTrackType type;
   @override
   final bool showStatsLayer;
+  @override
+  final ParticipantStatus participantStatus;
 
   const RemoteParticipantWidget(
     this.participant,
     this.type,
-    this.showStatsLayer, {
+    this.showStatsLayer, 
+    this.participantStatus,
+    {
     super.key,
   });
 
@@ -87,6 +103,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
 
+ 
   @override
   void initState() {
     super.initState();
@@ -122,6 +139,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   @override
   Widget build(BuildContext ctx) {
+      print(widget.participantStatus.toJson());
     String formatName(String name) {
       if (name.isEmpty) return name;
       return name
@@ -199,6 +217,13 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               ),
             ),
           ),
+
+           
+         if ( widget.participantStatus.isHandRaised)
+          Positioned(
+            top: 8.0,
+            left: 8.0,
+            child: Icon(Icons.pan_tool, color: Colors.orange ,size: 30,),),
 
           // Positioned(
           //   top: 0,

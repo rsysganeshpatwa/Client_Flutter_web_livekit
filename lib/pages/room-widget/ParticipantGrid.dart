@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
 import 'dart:math' as math;
@@ -7,12 +8,14 @@ class ParticipantGrid extends StatelessWidget {
   final List<ParticipantTrack> participantTracks;
   final double gridWidth;
   final double gridHeight;
+  final List<ParticipantStatus> participantStatuses;
 
   const ParticipantGrid({
     super.key,
     required this.participantTracks,
     required this.gridWidth,
     required this.gridHeight,
+    required this.participantStatuses,
   });
 
   @override
@@ -41,6 +44,8 @@ class ParticipantGrid extends StatelessWidget {
       ),
       itemCount: participantTracks.length,
       itemBuilder: (context, index) {
+
+        final status = participantStatuses.where((status) => status.identity == participantTracks[index].participant.identity).first;
         return GestureDetector(
           onTap: () {
             // Add interaction logic here
@@ -58,7 +63,8 @@ class ParticipantGrid extends StatelessWidget {
                 borderRadius: BorderRadius.circular(0),
                 child: ParticipantWidget.widgetFor(
                   participantTracks[index],
-                  showStatsLayer: false,
+                  status,
+                                    showStatsLayer: false,
                 ),
               ),
             ),

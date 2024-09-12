@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'dart:math' as math;
@@ -8,10 +9,12 @@ import 'package:video_meeting_room/widgets/participant_info.dart';
 
 class ParticipantListView extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
+  final List<ParticipantStatus> participantStatuses;
 
   const ParticipantListView({
     super.key,
     required this.participantTracks,
+    required this.participantStatuses,
   });
 
   @override
@@ -63,6 +66,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                 height: screenSize.height * 0.2, // Use screen height dynamically
                                 child: ParticipantWidget.widgetFor(
                                   widget.participantTracks[index],
+                                  widget.participantStatuses[index],
                                   showStatsLayer: false,
                                 ),
                               ),
@@ -112,6 +116,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                           height: screenSize.height * 0.2, // Use screen height dynamically
                                           child: ParticipantWidget.widgetFor(
                                             widget.participantTracks[index],
+                                            widget.participantStatuses[index],
                                             showStatsLayer: false,
                                           ),
                                         ),

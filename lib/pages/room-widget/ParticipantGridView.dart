@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGrid.dart';
-import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
 import 'dart:math' as math;
 
 class ParticipantGridView extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
+  final List<ParticipantStatus> participantStatuses ;
 
   const ParticipantGridView({
     super.key,
     required this.participantTracks,
+    required this.participantStatuses,
   });
 
   @override
@@ -43,6 +45,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
               participantTracks: widget.participantTracks,
               gridWidth: adjustedGridWidth,
               gridHeight: adjustedGridHeight,
+              participantStatuses: widget.participantStatuses,
             );
           } else {
             final int itemsPerPage = 4;
@@ -58,11 +61,12 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                       final startIndex = pageIndex * itemsPerPage;
                       final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
                       final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
-
+                      
                       return ParticipantGrid(
                         participantTracks: pageParticipants,
                         gridWidth: adjustedGridWidth,
                         gridHeight: adjustedGridHeight,
+                        participantStatuses: widget.participantStatuses,
                       );
                     },
                   ),

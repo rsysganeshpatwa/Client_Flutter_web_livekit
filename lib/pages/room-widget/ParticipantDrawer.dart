@@ -38,7 +38,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     _selectAllAudio = _areAllParticipantsSelected('audio');
     _selectAllVideo = _areAllParticipantsSelected('video');
     _selectMuteAll = !_areAllParticipantsSelected('talkToHost');
-    print('initState Select Mute All: $_selectMuteAll');
+    // print('initState Select Mute All: $_selectMuteAll');
   }
 
   @override
@@ -48,7 +48,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       _selectAllAudio = _areAllParticipantsSelected('audio');
       _selectAllVideo = _areAllParticipantsSelected('video');
      _selectMuteAll = !_areAllParticipantsSelected('talkToHost');
-   //   print('didUpdateWidget Select Mute All: $_selectMuteAll');
+   //   // print('didUpdateWidget Select Mute All: $_selectMuteAll');
     }
   }
 
@@ -67,7 +67,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
   }
 
   void _toggleSelectAll(String type, bool value) {
-    print('Toggle select all: $type, $value');
+    // print('Toggle select all: $type, $value');
     setState(() {
       if (type == 'audio') {
         _selectAllAudio = value;
@@ -83,11 +83,11 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
         widget.onParticipantsStatusChanged(updatedList);
       } else {
         _selectMuteAll = value;
-        print('Select Mute All: $_selectMuteAll');
+        // print('Select Mute All: $_selectMuteAll');
         final updatedList = widget.participantsStatusList.map((status) {
           // Update only if the participant is not an admin
           if (status.role != Role.admin.toString()) {
-            print('Select Mute All: status: ${status.toJson()}');
+            // print('Select Mute All: status: ${status.toJson()}');
             return status.copyWith(isTalkToHostEnable: !_selectMuteAll);
           }
           return status; // Leave admin participants unchanged
@@ -112,7 +112,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       isTalkToHostEnable: isAllowToTalk,
       isHandRaised: false,
     );
-    print('Allow to talk status updated: ${updatedStatus.toJson()}');
+    // print('Allow to talk status updated: ${updatedStatus.toJson()}');
     _triggerParticipantsStatusUpdate(updatedStatus);
   }
 
@@ -147,7 +147,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
         ),
       );
     } catch (e) {
-      print("Error retrieving participant status: $e");
+      // print("Error retrieving participant status: $e");
       return null;
     }
   }
@@ -326,7 +326,7 @@ Column _selectAllTalkToHostModeParticipants() {
                   ),
                 ),
                 onPressed: () {
-                  print('onPressed Select Mute All: $_selectMuteAll');
+                  // print('onPressed Select Mute All: $_selectMuteAll');
                   _toggleSelectAll('talkToHost', !_selectMuteAll);
                 },
               ),
@@ -435,7 +435,7 @@ Column _selectAllTalkToHostModeParticipants() {
 
   Widget _buildParticipantTile(BuildContext context,
       {required String name, ParticipantStatus? participantStatus, tabName, bool isFromHandRaised = false}) {
-    print('Participant Status: ${participantStatus?.toJson()}');
+    // print('Participant Status: ${participantStatus?.toJson()}');
     return Column(
       children: [
         ListTile(

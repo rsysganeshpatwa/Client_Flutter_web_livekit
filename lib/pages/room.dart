@@ -821,6 +821,7 @@ Widget build(BuildContext context) {
                                   participantTracks: participantTracks.where((track) {
                                     return track.type == ParticipantTrackType.kScreenShare && track.participant.identity != widget.room.localParticipant?.identity;
                                   }).toList(),
+                                    participantStatuses:  participantsManager,
                                 ),
                               ),
                               // Optionally display other participants in a side panel (if needed)
@@ -830,6 +831,7 @@ Widget build(BuildContext context) {
                             participantTracks: participantTracks.where((track) {
                               return track.type != ParticipantTrackType.kScreenShare;
                             }).toList(),
+                            participantStatuses:  participantsManager,
                           ),
                   ),
                 ),
@@ -858,6 +860,7 @@ Widget build(BuildContext context) {
                 participantTracks: participantTracks.where((track) {
                   return track.type != ParticipantTrackType.kScreenShare;
                 }).toList(),
+                participantStatuses: participantsManager,
               ),
             ),
         ],
