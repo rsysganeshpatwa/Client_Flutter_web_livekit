@@ -33,7 +33,8 @@ class ParticipantGrid extends StatelessWidget {
         ? 2
         : (numParticipants / crossAxisCount).ceil();
 
-    final double aspectRatio = (gridWidth / crossAxisCount) / (gridHeight / rowCount);
+    final double aspectRatio =
+        (gridWidth / crossAxisCount) / (gridHeight / rowCount);
 
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -44,8 +45,18 @@ class ParticipantGrid extends StatelessWidget {
       ),
       itemCount: participantTracks.length,
       itemBuilder: (context, index) {
-
-        final status = participantStatuses.where((status) => status.identity == participantTracks[index].participant.identity).first;
+     ParticipantStatus? status = participantStatuses
+    .firstWhere(
+      (status) =>
+          status.identity == participantTracks[index].participant.identity,
+      orElse: () =>  ParticipantStatus(
+        identity: '',
+        isAudioEnable: false,
+        isVideoEnable: false,
+        isHandRaised: false,
+        isTalkToHostEnable:  false,
+       ) // Return null if no match is found
+    );
         return GestureDetector(
           onTap: () {
             // Add interaction logic here
@@ -64,7 +75,8 @@ class ParticipantGrid extends StatelessWidget {
                 child: ParticipantWidget.widgetFor(
                   participantTracks[index],
                   status,
-                                    showStatsLayer: false,
+                  showStatsLayer: false,
+                  participantIndex: index,
                 ),
               ),
             ),

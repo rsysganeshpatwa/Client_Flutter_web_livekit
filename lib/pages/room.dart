@@ -131,7 +131,7 @@ class _RoomPageState extends State<RoomPage> {
       if (localParticipantRole == Role.participant.toString()) {
         Future.delayed(Duration.zero, () {
           if (mounted) {
-            NewParticipantDialog.show(context,localParticipant.name);
+            NewParticipantDialog.show(context, localParticipant.name);
           }
         });
       }
@@ -525,9 +525,7 @@ class _RoomPageState extends State<RoomPage> {
       final isVideo = participantStatus.isVideoEnable;
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
-      if (isRemoteParticipantHost) {
-        print('isRemoteParticipantHost ${participantStatus.toJson()}');
-      }
+      
       // print('Starting  for  participantStatus${ participantStatus.toJson()}');
       // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
@@ -561,7 +559,6 @@ class _RoomPageState extends State<RoomPage> {
         }
       } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
         userMediaTracks.add(ParticipantTrack(participant: participant));
-      
       }
     }
 
@@ -570,9 +567,6 @@ class _RoomPageState extends State<RoomPage> {
           b.participant.joinedAt.millisecondsSinceEpoch;
     });
     // make localparticipant always on fourth position
-
-    
-
 
     final localParticipantTracks =
         widget.room.localParticipant?.videoTrackPublications;
@@ -601,45 +595,73 @@ class _RoomPageState extends State<RoomPage> {
       }
     }
 
-userMediaTracks.sort((a, b) { 
-  final now = DateTime.now().millisecondsSinceEpoch;
-  final fiveSecondsAgo = now - 10000; // 5000 milliseconds = 5 seconds
+    userMediaTracks.sort((a, b) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final fiveSecondsAgo = now - 10000; // 5000 milliseconds = 5 seconds
 
-  // lastSpokeAt in milliseconds, default to 0 if null
-  final aSpokeAt = a.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
-  final bSpokeAt = b.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+      // lastSpokeAt in milliseconds, default to 0 if null
+      final aSpokeAt = a.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+      final bSpokeAt = b.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
 
-  // Sort by whether they spoke within the last 5 seconds
-  final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
-  final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
+      // Sort by whether they spoke within the last 5 seconds
+      final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
+      final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
 
-  if (aSpokeRecently != bSpokeRecently) {
-    return aSpokeRecently ? -1 : 1;
-  }
+      if (aSpokeRecently != bSpokeRecently) {
+        return aSpokeRecently ? -1 : 1;
+      }
 
-  // Sort by video status if spoken within last 5 seconds is the same
-  if (a.participant.hasVideo != b.participant.hasVideo) {
-    return a.participant.hasVideo ? -1 : 1;
-  }
+      // Sort by video status if spoken within last 5 seconds is the same
+      if (a.participant.hasVideo != b.participant.hasVideo) {
+        return a.participant.hasVideo ? -1 : 1;
+      }
 
-  // Sort by joinedAt if both spoke recently or not recently
-  return a.participant.joinedAt.millisecondsSinceEpoch -
-         b.participant.joinedAt.millisecondsSinceEpoch;
-});
+      // Sort by joinedAt if both spoke recently or not recently
+      return a.participant.joinedAt.millisecondsSinceEpoch -
+          b.participant.joinedAt.millisecondsSinceEpoch;
+    });
+
+userMediaTracks
+    .sort((a, b) {
+      final statusA = _getParticipantStatus(a.participant.identity);
+      final statusB = _getParticipantStatus(b.participant.identity);
+      
+      // Check if both participants have raised their hands
+      final isHandRaisedA = statusA?.isHandRaised ?? false;
+      final isHandRaisedB = statusB?.isHandRaised ?? false;
+      
+      if (!isHandRaisedA && !isHandRaisedB) {
+        // Neither have raised hands, keep them in the same order
+        return 0;
+      } else if (!isHandRaisedA) {
+        // A hasn't raised hand, so move A down
+        return 1;
+      } else if (!isHandRaisedB) {
+        // B hasn't raised hand, so move B down
+        return -1;
+      }
+      
+      // If both have raised hands, sort by handRaisedTimeStamp
+      // Earlier timestamps (raised first) should come first
+      return (statusA?.handRaisedTimeStamp ?? 0) - 
+             (statusB?.handRaisedTimeStamp ?? 0);
+    });
 
 
-  // Add the local participant to the user media tracks list
-if (localParticipant != null) {
-  final localParticipantTrack = ParticipantTrack(participant: localParticipant);
+    // Add the local participant to the user media tracks list
+    if (localParticipant != null) {
+      final localParticipantTrack =
+          ParticipantTrack(participant: localParticipant);
 
-  // If there are more than 4 participants, insert localParticipant at the 4th position
-  if (userMediaTracks.length >= 4) {
-    userMediaTracks.insert(3, localParticipantTrack); // Insert at index 3 (4th position)
-  } else {
-    // If 4 or fewer participants, add the local participant to the end of the list
-    userMediaTracks.add(localParticipantTrack);
-  }
-}
+      // If there are more than 4 participants, insert localParticipant at the 4th position
+      if (userMediaTracks.length >= 4) {
+        userMediaTracks.insert(
+            3, localParticipantTrack); // Insert at index 3 (4th position)
+      } else {
+        // If 4 or fewer participants, add the local participant to the end of the list
+        userMediaTracks.add(localParticipantTrack);
+      }
+    }
     setState(() {
       participantTracks = [...screenTracks, ...userMediaTracks];
     });
@@ -780,105 +802,115 @@ if (localParticipant != null) {
   }
 
   @override
-Widget build(BuildContext context) {
-  final screenWidth = MediaQuery.of(context).size.width;
-  final bool isMobile = screenWidth < 600;
-  final bool isParticipantScreenShared = participantTracks
-      .any((track) => track.type == ParticipantTrackType.kScreenShare && track.participant.identity != widget.room.localParticipant?.identity);
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
+    final bool isParticipantScreenShared = participantTracks.any((track) =>
+        track.type == ParticipantTrackType.kScreenShare &&
+        track.participant.identity != widget.room.localParticipant?.identity);
 
-  return Scaffold(
-    key: _scaffoldKey,
-    backgroundColor: Color(0xFF353535),
-    body: SafeArea(
-      child: Row( // Changed to Row
-        children: [
-          // Participant list as a sidebar
-          if (widget.room.localParticipant != null)
-           
-          // Main column with header, grid, and footer
-          Expanded(
-            child: Column(
-              children: [
-                // Room header
-                RoomHeader(
-                  room: widget.room,
-                  participantsStatusList: participantsManager,
-                  onToggleRaiseHand: _handleToggleRaiseHand,
-                  isHandRaisedStatusChanged: _isHandleRaiseHand,
-                  isAdmin: localParticipantRole == Role.admin.toString(),
-                ),
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: Color(0xFF353535),
+      body: SafeArea(
+        child: Row(
+          // Changed to Row
+          children: [
+            // Participant list as a sidebar
+            if (widget.room.localParticipant != null)
 
-                // Expanded Grid View (between header and footer)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0), // Add padding
-                    child: isParticipantScreenShared
-                        ? Stack(
-                            children: [
-                              // Display the screen share participant prominently
-                              Positioned.fill(
-                                child: ParticipantGridView(
-                                  participantTracks: participantTracks.where((track) {
-                                    return track.type == ParticipantTrackType.kScreenShare && track.participant.identity != widget.room.localParticipant?.identity;
-                                  }).toList(),
-                                    participantStatuses:  participantsManager,
-                                ),
+              // Main column with header, grid, and footer
+              Expanded(
+                child: Column(
+                  children: [
+                    // Room header
+                    RoomHeader(
+                      room: widget.room,
+                      participantsStatusList: participantsManager,
+                      onToggleRaiseHand: _handleToggleRaiseHand,
+                      isHandRaisedStatusChanged: _isHandleRaiseHand,
+                      isAdmin: localParticipantRole == Role.admin.toString(),
+                    ),
+
+                    // Expanded Grid View (between header and footer)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0), // Add padding
+                        child: isParticipantScreenShared
+                            ? Stack(
+                                children: [
+                                  // Display the screen share participant prominently
+                                  Positioned.fill(
+                                    child: ParticipantGridView(
+                                      participantTracks:
+                                          participantTracks.where((track) {
+                                        return track.type ==
+                                                ParticipantTrackType
+                                                    .kScreenShare &&
+                                            track.participant.identity !=
+                                                widget.room.localParticipant
+                                                    ?.identity;
+                                      }).toList(),
+                                      participantStatuses: participantsManager,
+                                    ),
+                                  ),
+                                  // Optionally display other participants in a side panel (if needed)
+                                ],
+                              )
+                            : ParticipantGridView(
+                                participantTracks:
+                                    participantTracks.where((track) {
+                                  return track.type !=
+                                      ParticipantTrackType.kScreenShare;
+                                }).toList(),
+                                participantStatuses: participantsManager,
                               ),
-                              // Optionally display other participants in a side panel (if needed)
-                            ],
-                          )
-                        : ParticipantGridView(
-                            participantTracks: participantTracks.where((track) {
-                              return track.type != ParticipantTrackType.kScreenShare;
-                            }).toList(),
-                            participantStatuses:  participantsManager,
-                          ),
-                  ),
-                ),
+                      ),
+                    ),
 
-                // Control Footer
-                ControlsWidget(
-                  _toggleMuteAll,
-                  _handleToggleRaiseHand,
-                  _openEndDrawer,
-                  () => _copyInviteLinkToClipboard(context),
-                  _muteAll,
-                  _isHandleRaiseHand,
-                  localParticipantRole,
-                  widget.room,
-                  widget.room.localParticipant!,
-                  participantsManager,
+                    // Control Footer
+                    ControlsWidget(
+                      _toggleMuteAll,
+                      _handleToggleRaiseHand,
+                      _openEndDrawer,
+                      () => _copyInviteLinkToClipboard(context),
+                      _muteAll,
+                      _isHandleRaiseHand,
+                      localParticipantRole,
+                      widget.room,
+                      widget.room.localParticipant!,
+                      participantsManager,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          if (widget.room.localParticipant != null && isParticipantScreenShared)
-            Container(
-              width: 300, // Sidebar width
-              color: Color(0xFF404040),
-              child: ParticipantListView(
-                participantTracks: participantTracks.where((track) {
-                  return track.type != ParticipantTrackType.kScreenShare;
-                }).toList(),
-                participantStatuses: participantsManager,
               ),
-            ),
-        ],
-        
+            if (widget.room.localParticipant != null &&
+                isParticipantScreenShared)
+              Container(
+                width: 300, // Sidebar width
+                color: Color(0xFF404040),
+                child: ParticipantListView(
+                  participantTracks: participantTracks.where((track) {
+                    return track.type != ParticipantTrackType.kScreenShare;
+                  }).toList(),
+                  participantStatuses: participantsManager,
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
-    endDrawer: ParticipantDrawer(
-      searchQuery: searchQuery,
-      onSearchChanged: (value) {
-        setState(() {
-          searchQuery = value;
-        });
-      },
-      filterParticipants: _filterParticipants,
-      localParticipant: widget.room.localParticipant,
-      onParticipantsStatusChanged: sendParticipantsStatus,
-      participantsStatusList: participantsManager,
-    ),
-  );
-}
+      endDrawer: ParticipantDrawer(
+        searchQuery: searchQuery,
+        onSearchChanged: (value) {
+          setState(() {
+            searchQuery = value;
+          });
+        },
+        filterParticipants: _filterParticipants,
+        localParticipant: widget.room.localParticipant,
+        onParticipantsStatusChanged: sendParticipantsStatus,
+        participantsStatusList: participantsManager,
+      ),
+    );
+  }
 }
