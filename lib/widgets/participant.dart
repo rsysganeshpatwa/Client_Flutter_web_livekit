@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
-import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/theme.dart';
 
@@ -70,7 +69,6 @@ class LocalParticipantWidget extends ParticipantWidget {
   @override
   State<StatefulWidget> createState() => _LocalParticipantWidgetState();
 }
-
 class RemoteParticipantWidget extends ParticipantWidget{
   @override
   final RemoteParticipant participant;
@@ -103,8 +101,6 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   TrackPublication? get audioPublication;
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
-  Participant<TrackPublication<Track>>? get localParticipant =>
-      widget.participant is LocalParticipant ? widget.participant : null;
  
   @override
   void initState() {
