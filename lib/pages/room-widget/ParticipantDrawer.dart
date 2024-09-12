@@ -266,7 +266,9 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     return widget.filterParticipants(widget.searchQuery).where((track) {
       final metadata = track.participant.metadata;
       final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-      return role != Role.admin.toString();
+       final participantStatus =
+          _getParticipantStatus(track.participant.identity);
+      return role != Role.admin.toString() && participantStatus?.isHandRaised == false;
     }).map((track) {
       final participantStatus =
           _getParticipantStatus(track.participant.identity);
@@ -416,8 +418,8 @@ Column _selectAllTalkToHostModeParticipants() {
           ..sort((a, b) {
             final statusA = _getParticipantStatus(a.participant.identity);
             final statusB = _getParticipantStatus(b.participant.identity);
-            return (statusB?.handRaisedTimeStamp ?? 0) -
-                (statusA?.handRaisedTimeStamp ?? 0);
+            return (statusA?.handRaisedTimeStamp ?? 0) -
+                (statusB?.handRaisedTimeStamp ?? 0);
           });
 
     return handRaisedParticipants.map((track) {

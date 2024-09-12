@@ -12,23 +12,23 @@ import 'participant_stats.dart';
 
 abstract class ParticipantWidget extends StatefulWidget {
   // Convenience method to return relevant widget for participant
-  static ParticipantWidget widgetFor(ParticipantTrack participantTrack,ParticipantStatus participantStatus,
-      {bool showStatsLayer = false}) {
+  static ParticipantWidget widgetFor(
+      ParticipantTrack participantTrack, ParticipantStatus participantStatus,
+      {bool showStatsLayer = false, int participantIndex = 0}) {
     if (participantTrack.participant is LocalParticipant) {
       return LocalParticipantWidget(
           participantTrack.participant as LocalParticipant,
           participantTrack.type,
           showStatsLayer,
           participantStatus,
-        
-          );
+          participantIndex);
     } else if (participantTrack.participant is RemoteParticipant) {
       return RemoteParticipantWidget(
           participantTrack.participant as RemoteParticipant,
           participantTrack.type,
           showStatsLayer,
-          participantStatus
-          );
+          participantStatus,
+          participantIndex);
     }
     throw UnimplementedError('Unknown participant type');
   }
@@ -39,6 +39,7 @@ abstract class ParticipantWidget extends StatefulWidget {
   abstract final bool showStatsLayer;
   final VideoQuality quality;
   abstract final ParticipantStatus participantStatus;
+  abstract final int participantIndex;
 
   const ParticipantWidget({
     this.quality = VideoQuality.MEDIUM,
@@ -53,16 +54,18 @@ class LocalParticipantWidget extends ParticipantWidget {
   final ParticipantTrackType type;
   @override
   final bool showStatsLayer;
-  
+  @override
+  final int participantIndex;
+
   @override
   final ParticipantStatus participantStatus;
 
   const LocalParticipantWidget(
     this.participant,
     this.type,
-    this.showStatsLayer, 
+    this.showStatsLayer,
     this.participantStatus,
-    {
+    this.participantIndex, {
     super.key,
   });
 
@@ -79,13 +82,15 @@ class RemoteParticipantWidget extends ParticipantWidget {
   final bool showStatsLayer;
   @override
   final ParticipantStatus participantStatus;
+  @override
+  final int participantIndex;
 
   const RemoteParticipantWidget(
     this.participant,
     this.type,
-    this.showStatsLayer, 
+    this.showStatsLayer,
     this.participantStatus,
-    {
+    this.participantIndex, {
     super.key,
   });
 
@@ -103,7 +108,6 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
 
- 
   @override
   void initState() {
     super.initState();
@@ -139,7 +143,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   @override
   Widget build(BuildContext ctx) {
-      print(widget.participantStatus.toJson());
+    print(widget.participantStatus.toJson());
     String formatName(String name) {
       if (name.isEmpty) return name;
       return name
@@ -152,38 +156,30 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
     return Container(
       foregroundDecoration: BoxDecoration(
-        
         border: widget.participant.isSpeaking &&
                 audioPublication?.subscribed == true &&
                 !isScreenShare
             ? Border.all(width: 5, color: Colors.green)
-            
             : null,
-
-          
       ),
       decoration: BoxDecoration(
         color: Color(0xFF747474),
-       
       ),
-    
       child: Stack(
-      
         children: [
-        
-            // Display the regular video
+          // Display the regular video
 
-            InkWell(
-              onTap: () => setState(() => _visible = !_visible),
-              child: activeVideoTrack != null && !activeVideoTrack!.muted
-                  ? VideoTrackRenderer(
-                      activeVideoTrack!,
-                      fit: MediaQuery.of(ctx).size.width < 600
-                          ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                    )
-                  : const NoVideoWidget(),
-            ),
+          InkWell(
+            onTap: () => setState(() => _visible = !_visible),
+            child: activeVideoTrack != null && !activeVideoTrack!.muted
+                ? VideoTrackRenderer(
+                    activeVideoTrack!,
+                    fit: MediaQuery.of(ctx).size.width < 600
+                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                  )
+                : const NoVideoWidget(),
+          ),
           if (widget.showStatsLayer)
             Positioned(
                 top: 30,
@@ -210,7 +206,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                     ? formatName(widget.participant.name)
                     : widget.participant.identity,
                 style: TextStyle(
-                  fontSize:  20 * 0.65, // Equivalent to var(--text-lg)
+                  fontSize: 20 * 0.65, // Equivalent to var(--text-lg)
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -218,12 +214,30 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
             ),
           ),
 
-           
-         if ( widget.participantStatus.isHandRaised)
-          Positioned(
-            top: 8.0,
-            left: 8.0,
-            child: Icon(Icons.pan_tool, color: Colors.orange ,size: 30,),),
+          if (widget.participantStatus.isHandRaised)
+            Positioned(
+              top: 8.0,
+              left: 8.0,
+              child: Row(
+                children: [
+                  Text(
+                    (widget.participantIndex+1).toString()
+                       , // Replace with your dynamic index
+                    style: const TextStyle(
+                      fontSize: 20.0,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  SizedBox(width: 8.0), // Space between index and icon
+                  Icon(
+                    Icons.pan_tool,
+                    color: Colors.orange,
+                    size: 30,
+                  ),
+                ],
+              ),
+            ),
 
           // Positioned(
           //   top: 0,
@@ -262,21 +276,18 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
           // ),
 
           Positioned(
-        
             top: 0,
             right: 8.0,
-            child: 
-                  ParticipantInfoWidget(
-                    title: widget.participant.name.isNotEmpty
-                        ? '${widget.participant.name} (${widget.participant.identity})'
-                        : widget.participant.identity,
-                    audioAvailable: audioPublication?.muted == false,
-                    publicAudioDisabled: audioPublication?.subscribed == false,
-                    connectionQuality: widget.participant.connectionQuality,
-                    isScreenShare: isScreenShare,
-                    enabledE2EE: widget.participant.isEncrypted,
-                  ),
-             
+            child: ParticipantInfoWidget(
+              title: widget.participant.name.isNotEmpty
+                  ? '${widget.participant.name} (${widget.participant.identity})'
+                  : widget.participant.identity,
+              audioAvailable: audioPublication?.muted == false,
+              publicAudioDisabled: audioPublication?.subscribed == false,
+              connectionQuality: widget.participant.connectionQuality,
+              isScreenShare: isScreenShare,
+              enabledE2EE: widget.participant.isEncrypted,
+            ),
           ),
           //    Optionally, you could add other participants' video feeds here if needed
         ],

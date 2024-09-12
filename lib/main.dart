@@ -27,18 +27,18 @@ void main() async {
   }
   setup();
 
-  // ErrorWidget.builder = (FlutterErrorDetails details) {
-  //   print('Error: ${details.exception} ${details.stack} ${details.library}');
-  //   return Container(
-  //     color: Colors.white,
-  //     child: Center(
-  //       child: Text(
-  //         'An error occurred. Please restart the app.',
-  //         style: TextStyle(color: Colors.red),
-  //       ),
-  //     ),
-  //   );
-  // };
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    print('ganesh Error: ${details.exception} ${details.stack} ${details.library}');
+    return Container(
+      color: Colors.white,
+      child: Center(
+        child: Text(
+          'An error occurred. Please restart the app.',
+          style: TextStyle(color: Colors.red),
+        ),
+      ),
+    );
+  };
 
   runApp(const LiveKitExampleApp());
 }
