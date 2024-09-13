@@ -72,8 +72,7 @@ class LocalParticipantWidget extends ParticipantWidget {
   @override
   State<StatefulWidget> createState() => _LocalParticipantWidgetState();
 }
-
-class RemoteParticipantWidget extends ParticipantWidget {
+class RemoteParticipantWidget extends ParticipantWidget{
   @override
   final RemoteParticipant participant;
   @override
@@ -107,7 +106,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   TrackPublication? get audioPublication;
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
-
+  
   @override
   void initState() {
     super.initState();
@@ -215,7 +214,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
             ),
           ),
 
-          if (widget.participantStatus.isHandRaised)
+          if (!(widget.participant is LocalParticipant) && widget.participantStatus.isHandRaised)
             Positioned(
               top: 8.0,
               left: 8.0,
