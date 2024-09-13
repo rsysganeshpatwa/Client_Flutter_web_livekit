@@ -175,48 +175,51 @@ class _PreJoinPageState extends State<PreJoinPage> {
     super.dispose();
   }
 
- Future<bool> _waitForApproval(String participantName, String roomName) async {
-  try {
-    // Request approval before joining
-    final request = await _approvalService.createApprovalRequest(participantName, roomName);
-    final requestId = request['id'];
+  Future<bool> _waitForApproval(String participantName, String roomName) async {
+    try {
+      // Request approval before joining
+      final request = await _approvalService.createApprovalRequest(
+          participantName, roomName);
+      final requestId = request['id'];
 
-    // Initialize timer for 30 seconds
-    const int timeout = 30;
-    int elapsedTime = 0;
-    bool approved = false;
+      // Initialize timer for 30 seconds
+      const int timeout = 30;
+      int elapsedTime = 0;
+      bool approved = false;
 
-    while (elapsedTime < timeout) {
-      await Future.delayed(Duration(seconds: 5));
-      elapsedTime += 5;
+      while (elapsedTime < timeout) {
+        await Future.delayed(Duration(seconds: 5));
+        elapsedTime += 5;
 
-      final statusResponse = await _approvalService.getRequestStatus(requestId);
-      final status = statusResponse['status'];
+        final statusResponse =
+            await _approvalService.getRequestStatus(requestId);
+        final status = statusResponse['status'];
 
-      if (status == 'approved') {
-        approved = true;
-        context.showApprovalStatusDialog('approved');
-         await _approvalService.removeRequest(requestId);
-        return true; // Approval was granted
-      } else if (status == 'rejected') {
-        context.showApprovalStatusDialog('rejected');
-         await _approvalService.removeRequest(requestId);
-        return false; // Approval was denied
+        if (status == 'approved') {
+          approved = true;
+          context.showApprovalStatusDialog('approved');
+          await _approvalService.removeRequest(requestId);
+          return true; // Approval was granted
+        } else if (status == 'rejected') {
+          context.showApprovalStatusDialog('rejected');
+          await _approvalService.removeRequest(requestId);
+          return false; // Approval was denied
+        }
       }
-    }
 
-    // If 30 seconds have passed and no approval was granted
-    if (!approved) {
-      context.showApprovalStatusDialog('No host available, please try again.');
-      await _approvalService.removeRequest(requestId);
-      return false;
+      // If 30 seconds have passed and no approval was granted
+      if (!approved) {
+        context
+            .showApprovalStatusDialog('No host available, please try again.');
+        await _approvalService.removeRequest(requestId);
+        return false;
+      }
+    } catch (error) {
+      print('Error during approval process: $error');
+      return false; // Approval was not granted or an error occurred
     }
-  } catch (error) {
-    print('Error during approval process: $error');
-    return false; // Approval was not granted or an error occurred
+    return false; // Fallback, in case nothing happened
   }
-  return false; // Fallback, in case nothing happened
-}
 
   _join(BuildContext context) async {
     _busy = true;
@@ -228,7 +231,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
     try {
       // Wait for approval before proceeding
-     // final isLoggedIn = prefs.getBool('isLoggedIn');
+      // final isLoggedIn = prefs.getBool('isLoggedIn');
       if (args.role == Role.participant) {
         bool isApproved = await _waitForApproval(args.identity, args.roomName);
         if (!isApproved) {
@@ -251,39 +254,47 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
       // Try to connect to the room
       // This will throw an Exception if it fails for any reason.
-      await room.connect(
-        args.url,
-        args.token,
-        roomOptions: RoomOptions(
-          adaptiveStream: args.adaptiveStream,
-          dynacast: args.dynacast,
-          defaultAudioPublishOptions: const AudioPublishOptions(
-            name: 'custom_audio_track_name',
-          ),
-          defaultVideoPublishOptions: VideoPublishOptions(
-            simulcast: args.simulcast,
-            videoCodec: args.preferredCodec,
-            backupVideoCodec: BackupVideoCodec(
-              enabled: args.enableBackupVideoCodec,
+      await room
+          .connect(
+            args.url,
+            args.token,
+            roomOptions: RoomOptions(
+              adaptiveStream: args.adaptiveStream,
+              dynacast: args.dynacast,
+              defaultAudioPublishOptions: const AudioPublishOptions(
+                name: 'custom_audio_track_name',
+              ),
+              defaultVideoPublishOptions: VideoPublishOptions(
+                simulcast: args.simulcast,
+                videoCodec: args.preferredCodec,
+                backupVideoCodec: BackupVideoCodec(
+                  enabled: args.enableBackupVideoCodec,
+                ),
+              ),
+              defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
+                  useiOSBroadcastExtension: true,
+                  params: VideoParameters(
+                      dimensions: VideoDimensionsPresets.h1080_169,
+                      encoding: VideoEncoding(
+                        maxBitrate: 3 * 1000 * 1000,
+                        maxFramerate: 15,
+                      ))),
+              defaultCameraCaptureOptions: CameraCaptureOptions(
+                  maxFrameRate: 30, params: _selectedVideoParameters),
+              e2eeOptions: e2eeOptions,
             ),
-          ),
-          defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
-              useiOSBroadcastExtension: true,
-              params: VideoParameters(
-                  dimensions: VideoDimensionsPresets.h1080_169,
-                  encoding: VideoEncoding(
-                    maxBitrate: 3 * 1000 * 1000,
-                    maxFramerate: 15,
-                  ))),
-          defaultCameraCaptureOptions: CameraCaptureOptions(
-              maxFrameRate: 30, params: _selectedVideoParameters),
-          e2eeOptions: e2eeOptions,
-        ),
-        fastConnectOptions: FastConnectOptions(
-          microphone: TrackOption(track: _audioTrack),
-          camera: TrackOption(track: _videoTrack),
-        ),
-      );
+            fastConnectOptions: FastConnectOptions(
+              microphone: TrackOption(track: _audioTrack),
+              camera: TrackOption(track: _videoTrack),
+            ),
+          )
+          .catchError((error) async => {
+                print('catchError Could not connect $error'),
+                await Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(builder: (_) => RoomPage(room, listener)),
+                )
+              });
 
       await Navigator.push<void>(
         context,
@@ -291,7 +302,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
       );
     } catch (error) {
       print('Could not connect $error');
-      await context.showErrorDialog(error);
+      // await context.showErrorDialog(error);
     } finally {
       setState(() {
         _busy = false;
@@ -308,7 +319,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+        backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
           title: const Text(
@@ -323,32 +334,32 @@ class _PreJoinPageState extends State<PreJoinPage> {
             onPressed: () => _actionBack(context),
           ),
         ),
-        
         body: Container(
             alignment: Alignment.center,
-            color : Colors.white,
+            color: Colors.white,
             // decoration: BoxDecoration(border:Border.all(color: Colors.black,width: 1) ),
-            
+
             child: SingleChildScrollView(
                 child: Container(
-                  color: Colors.white,
+              color: Colors.white,
               padding: const EdgeInsets.symmetric(
                 horizontal: 20,
                 vertical: 20,
               ),
-              
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text('      Select Devices',
-                        style: TextStyle(fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color:Colors.black),)
-                    ),
+                        padding: const EdgeInsets.all(20.0),
+                        child: Text(
+                          '      Select Devices',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black),
+                        )),
                     Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: SizedBox(
@@ -381,8 +392,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Camera:',
-                          style: TextStyle(color:Colors.black,fontWeight: FontWeight.bold),),
+                          const Text(
+                            'Camera:',
+                            style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold),
+                          ),
                           Switch(
                             value: _enableVideo,
                             onChanged: (value) => _setEnableVideo(value),
@@ -394,27 +409,24 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       padding: const EdgeInsets.only(bottom: 25),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton2<MediaDevice>(
-                     
                           isExpanded: true,
                           disabledHint: const Text('Disable Camera'),
                           hint: const Text(
                             'Select Camera',
                           ),
                           items: _videoInputs
-                                  .map((MediaDevice item) =>
-                                      DropdownMenuItem<MediaDevice>(
-                                        value: item,
-                                        child: Text(
-                                          item.label,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black,
-                                           
-                                          ),
-                                        ),
-                      
-                                      ))
-                                  .toList(),
+                              .map((MediaDevice item) =>
+                                  DropdownMenuItem<MediaDevice>(
+                                    value: item,
+                                    child: Text(
+                                      item.label,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
                           value: _selectedVideoDevice,
                           onChanged: (MediaDevice? value) async {
                             if (value != null) {
@@ -427,14 +439,14 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             padding: EdgeInsets.symmetric(horizontal: 16),
                             height: 40,
                             width: 140,
-                  
                           ),
                           menuItemStyleData: const MenuItemStyleData(
                             height: 40,
                           ),
                           dropdownStyleData: const DropdownStyleData(
                             decoration: BoxDecoration(
-                              color: Colors.white, // Set the dropdown background color to white
+                              color: Colors
+                                  .white, // Set the dropdown background color to white
                             ),
                           ),
                         ),
@@ -448,7 +460,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             isExpanded: true,
                             hint: const Text(
                               'Select Video Dimensions',
-                              style: TextStyle(color:Colors.black),
+                              style: TextStyle(color: Colors.black),
                             ),
                             items: [
                               VideoParametersPresets.h480_43,
@@ -464,9 +476,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: Colors.black,
-                  
                                           fontWeight: FontWeight.bold,
-                
                                         ),
                                       ),
                                     ))
@@ -483,24 +493,20 @@ class _PreJoinPageState extends State<PreJoinPage> {
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               height: 40,
                               width: 140,
-              
                             ),
                             style: TextStyle(
                               color: Colors.grey[700],
                               fontSize: 16,
                             ),
-                            
                             menuItemStyleData: const MenuItemStyleData(
                               height: 40,
                             ),
                             dropdownStyleData: const DropdownStyleData(
-                            decoration: BoxDecoration(
-                              color: Colors.white, // Set the dropdown background color to white
+                              decoration: BoxDecoration(
+                                color: Colors
+                                    .white, // Set the dropdown background color to white
+                              ),
                             ),
-                          ),
-                      
-
-                  
                           ),
                         ),
                       ),
@@ -509,8 +515,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Micriphone:',
-                          style: TextStyle(color:Colors.black,fontWeight: FontWeight.bold),),
+                          const Text(
+                            'Micriphone:',
+                            style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold),
+                          ),
                           Switch(
                             value: _enableAudio,
                             onChanged: (value) => _setEnableAudio(value),
@@ -523,10 +533,13 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton2<MediaDevice>(
                           isExpanded: true,
-                          disabledHint: const Text('Disable Microphone',style: TextStyle(color:Colors.black),),
+                          disabledHint: const Text(
+                            'Disable Microphone',
+                            style: TextStyle(color: Colors.black),
+                          ),
                           hint: const Text(
                             'Select Micriphone',
-                            style: TextStyle(color:Colors.black),
+                            style: TextStyle(color: Colors.black),
                           ),
                           items: _enableAudio
                               ? _audioInputs
@@ -538,7 +551,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             color: Colors.black,
-                                         
                                           ),
                                         ),
                                       ))
@@ -554,7 +566,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           },
                           buttonStyleData: const ButtonStyleData(
                             padding: EdgeInsets.symmetric(horizontal: 16),
-                          
                             height: 40,
                             width: 140,
                           ),
@@ -563,7 +574,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           ),
                           dropdownStyleData: const DropdownStyleData(
                             decoration: BoxDecoration(
-                              color: Colors.white, // Set the dropdown background color to white
+                              color: Colors
+                                  .white, // Set the dropdown background color to white
                             ),
                           ),
                         ),
@@ -586,7 +598,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
                                 ),
                               ),
                             ),
-                          const Text('JOIN', style: TextStyle(color:Colors.white,fontWeight: FontWeight.bold),),
+                          const Text(
+                            'JOIN',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ),

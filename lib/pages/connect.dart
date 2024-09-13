@@ -26,7 +26,7 @@ class _ConnectPageState extends State<ConnectPage> {
   final PermissionService _permissionService = GetIt.I<PermissionService>();
 
   final _identityCtrl = TextEditingController();
-  final _roomCtrl = TextEditingController(text: 'ganesh');
+  final _roomCtrl = TextEditingController();
   final _welcomeMessageCtrl = TextEditingController(text: 'Welcome to the room!');
 
   bool _busy = false;
@@ -370,7 +370,7 @@ Widget buildMainContent() {
                         child: Text(
                           'Revolutionizing Virtual Classrooms\nand Lectures',
                           style: TextStyle(
-                            fontSize: screenHeight * 0.03,
+                            fontSize: screenHeight * 0.02,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
