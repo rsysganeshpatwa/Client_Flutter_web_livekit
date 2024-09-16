@@ -120,10 +120,28 @@ class _ConnectPageState extends State<ConnectPage> {
         _busy = true;
       });
 
-      await _writePrefs();
+
 
       final identity = _identityCtrl.text;
       final roomName = _roomCtrl.text;
+       if (identity.isEmpty) {
+      await ctx.showErrorDialog('Please enter your name',title: 'Input Error');
+       setState(() {
+        _busy = false;
+      });
+      return; 
+       }
+      else if (roomName.isEmpty) {
+      await ctx.showErrorDialog('Please enter a room name',title: 'Input Error');
+       setState(() {
+        _busy = false;
+      });
+      return; 
+      }
+
+      await _writePrefs();
+
+ 
       final adminWelcomeMessage = _welcomeMessageCtrl.text;
       final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 

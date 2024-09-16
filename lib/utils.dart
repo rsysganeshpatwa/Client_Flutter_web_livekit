@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:encrypt/encrypt.dart' as  erc;
+import 'package:flutter/services.dart';
 
 
 FutureOr<void> Function()? onWindowShouldClose;
@@ -72,4 +73,25 @@ static String encrypt(String text) {
   static Map<String, String> decodeParams(String query) {
     return Uri.splitQueryString(query);
   }
+
+
 }
+
+
+class ValidateTextField {
+  static List<TextInputFormatter> globalInputFormatters({int? maxLength}) {
+    return [
+      if (maxLength != null) LengthLimitingTextInputFormatter(maxLength), // Set max length if provided
+      // Deny leading/trailing spaces but allow spaces in between words
+      TextInputFormatter.withFunction((oldValue, newValue) {
+        String trimmedValue = newValue.text.trimLeft(); // Remove leading spaces
+        return TextEditingValue(
+          text: trimmedValue,
+          selection: TextSelection.collapsed(offset: trimmedValue.length),
+        );
+      }),
+    ];
+  }
+}
+
+

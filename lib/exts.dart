@@ -110,10 +110,10 @@ extension LKExampleExt on BuildContext {
         ),
       );
 
-  Future<void> showErrorDialog(dynamic exception) => showDialog<void>(
+  Future<void> showErrorDialog(dynamic exception, {String title ='Error'}) => showDialog<void>(
         context: this,
         builder: (ctx) => AlertDialog(
-          title: const Text('Error'),
+          title:  Text(title),
           content: Text(exception.toString()),
           actions: [
             TextButton(

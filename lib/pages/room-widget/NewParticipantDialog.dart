@@ -35,7 +35,7 @@ class NewParticipantDialog {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
-                  '${participantName}, you are muted by default, please raise your hand.',
+                  '${participantName}, You are currently muted. Please raise your hand if you would like to speak.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.black87,
