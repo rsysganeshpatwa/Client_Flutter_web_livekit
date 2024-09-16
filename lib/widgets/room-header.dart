@@ -1,15 +1,23 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 
 class RoomHeader extends StatefulWidget {
   final Room room;
   final List<ParticipantStatus> participantsStatusList;
-    final void Function(bool) onToggleRaiseHand;
-    final bool isHandRaisedStatusChanged;
-    final bool isAdmin;
+  final void Function(bool) onToggleRaiseHand;
+  final bool isHandRaisedStatusChanged;
+  final bool isAdmin;
 
-  RoomHeader({required this.room, required this.participantsStatusList, required this.onToggleRaiseHand, required this.isHandRaisedStatusChanged, required this.isAdmin});
+  RoomHeader(
+      {required this.room,
+      required this.participantsStatusList,
+      required this.onToggleRaiseHand,
+      required this.isHandRaisedStatusChanged,
+      required this.isAdmin});
 
   @override
   _RoomHeaderState createState() => _RoomHeaderState();
@@ -29,7 +37,8 @@ class _RoomHeaderState extends State<RoomHeader> {
   @override
   void didUpdateWidget(covariant RoomHeader oldWidget) {
     super.didUpdateWidget(oldWidget);
-     if (widget.isHandRaisedStatusChanged != oldWidget.isHandRaisedStatusChanged) {
+    if (widget.isHandRaisedStatusChanged !=
+        oldWidget.isHandRaisedStatusChanged) {
       if (!widget.isHandRaisedStatusChanged) {
         setState(() {
           _isHandRaised =
@@ -74,9 +83,12 @@ class _RoomHeaderState extends State<RoomHeader> {
                 if (_audioInputs != null)
                   ..._audioInputs!.map((device) {
                     return ListTile(
-                      leading: (device.deviceId == widget.room.selectedAudioInputDeviceId)
-                          ? const Icon(Icons.check_box_outlined, color: Colors.indigo)
-                          : const Icon(Icons.check_box_outline_blank, color: Colors.black),
+                      leading: (device.deviceId ==
+                              widget.room.selectedAudioInputDeviceId)
+                          ? const Icon(Icons.check_box_outlined,
+                              color: Colors.indigo)
+                          : const Icon(Icons.check_box_outline_blank,
+                              color: Colors.black),
                       title: Text(
                         device.label,
                         style: const TextStyle(
@@ -115,9 +127,12 @@ class _RoomHeaderState extends State<RoomHeader> {
                 if (_videoInputs != null)
                   ..._videoInputs!.map((device) {
                     return ListTile(
-                      leading: (device.deviceId == widget.room.selectedVideoInputDeviceId)
-                          ? const Icon(Icons.check_box_outlined, color: Colors.indigo)
-                          : const Icon(Icons.check_box_outline_blank, color: Colors.black),
+                      leading: (device.deviceId ==
+                              widget.room.selectedVideoInputDeviceId)
+                          ? const Icon(Icons.check_box_outlined,
+                              color: Colors.indigo)
+                          : const Icon(Icons.check_box_outline_blank,
+                              color: Colors.black),
                       title: Text(
                         device.label,
                         style: const TextStyle(
@@ -139,21 +154,32 @@ class _RoomHeaderState extends State<RoomHeader> {
     );
   }
 
- 
   void _toggleHandRaise() {
     setState(() {
       _isHandRaised = !_isHandRaised;
 
       widget.onToggleRaiseHand(_isHandRaised);
-  
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    var totalHostCount = widget.room.remoteParticipants.values.where((p) {
+      return p.metadata != null &&
+          jsonDecode(p.metadata!)['role'] == Role.admin.toString();
+    }).length;
+
+    var totalParticipantCount = widget.room.remoteParticipants.values.where(
+        (p) => p.metadata != null && jsonDecode(p.metadata!)['role'] == Role.participant.toString()).length;
+
+
+    totalHostCount = widget.isAdmin ? totalHostCount + 1 : totalHostCount;
+    totalParticipantCount = !widget.isAdmin ? totalParticipantCount + 1 : totalParticipantCount;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      color: Color(0xFF4A4A4A).withOpacity(0.8), // Use the actual hex code for var(--gray_700)
+      color: Color(0xFF4A4A4A)
+          .withOpacity(0.8), // Use the actual hex code for var(--gray_700)
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -169,16 +195,40 @@ class _RoomHeaderState extends State<RoomHeader> {
               overflow: TextOverflow.ellipsis, // Handles overflow
             ),
           ),
+          if(widget.isAdmin)
+          SizedBox(
+              height:
+                  4), // Add some spacing between the title and participant count
+          Text(
+            'Participants: ${totalParticipantCount}', // Display total participant count
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white, // Text color for participant count
+            ),
+          ),
+           if(widget.isAdmin)
+          SizedBox(
+            width: 16,
+          ), // Add some spacing between the participant count and host count
+          Text(
+            'Hosts: ${totalHostCount}', // Display total host count
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white, // Text color for host count
+            ),
+          ),
           // Hand Raise Icon
           if (!widget.isAdmin)
-          IconButton(
-            icon: Icon(
-               Icons.pan_tool,
-              color: _isHandRaised ? Colors.orange : Colors.white, // Change color based on state
-              size: 30,
+            IconButton(
+              icon: Icon(
+                Icons.pan_tool,
+                color: _isHandRaised
+                    ? Colors.orange
+                    : Colors.white, // Change color based on state
+                size: 30,
+              ),
+              onPressed: _toggleHandRaise,
             ),
-            onPressed: _toggleHandRaise,
-          ),
           // Settings Popup Menu
           PopupMenuButton<String>(
             icon: Icon(
@@ -222,7 +272,7 @@ class _RoomHeaderState extends State<RoomHeader> {
                     ),
                   ),
                 ),
-                  PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'codec',
                   child: ListTile(
                     leading: Icon(Icons.info, color: Colors.black),

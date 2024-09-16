@@ -72,7 +72,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       if (type == 'audio') {
         _selectAllAudio = value;
         final updatedList = widget.participantsStatusList.map((status) {
-          return status.copyWith(isAudioEnable: _selectAllAudio);
+          return status.copyWith(isAudioEnable: _selectAllAudio,isTalkToHostEnable: _selectAllAudio);
         }).toList();
         widget.onParticipantsStatusChanged(updatedList);
       } else if (type == 'video') {
@@ -102,6 +102,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     final updatedStatus = participantStatus.copyWith(
       isAudioEnable: isAudio,
       isVideoEnable: isVideo,
+      isTalkToHostEnable: isAudio, // Auto enable talk to host if audio is enabled
     );
     _triggerParticipantsStatusUpdate(updatedStatus);
   }

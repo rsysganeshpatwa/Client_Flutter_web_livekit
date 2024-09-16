@@ -602,17 +602,17 @@ Widget build(BuildContext context) {
             },
             itemBuilder: (context) => [
               if (widget.role == Role.admin.toString()) ...[
-                // PopupMenuItem(
-                //   value: 'ScreenShare',
-                //   child: ListTile(
-                //     leading: Icon(participant.isScreenShareEnabled()
-                //         ? Icons.stop_screen_share
-                //         : Icons.screen_share),
-                //     title: Text(participant.isScreenShareEnabled()
-                //         ? 'Stop Screen Share'
-                //         : 'Start Screen Share'),
-                //   ),
-                // ),
+                PopupMenuItem(
+                  value: 'ScreenShare',
+                  child: ListTile(
+                    leading: Icon(participant.isScreenShareEnabled()
+                        ? Icons.stop_screen_share
+                        : Icons.screen_share),
+                    title: Text(participant.isScreenShareEnabled()
+                        ? 'Stop Screen Share'
+                        : 'Start Screen Share'),
+                  ),
+                ),
                 PopupMenuItem(
                   value: 'ViewParticipants',
                   child: ListTile(
@@ -655,7 +655,7 @@ Widget build(BuildContext context) {
         backgroundColor: color,
         shape: CircleBorder(),
         padding: EdgeInsets.all(8),
-        minimumSize:isMobile ? Size(30, 30) : Size(40, 40),
+        minimumSize:isMobile ? Size(40, 40) : Size(50, 50),
       ),
       onPressed: onPressed,
       child: Icon(
