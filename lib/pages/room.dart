@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math' as math;
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -70,6 +71,14 @@ class _RoomPageState extends State<RoomPage> {
   @override
   void initState() {
     super.initState();
+
+    html.window.addEventListener('beforeunload', (event) async {
+      // Perform your action here, e.g., cleanup or save state
+      print("Tab is closing or reloading");
+      await widget.room.disconnect();
+      // To display a confirmation dialog (optional):
+      // event.returnValue = 'Are you sure you want to leave?';
+    });
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
     // Set up role for the local participant
@@ -100,6 +109,7 @@ class _RoomPageState extends State<RoomPage> {
     //sendParticipant call every 5 second
     //exchangeData();
   }
+  // Capture the window close event
 
   @override
   void dispose() {
@@ -107,6 +117,7 @@ class _RoomPageState extends State<RoomPage> {
       if (lkPlatformIs(PlatformType.iOS)) {
         ReplayKitChannel.closeReplayKit();
       }
+      print('RoomPage dispose');
       widget.room.removeListener(_onRoomDidUpdate);
       await _listener.dispose();
       await widget.room.dispose();
@@ -868,11 +879,10 @@ class _RoomPageState extends State<RoomPage> {
                     if (widget.room.localParticipant != null &&
                         isParticipantScreenShared &&
                         isMobile)
-                        
                       SizedBox(
-                     //   Sidebar width  
+                        //   Sidebar width
                         height: 150,
-                      
+
                         child: ParticipantListView(
                           participantTracks: participantTracks.where((track) {
                             return track.type !=
@@ -880,8 +890,8 @@ class _RoomPageState extends State<RoomPage> {
                           }).toList(),
                           participantStatuses: participantsManager,
                         ),
-                        ),
-                        
+                      ),
+
                     // Control Footer
                     ControlsWidget(
                       _toggleMuteAll,
