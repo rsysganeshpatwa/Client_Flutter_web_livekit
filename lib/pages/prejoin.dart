@@ -287,14 +287,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
               microphone: TrackOption(track: _audioTrack),
               camera: TrackOption(track: _videoTrack),
             ),
-          )
-          .catchError((error) async => {
-                print('catchError Could not connect $error'),
-                await Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(builder: (_) => RoomPage(room, listener)),
-                )
-              });
+          );
+          
 
       await Navigator.push<void>(
         context,
@@ -302,7 +296,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
       );
     } catch (error) {
       print('Could not connect $error');
-      // await context.showErrorDialog(error);
+      await context.showErrorDialog(error);
     } finally {
       setState(() {
         _busy = false;

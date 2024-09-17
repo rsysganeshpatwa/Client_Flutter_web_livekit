@@ -195,10 +195,11 @@ class _RoomHeaderState extends State<RoomHeader> {
               overflow: TextOverflow.ellipsis, // Handles overflow
             ),
           ),
-          if(widget.isAdmin)
+        
           SizedBox(
               height:
                   4), // Add some spacing between the title and participant count
+                    if(widget.isAdmin)
           Text(
             'Participants: ${totalParticipantCount}', // Display total participant count
             style: TextStyle(
@@ -206,10 +207,11 @@ class _RoomHeaderState extends State<RoomHeader> {
               color: Colors.white, // Text color for participant count
             ),
           ),
-           if(widget.isAdmin)
+           
           SizedBox(
             width: 16,
           ), // Add some spacing between the participant count and host count
+          if(widget.isAdmin)
           Text(
             'Hosts: ${totalHostCount}', // Display total host count
             style: TextStyle(
