@@ -252,42 +252,49 @@ class _PreJoinPageState extends State<PreJoinPage> {
         await keyProvider.setKey(args.e2eeKey!);
       }
 
+    
+
+
       // Try to connect to the room
       // This will throw an Exception if it fails for any reason.
       await room
           .connect(
             args.url,
             args.token,
-            roomOptions: RoomOptions(
-              adaptiveStream: args.adaptiveStream,
-              dynacast: args.dynacast,
-              defaultAudioPublishOptions: const AudioPublishOptions(
-                name: 'custom_audio_track_name',
-              ),
-              defaultVideoPublishOptions: VideoPublishOptions(
-                simulcast: args.simulcast,
-                videoCodec: args.preferredCodec,
-                backupVideoCodec: BackupVideoCodec(
-                  enabled: args.enableBackupVideoCodec,
-                ),
-              ),
-              defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
-                  useiOSBroadcastExtension: true,
-                  params: VideoParameters(
-                      dimensions: VideoDimensionsPresets.h1080_169,
-                      encoding: VideoEncoding(
-                        maxBitrate: 3 * 1000 * 1000,
-                        maxFramerate: 15,
-                      ))),
-              defaultCameraCaptureOptions: CameraCaptureOptions(
-                  maxFrameRate: 30, params: _selectedVideoParameters),
-              e2eeOptions: e2eeOptions,
-            ),
-            fastConnectOptions: FastConnectOptions(
+            // roomOptions: RoomOptions(
+            //   adaptiveStream: args.adaptiveStream,
+            //   dynacast: args.dynacast,
+            //   defaultAudioPublishOptions: const AudioPublishOptions(
+            //     name: 'custom_audio_track_name',
+            //   ),
+            //   defaultVideoPublishOptions: VideoPublishOptions(
+            //     simulcast: args.simulcast,
+            //     videoCodec: args.preferredCodec,
+            //     backupVideoCodec: BackupVideoCodec(
+            //       enabled: args.enableBackupVideoCodec,
+            //     ),
+            //   ),
+            //   defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
+            //       useiOSBroadcastExtension: true,
+            //       params: VideoParameters(
+            //           dimensions: VideoDimensionsPresets.h1080_169,
+            //           encoding: VideoEncoding(
+            //             maxBitrate: 3 * 1000 * 1000,
+            //             maxFramerate: 15,
+            //           ))),
+            //   defaultCameraCaptureOptions: CameraCaptureOptions(
+            //       maxFrameRate: 30, params: _selectedVideoParameters),
+            //   e2eeOptions: e2eeOptions,
+            // ),
+             fastConnectOptions: FastConnectOptions(
               microphone: TrackOption(track: _audioTrack),
               camera: TrackOption(track: _videoTrack),
             ),
-          );
+          ).catchError((error) async {
+            print('Could not connect $error');
+            await room.disconnect();
+            context.showErrorDialog(error);
+          });
           
 
       await Navigator.push<void>(
@@ -296,11 +303,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
       );
     } catch (error) {
       print('Could not connect $error');
+    
       await context.showErrorDialog(error);
     } finally {
       setState(() {
         _busy = false;
-      });
+      }); 
     }
   }
 

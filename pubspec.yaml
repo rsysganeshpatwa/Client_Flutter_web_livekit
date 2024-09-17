@@ -30,7 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  livekit_client: ^2.2.2
+  livekit_client: ^2.2.5
   provider: ^6.0.2
   cloud_firestore: ^5.0.1
 
