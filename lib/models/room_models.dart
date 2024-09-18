@@ -66,3 +66,9 @@ class ParticipantStatus {
 }
 
 
+
+enum StatsType {
+  kUnknown,
+  kLocalAudioSender,
+  kLocalVideoSender,
+}

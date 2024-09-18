@@ -41,12 +41,12 @@ class _RoomHeaderState extends State<RoomHeader> {
   List<EventsListener<TrackEvent>> listeners = [];
   StatsType statsType = StatsType.kUnknown;
   LocalParticipant get participant => widget.room.localParticipant!;
+  bool isListenerSet = false;
 
   @override
   void initState() {
     super.initState();
     _loadDevices();
-	_setUpTrackListeners();
   }
 
   @override
@@ -62,7 +62,7 @@ class _RoomHeaderState extends State<RoomHeader> {
       }
     }
   }
-  
+
   Future<void> _loadDevices() async {
     final devices = await Hardware.instance.enumerateDevices();
     setState(() {
@@ -168,7 +168,7 @@ class _RoomHeaderState extends State<RoomHeader> {
       },
     );
   }
-  
+
   void _setUpTrackListeners() {
     // Dispose of any existing listeners
     for (var element in listeners) {
@@ -190,31 +190,29 @@ class _RoomHeaderState extends State<RoomHeader> {
         }
       }
 
-      // Continue checking until both microphone and camera are enabled
-      if (participant.isMicrophoneEnabled() && participant.isCameraEnabled()) {
-        print("vikas Both microphone and camera are enabled, stopping monitoring.");
-        // Stop the timer once both are enabled
-        _checkTracksTimer?.cancel();
-      }
-    }
 
-    // Set up a periodic timer to check the condition every second (or your desired interval)
-    _checkTracksTimer = Timer.periodic(Duration(seconds: 5), (timer) {
-      _checkMicrophoneAndCameraStatus();
-    });
+    }
+_checkMicrophoneAndCameraStatus();
+   
   }
 
   void _setUpListener(Track track) async {
     var listener = track.createListener();
     listeners.add(listener);
     if (track is LocalVideoTrack) {
+      if(isListenerSet  ==false){
       await participant.setCameraEnabled(false);
       await participant.setCameraEnabled(true);
+      }
       statsType = StatsType.kLocalVideoSender;
       listener.on<VideoSenderStatsEvent>((event) {
-        print("vikas testing in video track ${event.currentBitrate.toInt()} kbps");
+      
+        print(
+            "vikas testing in video track ${event.currentBitrate.toInt()} kbps");
         setState(() {
-          StatsRepository().stats['video tx'] = '${event.currentBitrate.toInt()} kbps';
+          isListenerSet = true;
+          StatsRepository().stats['video tx'] =
+              '${event.currentBitrate.toInt()} kbps';
           var firstStats =
               event.stats['f'] ?? event.stats['h'] ?? event.stats['q'];
           if (firstStats != null) {
@@ -229,14 +227,20 @@ class _RoomHeaderState extends State<RoomHeader> {
           }
         });
       });
-    } else if (track is LocalAudioTrack) {  
+    } else if (track is LocalAudioTrack) {
+      if(isListenerSet ==false){
       await participant.setMicrophoneEnabled(false);
       await participant.setMicrophoneEnabled(true);
+
+      }
       statsType = StatsType.kLocalAudioSender;
       listener.on<AudioSenderStatsEvent>((event) {
-        print("vikas testing in audio track ${event.currentBitrate.toInt()} kbps");
+        print(
+            "vikas testing in audio track ${event.currentBitrate.toInt()} kbps");
         setState(() {
-          StatsRepository().stats['audio tx'] = '${event.currentBitrate.toInt()} kbps';
+           isListenerSet = true;
+          StatsRepository().stats['audio tx'] =
+              '${event.currentBitrate.toInt()} kbps';
           StatsRepository().stats['audio codec'] =
               '${event.stats.mimeType}, ${event.stats.clockRate}hz, ${event.stats.channels}ch, pt: ${event.stats.payloadType}';
         });
@@ -245,13 +249,29 @@ class _RoomHeaderState extends State<RoomHeader> {
   }
 
   void showCodecStatsDialog(BuildContext context, Map<String, String> stats) {
+    final isCameraEnabled = participant.isCameraEnabled();
+    final isMicrophoneEnabled = participant.isMicrophoneEnabled();
+    _setUpTrackListeners();
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return CodecStatsDialog(stats: stats);
+        return CodecStatsDialog(stats: stats,isVideoOn: isCameraEnabled || isMicrophoneEnabled);
       },
-    );
+    ).then((value) {
+      // Code to execute after the dialog is closed
+      print("Dialog closed");
+      listeners.forEach((element) {
+        element.dispose();
+      });
+      listeners.clear();
+      setState(() {
+         StatsRepository().stats.clear();
+      });
+      // Do any other operation here
+    });
+    
   }
+
   void _toggleHandRaise() {
     setState(() {
       _isHandRaised = !_isHandRaised;
@@ -267,12 +287,15 @@ class _RoomHeaderState extends State<RoomHeader> {
           jsonDecode(p.metadata!)['role'] == Role.admin.toString();
     }).length;
 
-    var totalParticipantCount = widget.room.remoteParticipants.values.where(
-        (p) => p.metadata != null && jsonDecode(p.metadata!)['role'] == Role.participant.toString()).length;
-
+    var totalParticipantCount = widget.room.remoteParticipants.values
+        .where((p) =>
+            p.metadata != null &&
+            jsonDecode(p.metadata!)['role'] == Role.participant.toString())
+        .length;
 
     totalHostCount = widget.isAdmin ? totalHostCount + 1 : totalHostCount;
-    totalParticipantCount = !widget.isAdmin ? totalParticipantCount + 1 : totalParticipantCount;
+    totalParticipantCount =
+        !widget.isAdmin ? totalParticipantCount + 1 : totalParticipantCount;
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -293,30 +316,30 @@ class _RoomHeaderState extends State<RoomHeader> {
               overflow: TextOverflow.ellipsis, // Handles overflow
             ),
           ),
-        
+
           SizedBox(
               height:
                   4), // Add some spacing between the title and participant count
-                    if(widget.isAdmin)
-          Text(
-            'Participants: ${totalParticipantCount}', // Display total participant count
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white, // Text color for participant count
+          if (widget.isAdmin)
+            Text(
+              'Participants: ${totalParticipantCount}', // Display total participant count
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white, // Text color for participant count
+              ),
             ),
-          ),
-           
+
           SizedBox(
             width: 16,
           ), // Add some spacing between the participant count and host count
-          if(widget.isAdmin)
-          Text(
-            'Hosts: ${totalHostCount}', // Display total host count
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white, // Text color for host count
+          if (widget.isAdmin)
+            Text(
+              'Hosts: ${totalHostCount}', // Display total host count
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white, // Text color for host count
+              ),
             ),
-          ),
           // Hand Raise Icon
           if (!widget.isAdmin)
             IconButton(
@@ -343,8 +366,8 @@ class _RoomHeaderState extends State<RoomHeader> {
               } else if (value == 'Camera') {
                 _showVideoOptions(context);
               } else if (value == 'codec') {
-                showCodecStatsDialog(context,StatsRepository().stats);
-            }
+                showCodecStatsDialog(context, StatsRepository().stats);
+              }
             },
             itemBuilder: (BuildContext context) {
               return [
