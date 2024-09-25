@@ -4,31 +4,33 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/models/room_models.dart';
-import 'package:video_meeting_room/theme.dart';
 
 import 'no_video.dart';
 import 'participant_info.dart';
-import 'participant_stats.dart';
 
 abstract class ParticipantWidget extends StatefulWidget {
   // Convenience method to return relevant widget for participant
   static ParticipantWidget widgetFor(
       ParticipantTrack participantTrack, ParticipantStatus participantStatus,
-      {bool showStatsLayer = false, int participantIndex = 0}) {
+      {bool showStatsLayer = false,
+      int participantIndex = 0,
+       VoidCallback? handleExtractText}) {
     if (participantTrack.participant is LocalParticipant) {
       return LocalParticipantWidget(
           participantTrack.participant as LocalParticipant,
           participantTrack.type,
           showStatsLayer,
           participantStatus,
-          participantIndex);
+          participantIndex,
+          handleExtractText!);
     } else if (participantTrack.participant is RemoteParticipant) {
       return RemoteParticipantWidget(
           participantTrack.participant as RemoteParticipant,
           participantTrack.type,
           showStatsLayer,
           participantStatus,
-          participantIndex);
+          participantIndex,
+          handleExtractText!);
     }
     throw UnimplementedError('Unknown participant type');
   }
@@ -40,6 +42,7 @@ abstract class ParticipantWidget extends StatefulWidget {
   final VideoQuality quality;
   abstract final ParticipantStatus participantStatus;
   abstract final int participantIndex;
+  abstract final VoidCallback? handleExtractText;
 
   const ParticipantWidget({
     this.quality = VideoQuality.MEDIUM,
@@ -56,6 +59,8 @@ class LocalParticipantWidget extends ParticipantWidget {
   final bool showStatsLayer;
   @override
   final int participantIndex;
+  @override
+  final VoidCallback handleExtractText;
 
   @override
   final ParticipantStatus participantStatus;
@@ -65,14 +70,16 @@ class LocalParticipantWidget extends ParticipantWidget {
     this.type,
     this.showStatsLayer,
     this.participantStatus,
-    this.participantIndex, {
+    this.participantIndex,
+    this.handleExtractText, {
     super.key,
   });
 
   @override
   State<StatefulWidget> createState() => _LocalParticipantWidgetState();
 }
-class RemoteParticipantWidget extends ParticipantWidget{
+
+class RemoteParticipantWidget extends ParticipantWidget {
   @override
   final RemoteParticipant participant;
   @override
@@ -83,13 +90,16 @@ class RemoteParticipantWidget extends ParticipantWidget{
   final ParticipantStatus participantStatus;
   @override
   final int participantIndex;
+  @override
+  final VoidCallback handleExtractText;
 
   const RemoteParticipantWidget(
     this.participant,
     this.type,
     this.showStatsLayer,
     this.participantStatus,
-    this.participantIndex, {
+    this.participantIndex,
+    this.handleExtractText, {
     super.key,
   });
 
@@ -106,7 +116,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   TrackPublication? get audioPublication;
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
-  
+
   @override
   void initState() {
     super.initState();
@@ -142,7 +152,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   @override
   Widget build(BuildContext ctx) {
-   // print(widget.participantStatus.toJson());
+    // print(widget.participantStatus.toJson());
     String formatName(String name) {
       if (name.isEmpty) return name;
       return name
@@ -163,7 +173,6 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
       ),
       decoration: BoxDecoration(
         color: Color(0xFF747474),
-      
       ),
       child: Stack(
         children: [
@@ -177,18 +186,33 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                     fit: MediaQuery.of(ctx).size.width < 600
                         ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
                         : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                    mirrorMode: VideoViewMirrorMode.off,
                   )
                 : const NoVideoWidget(),
           ),
-          if (widget.showStatsLayer)
-            Positioned(
-                top: 30,
-                right: 30,
-                child: ParticipantStatsWidget(
-                  participant: widget.participant,
-                )),
+
+
+          if(widget.handleExtractText != null)
+          Positioned(
+            top: 8.0,
+            left: 8.0,
+            child: IconButton(
+              icon: Icon(
+                Icons.camera_alt,
+                color: Colors.black,
+              ),
+              onPressed: () {
+                // Call OCR
+                widget.handleExtractText!();
+               // widget.handleExtractText;
+              },
+              tooltip: 'Perform OCR',
+            ),
+          ),
 
           // Overlay with text and button
+
+          // ADD ICON CAMERA SHOT TOP LEFT
 
           Positioned(
             bottom: 8.0,
@@ -214,15 +238,16 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
             ),
           ),
 
-          if (!(widget.participant is LocalParticipant) && widget.participantStatus.isHandRaised)
+          if (!(widget.participant is LocalParticipant) &&
+              widget.participantStatus.isHandRaised)
             Positioned(
               top: 8.0,
               left: 8.0,
               child: Row(
                 children: [
                   Text(
-                    (widget.participantIndex+1).toString()
-                       , // Replace with your dynamic index
+                    (widget.participantIndex + 1)
+                        .toString(), // Replace with your dynamic index
                     style: const TextStyle(
                       fontSize: 20.0,
                       fontWeight: FontWeight.bold,
@@ -238,42 +263,6 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 ],
               ),
             ),
-
-          // Positioned(
-          //   top: 0,
-          //   right: 8.0,
-          //   child: Row(
-          //     children: [
-          //      ElevatedButton(
-          //         style: ElevatedButton.styleFrom(
-          //           backgroundColor: Colors.grey,
-          //           shape: CircleBorder(),
-          //           padding: EdgeInsets.all(8),
-          //           minimumSize: Size(48, 48),
-          //         ),
-          //         onPressed: () {},
-          //         child: Icon(
-          //           Icons.push_pin,
-          //           color: Colors.white,
-          //         ),
-          //       ),
-          //       SizedBox(width: 8.0),
-          //       ElevatedButton(
-          //         style: ElevatedButton.styleFrom(
-          //           backgroundColor: Colors.deepOrange,
-          //           shape: CircleBorder(),
-          //           padding: EdgeInsets.all(8),
-          //           minimumSize: Size(48, 48),
-          //         ),
-          //         onPressed: () {},
-          //         child: Icon(
-          //           Icons.mic_off,
-          //           color: Colors.white,
-          //         ),
-          //       ),
-          //     ],
-          //   ),
-          // ),
 
           Positioned(
             top: 0,

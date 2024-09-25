@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/exts.dart';
 import 'package:video_meeting_room/main.dart';
@@ -92,8 +93,19 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   void _loadDevices(List<MediaDevice> devices) async {
-    _audioInputs = devices.where((d) => d.kind == 'audioinput').toList();
-    _videoInputs = devices.where((d) => d.kind == 'videoinput').toList();
+
+     // Request both camera and microphone permissions
+  PermissionStatus cameraStatus = await Permission.camera.request();
+  PermissionStatus microphoneStatus = await Permission.microphone.request();
+  if(cameraStatus.isGranted || microphoneStatus.isGranted){
+    devices = await Hardware.instance.enumerateDevices();
+  }
+            _setEnableVideo(cameraStatus.isGranted);
+            _setEnableAudio(microphoneStatus.isGranted);
+
+
+    _audioInputs = microphoneStatus.isGranted ? devices.where((d) => d.kind == 'audioinput').toList() :[];
+    _videoInputs = cameraStatus.isGranted ?devices.where((d) => d.kind == 'videoinput').toList() :[];
 
     if (_audioInputs.isNotEmpty) {
       if (_selectedAudioDevice == null) {
