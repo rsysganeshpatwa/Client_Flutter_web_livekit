@@ -1,17 +1,28 @@
-# video_meeting_room
+# LiveKit Flutter Video Conference Application
 
-A new Flutter project.
+This repository contains a **Flutter-based video conference application** powered by [LiveKit](https://livekit.io/). The app supports real-time video conferencing with customizable backgrounds and OCR (Optical Character Recognition) capabilities for document scanning.
 
-## Getting Started
+## Features
+- Real-time video conferencing powered by LiveKit.
+- Customizable backgrounds and video filters (e.g., background blur).
+- OCR integration for document capture and text extraction.
 
-This project is a starting point for a Flutter application.
+## Technologies
+- **Frontend**: Flutter using the [LiveKit Flutter SDK](https://github.com/livekit/client-sdk-flutter).
+- **Backend**: Node.js API for OCR and video conferencing features.
+- **Deployment**: 
+  - Frontend: Hosted on AWS S3 with CloudFront for distribution.
+  - Backend: Deployed on AWS EC2 with Nginx for reverse proxy.
 
-A few resources to get you started if this is your first Flutter project:
+## Prerequisites
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Before starting, ensure that you have the following installed and set up:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# Client_Flutter_web_livekit
+### 1. Flutter SDK Installation
+
+Flutter is the main framework used for building the frontend of the application. To install Flutter:
+
+#### macOS:
+1. Install Homebrew if you don’t have it:
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
