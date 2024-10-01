@@ -9,11 +9,13 @@ import 'dart:math' as math;
 class ParticipantGridView extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
   final List<ParticipantStatus> participantStatuses ;
+  final bool isLocalHost;
 
   const ParticipantGridView({
     super.key,
     required this.participantTracks,
     required this.participantStatuses,
+    required  this.isLocalHost,
   });
 
   @override
@@ -46,6 +48,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
               gridWidth: adjustedGridWidth,
               gridHeight: adjustedGridHeight,
               participantStatuses: widget.participantStatuses,
+              isLocalHost: widget.isLocalHost,
             );
           } else {
             final int itemsPerPage = 4;
@@ -76,6 +79,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
           gridWidth: gridWidth,
           gridHeight: gridHeight,
           participantStatuses: widget.participantStatuses,
+          isLocalHost: widget.isLocalHost,
         );
       },
     );

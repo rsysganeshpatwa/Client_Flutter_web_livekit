@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 
 import 'no_video.dart';
@@ -22,7 +23,7 @@ abstract class ParticipantWidget extends StatefulWidget {
           showStatsLayer,
           participantStatus,
           participantIndex,
-          handleExtractText!);
+          handleExtractText);
     } else if (participantTrack.participant is RemoteParticipant) {
       return RemoteParticipantWidget(
           participantTrack.participant as RemoteParticipant,
@@ -30,7 +31,7 @@ abstract class ParticipantWidget extends StatefulWidget {
           showStatsLayer,
           participantStatus,
           participantIndex,
-          handleExtractText!);
+          handleExtractText);
     }
     throw UnimplementedError('Unknown participant type');
   }
@@ -60,7 +61,7 @@ class LocalParticipantWidget extends ParticipantWidget {
   @override
   final int participantIndex;
   @override
-  final VoidCallback handleExtractText;
+  final VoidCallback? handleExtractText;
 
   @override
   final ParticipantStatus participantStatus;
@@ -91,7 +92,7 @@ class RemoteParticipantWidget extends ParticipantWidget {
   @override
   final int participantIndex;
   @override
-  final VoidCallback handleExtractText;
+  final VoidCallback? handleExtractText;
 
   const RemoteParticipantWidget(
     this.participant,
@@ -152,7 +153,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   @override
   Widget build(BuildContext ctx) {
-    // print(widget.participantStatus.toJson());
+ 
     String formatName(String name) {
       if (name.isEmpty) return name;
       return name

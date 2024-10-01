@@ -17,6 +17,7 @@ class ParticipantGrid extends StatefulWidget {
   final double gridWidth;
   final double gridHeight;
   final List<ParticipantStatus> participantStatuses;
+  final bool isLocalHost;
 
   ParticipantGrid({
     Key? key,
@@ -24,6 +25,7 @@ class ParticipantGrid extends StatefulWidget {
     required this.gridWidth,
     required this.gridHeight,
     required this.participantStatuses,
+    required this.isLocalHost,
   }) : super(key: key);
 
   @override
@@ -239,10 +241,10 @@ void _downloadOriginalImage(Uint8List imageBytes) {
                     status,
                     showStatsLayer: false,
                     participantIndex: index,
-                    handleExtractText: () {
+                    handleExtractText: widget.isLocalHost ? () {
                       print('Extracting text...');
                       _onParticipantTap(context, widget.participantTracks[index]);
-                    },
+                    }: null,
                   ),
                 ),
                 // IconButton(

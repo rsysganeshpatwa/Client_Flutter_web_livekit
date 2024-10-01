@@ -861,6 +861,7 @@ class _RoomPageState extends State<RoomPage> {
                                                     ?.identity;
                                       }).toList(),
                                       participantStatuses: participantsManager,
+                                      isLocalHost: false,
                                     ),
                                   ),
                                   // Optionally display other participants in a side panel (if needed)
@@ -873,6 +874,7 @@ class _RoomPageState extends State<RoomPage> {
                                       ParticipantTrackType.kScreenShare;
                                 }).toList(),
                                 participantStatuses: participantsManager,
+                                isLocalHost: localParticipantRole == Role.admin.toString(),
                               ),
                       ),
                     ),
