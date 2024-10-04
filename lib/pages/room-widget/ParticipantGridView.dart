@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
@@ -24,6 +25,39 @@ class ParticipantGridView extends StatefulWidget {
 
 class _ParticipantGridViewState extends State<ParticipantGridView> {
   final PageController _pageController = PageController();
+int? previousStartIndex;
+  int? previousEndIndex;
+  
+
+  void subscribe(List<ParticipantTrack> pageParticipants) {
+  for (var i = 0; i < pageParticipants.length; i++) {
+    final participant = pageParticipants[i].participant;
+
+    if (participant is RemoteParticipant) {
+      participant.videoTrackPublications.forEach((publication) {
+        if (!publication.subscribed) {
+          publication.subscribe();
+          print('Subscribed to ${pageParticipants[i].participant.identity}\'s video track');
+        }
+      });
+    }
+  }
+}
+
+void unsubscribe(List<ParticipantTrack> pageParticipants) {
+  for (var i = 0; i < pageParticipants.length; i++) {
+    final participant = pageParticipants[i].participant;
+
+    if (participant is RemoteParticipant) {
+      participant.videoTrackPublications.forEach((publication) {
+        if (publication.subscribed) {
+          publication.unsubscribe();
+          print('Unsubscribed from ${pageParticipants[i].participant.identity}\'s video track');
+        }
+      });
+    }
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +85,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
               isLocalHost: widget.isLocalHost,
             );
           } else {
-            final int itemsPerPage = 4;
+            const int itemsPerPage = 4;
             final int pageCount = (numParticipants / itemsPerPage).ceil();
 
             return Stack(
@@ -63,8 +97,26 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                     itemBuilder: (context, pageIndex) {
                       final startIndex = pageIndex * itemsPerPage;
                       final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
+        
+
                       final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
-                      
+                      // Only update subscriptions when startIndex and endIndex change
+                      if (startIndex != previousStartIndex || endIndex != previousEndIndex) {
+                   
+                        // Subscribe to the current page participants
+                       print('startIndex: $startIndex, endIndex: $endIndex');
+
+                        subscribe(pageParticipants);
+
+                        // Unsubscribe from participants who are not in the current page
+                       unsubscribe(widget.participantTracks.where((track) => 
+    widget.participantTracks.indexOf(track) < startIndex || 
+    widget.participantTracks.indexOf(track) >= endIndex).toList());
+
+                        // Update previous indices
+                        previousStartIndex = startIndex;
+                        previousEndIndex = endIndex;
+                      }
                      return LayoutBuilder(
       builder: (context, constraints) {
         final double availableWidth = constraints.maxWidth;
