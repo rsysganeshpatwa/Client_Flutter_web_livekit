@@ -293,6 +293,8 @@ _checkMicrophoneAndCameraStatus();
             jsonDecode(p.metadata!)['role'] == Role.participant.toString())
         .length;
 
+
+
     totalHostCount = widget.isAdmin ? totalHostCount + 1 : totalHostCount;
     totalParticipantCount =
         !widget.isAdmin ? totalParticipantCount + 1 : totalParticipantCount;
@@ -317,9 +319,23 @@ _checkMicrophoneAndCameraStatus();
             ),
           ),
 
+
           SizedBox(
               height:
-                  4), // Add some spacing between the title and participant count
+                  16), // Add some spacing between the title and participant count
+          if (widget.isAdmin)
+            Text(
+              'Total : ${widget.room.remoteParticipants.values.length +1}   ', // Display total participant count
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white, // Text color for participant count
+              ),
+            ),
+
+
+          SizedBox(
+              height:
+                  16), // Add some spacing between the title and participant count
           if (widget.isAdmin)
             Text(
               'Participants: ${totalParticipantCount}', // Display total participant count
