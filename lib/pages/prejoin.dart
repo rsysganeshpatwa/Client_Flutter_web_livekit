@@ -273,31 +273,36 @@ class _PreJoinPageState extends State<PreJoinPage> {
           .connect(
             args.url,
             args.token,
-            // roomOptions: RoomOptions(
-            //   adaptiveStream: args.adaptiveStream,
-            //   dynacast: args.dynacast,
-            //   defaultAudioPublishOptions: const AudioPublishOptions(
-            //     name: 'custom_audio_track_name',
-            //   ),
-            //   defaultVideoPublishOptions: VideoPublishOptions(
-            //     simulcast: args.simulcast,
-            //     videoCodec: args.preferredCodec,
-            //     backupVideoCodec: BackupVideoCodec(
-            //       enabled: args.enableBackupVideoCodec,
-            //     ),
-            //   ),
-            //   defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
-            //       useiOSBroadcastExtension: true,
-            //       params: VideoParameters(
-            //           dimensions: VideoDimensionsPresets.h1080_169,
-            //           encoding: VideoEncoding(
-            //             maxBitrate: 3 * 1000 * 1000,
-            //             maxFramerate: 15,
-            //           ))),
-            //   defaultCameraCaptureOptions: CameraCaptureOptions(
-            //       maxFrameRate: 30, params: _selectedVideoParameters),
-            //   e2eeOptions: e2eeOptions,
-            // ),
+            connectOptions: const ConnectOptions(
+             autoSubscribe: false,
+             
+            ),
+            roomOptions: RoomOptions(
+              adaptiveStream: args.adaptiveStream,
+        
+              dynacast: args.dynacast,
+              defaultAudioPublishOptions: const AudioPublishOptions(
+                name: 'custom_audio_track_name',
+              ),
+              defaultVideoPublishOptions: VideoPublishOptions(
+                simulcast: args.simulcast,
+                videoCodec: args.preferredCodec,
+                backupVideoCodec: BackupVideoCodec(
+                  enabled: args.enableBackupVideoCodec,
+                ),
+              ),
+              defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
+                  useiOSBroadcastExtension: true,
+                  params: VideoParameters(
+                      dimensions: VideoDimensionsPresets.h1080_169,
+                      encoding: VideoEncoding(
+                        maxBitrate: 3 * 1000 * 1000,
+                        maxFramerate: 15,
+                      ))),
+              defaultCameraCaptureOptions: CameraCaptureOptions(
+                  maxFrameRate: 30, params: _selectedVideoParameters),
+              e2eeOptions: e2eeOptions,
+            ),
              fastConnectOptions: FastConnectOptions(
               microphone: TrackOption(track: _audioTrack),
               camera: TrackOption(track: _videoTrack),

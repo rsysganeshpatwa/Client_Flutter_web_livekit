@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
@@ -14,12 +13,10 @@ import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/login.dart';
 import 'package:video_meeting_room/pages/room-widget/AdminApprovalDialog.dart';
 import 'package:video_meeting_room/pages/room-widget/CopyInviteLinkDialog.dart';
-import 'package:video_meeting_room/pages/room-widget/FloatingActionButtonBar.dart';
 import 'package:video_meeting_room/pages/room-widget/HandRaiseNotification.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantListView.dart';
-import 'package:video_meeting_room/pages/room-widget/ParticipantSelectionDialog.dart';
 import 'package:video_meeting_room/pages/room-widget/NewParticipantDialog.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
@@ -30,7 +27,6 @@ import 'package:video_meeting_room/widgets/thank_you.dart';
 import '../exts.dart';
 import '../utils.dart';
 import '../widgets/controls.dart';
-import '../widgets/participant.dart';
 import '../widgets/participant_info.dart';
 
 class RoomPage extends StatefulWidget {
@@ -83,7 +79,7 @@ class _RoomPageState extends State<RoomPage> {
     _setUpListeners();
     // Set up role for the local participant
     _initializeLocalParticipantRole();
-    _sortParticipants();
+    _sortParticipants('initState');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!fastConnection) {
         _askPublish();
@@ -158,7 +154,7 @@ class _RoomPageState extends State<RoomPage> {
           handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
-      _sortParticipants();
+      //  _sortParticipants('ParticipantEvent');
     })
     ..on<RoomRecordingStatusChanged>((event) {
       context.showRecordingStatusChangedDialog(event.activeRecording);
@@ -168,20 +164,21 @@ class _RoomPageState extends State<RoomPage> {
           'Attempting to reconnect ${event.attempt}/${event.maxAttemptsRetry}, '
           '(${event.nextRetryDelaysInMs}ms delay until next attempt)');
     })
-    ..on<LocalTrackPublishedEvent>((_) => _sortParticipants())
-    ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
-    // ignore: unnecessary_set_literal
+    // ..on<LocalTrackPublishedEvent>((_) => _sortParticipants())
+    // ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
+    // // ignore: unnecessary_set_literal
     ..on<TrackSubscribedEvent>((event) {
-      _sortParticipants();
+      _sortParticipants('TrackSubscribedEvent');
       //  _trackSubscribed(event);
     })
     ..on<TrackUnsubscribedEvent>((event) {
-      _sortParticipants();
+      _sortParticipants('TrackUnsubscribedEvent');
       //   _trackUnsubscribed(event);
     })
-    ..on<ParticipantNameUpdatedEvent>((event) {
-      _sortParticipants();
-    })
+    // ..on<ParticipantNameUpdatedEvent>((event) {
+    //   _sortParticipants();
+    // })
+  
     ..on<DataReceivedEvent>((event) {
       try {
         _receivedHandRaiseRequest(utf8.decode(event.data));
@@ -195,6 +192,7 @@ class _RoomPageState extends State<RoomPage> {
     })
     ..on<ParticipantDisconnectedEvent>((event) {
       removeParticipantStatus(event);
+      _sortParticipants('ParticipantDisconnectedEvent');
     })
     ..on<AudioPlaybackStatusChanged>((event) async {
       if (!widget.room.canPlaybackAudio) {
@@ -248,7 +246,10 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _onRoomDidUpdate() {
-    _sortParticipants();
+    setState(() {
+      //print('rohit _onRoomDidUpdate');
+      _sortUserMediaTracks(participantTracks);
+    });
   }
 
   Future<void> _initializeParticipantStatuses() async {
@@ -292,7 +293,7 @@ class _RoomPageState extends State<RoomPage> {
         participantsManager.add(localStatus);
 
         _updateRoomData(participantsManager);
-        _sortParticipants();
+        _sortParticipants('initializeParticipantStatuses');
       });
     }
   }
@@ -301,7 +302,7 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
-
+       print('rohit isNew $isNew');
       final role = _getRoleFromMetadata(event.participant.metadata);
       final isAdmin = role == Role.admin.toString();
       if (isNew) {
@@ -312,7 +313,7 @@ class _RoomPageState extends State<RoomPage> {
           isHandRaised: false,
           isTalkToHostEnable: isAdmin,
           handRaisedTimeStamp: 0,
-          role: role,
+          role: role.isEmpty ? Role.participant.toString() : role,
           // Set other default values for the new participant status
         );
 
@@ -423,7 +424,7 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       participantsManager = participantsStatus;
       _updateRoomData(participantsManager);
-      _sortParticipants();
+      _sortParticipants('sendParticipantsStatus');
     });
   }
 
@@ -453,7 +454,7 @@ class _RoomPageState extends State<RoomPage> {
             _isHandleRaiseHand = element.isHandRaised;
           }
         }
-        _sortParticipants();
+        _sortParticipants('updateParticipantStatusFromMetadata');
       });
     }
   }
@@ -495,7 +496,7 @@ class _RoomPageState extends State<RoomPage> {
       if (isHandRaised && localParticipantRole == Role.admin.toString()) {
         _showHandRaiseNotification(context, participant);
       }
-      _sortParticipants();
+      _sortParticipants('handleRaiseHandFromParticipant');
     });
   }
 
@@ -503,19 +504,20 @@ class _RoomPageState extends State<RoomPage> {
     final list =
         participantsManager.firstWhere((status) => status.identity == identity,
             orElse: () => ParticipantStatus(
-                  identity: '',
+                  identity: identity,
                   isAudioEnable: false,
                   isVideoEnable: false,
                   isHandRaised: false,
                   isTalkToHostEnable: false,
                   handRaisedTimeStamp: 0,
-                  role: '',
+                  role: Role.participant.toString(),
                 ));
 
     return list;
   }
 
-  void _sortParticipants() {
+  void _sortParticipants(String from) {
+    print('called from $from');
     List<ParticipantTrack> userMediaTracks = [];
     List<ParticipantTrack> screenTracks = [];
     final localParticipant = widget.room.localParticipant;
@@ -525,11 +527,11 @@ class _RoomPageState extends State<RoomPage> {
 
     for (var participant in widget.room.remoteParticipants.values) {
       // Find the corresponding ParticipantStatus
-
       final participantStatus = _getParticipantStatus(participant.identity);
       if (participantStatus.identity.isEmpty) {
         continue;
       }
+
       final isRemoteParticipantHost =
           _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
 
@@ -537,8 +539,6 @@ class _RoomPageState extends State<RoomPage> {
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
 
-      // print('Starting  for  participantStatus${ participantStatus.toJson()}');
-      // print('Starting _sortParticipants 123 for  participantStatus${ participant.audioTrackPublications.n}');
       final shouldAudioSubscribe =
           (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
               (isAudio &&
@@ -558,63 +558,41 @@ class _RoomPageState extends State<RoomPage> {
       }
 
       if (participant.isScreenShareEnabled()) {
+        print('rohit screen share $participant');
         screenTracks.add(ParticipantTrack(
           participant: participant,
           type: ParticipantTrackType.kScreenShare,
         ));
-        if (_isScreenShareModeOnce == false) {
-          setState(() {
-            _isScreenShareMode = true;
-            _isScreenShareModeOnce = true;
-          });
-        }
       } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
+      //  print('rohit isVideo $participant');
         userMediaTracks.add(ParticipantTrack(participant: participant));
       }
     }
 
-    userMediaTracks.sort((a, b) {
-      return a.participant.joinedAt.millisecondsSinceEpoch -
-          b.participant.joinedAt.millisecondsSinceEpoch;
+    final totalParticipantCount = userMediaTracks.length;
+    print('totalParticipantCount $totalParticipantCount');
+    // Sort the user media tracks
+    _sortUserMediaTracks(userMediaTracks);
+
+    // Add the local participant to the user media tracks
+   // _addLocalParticipant(userMediaTracks);
+
+    // Update the state with the combined participant tracks
+    setState(() {
+      participantTracks = [...screenTracks, ...userMediaTracks];
     });
-    // make localparticipant always on fourth position
+  }
 
-    final localParticipantTracks =
-        widget.room.localParticipant?.videoTrackPublications;
-
-    if (localParticipantTracks != null) {
-      for (var t in localParticipantTracks) {
-        if (t.isScreenShare) {
-          if (lkPlatformIs(PlatformType.iOS)) {
-            if (!_flagStartedReplayKit) {
-              _flagStartedReplayKit = true;
-              ReplayKitChannel.startReplayKit();
-            }
-          }
-          screenTracks.add(ParticipantTrack(
-            participant: widget.room.localParticipant!,
-            type: ParticipantTrackType.kScreenShare,
-          ));
-        } else {
-          if (lkPlatformIs(PlatformType.iOS)) {
-            if (_flagStartedReplayKit) {
-              _flagStartedReplayKit = false;
-              ReplayKitChannel.closeReplayKit();
-            }
-          }
-        }
-      }
-    }
-
+  void _sortUserMediaTracks(List<ParticipantTrack> userMediaTracks) {
     userMediaTracks.sort((a, b) {
       final now = DateTime.now().millisecondsSinceEpoch;
-      final fiveSecondsAgo = now - 10000; // 5000 milliseconds = 5 seconds
+      final fiveSecondsAgo = now - 10000; // 10000 milliseconds = 10 seconds
 
       // lastSpokeAt in milliseconds, default to 0 if null
       final aSpokeAt = a.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
       final bSpokeAt = b.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
 
-      // Sort by whether they spoke within the last 5 seconds
+      // Sort by whether they spoke within the last 10 seconds
       final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
       final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
 
@@ -622,7 +600,7 @@ class _RoomPageState extends State<RoomPage> {
         return aSpokeRecently ? -1 : 1;
       }
 
-      // Sort by video status if spoken within last 5 seconds is the same
+      // Sort by video status if spoken within last 10 seconds is the same
       if (a.participant.hasVideo != b.participant.hasVideo) {
         return a.participant.hasVideo ? -1 : 1;
       }
@@ -657,41 +635,59 @@ class _RoomPageState extends State<RoomPage> {
           (statusB?.handRaisedTimeStamp ?? 0);
     });
 
-    // Add the local participant to the user media tracks list
-    if (localParticipant != null) {
-      final localParticipantTrack =
-          ParticipantTrack(participant: localParticipant);
+_addLocalParticipant(userMediaTracks );
+subscribeToFirstToFourthParticipants(userMediaTracks);
+    
+  }
+void _addLocalParticipant(List<ParticipantTrack> userMediaTracks) {
+  final localParticipant = widget.room.localParticipant;
 
-      // If there are more than 4 participants, insert localParticipant at the 4th position
-      if (userMediaTracks.length >= 4) {
-        userMediaTracks.insert(
-            3, localParticipantTrack); // Insert at index 3 (4th position)
-      } else {
-        // If 4 or fewer participants, add the local participant to the end of the list
-        userMediaTracks.add(localParticipantTrack);
-      }
+  if (localParticipant != null) {
+    final localParticipantTrack = ParticipantTrack(participant: localParticipant);
+
+    // Remove localParticipant if it already exists in the list
+    userMediaTracks.removeWhere((track) => track.participant == localParticipant);
+
+    // If there are more than 3 participants, insert localParticipant at the 4th position
+    if (userMediaTracks.length >= 3) {
+      userMediaTracks.insert(3, localParticipantTrack); // Insert at index 3 (4th position)
+    } else {
+      // If 3 or fewer participants, add the local participant to the end of the list
+      userMediaTracks.add(localParticipantTrack);
     }
-    setState(() {
-      participantTracks = [...screenTracks, ...userMediaTracks];
-    });
+  }
+}
+
+void subscribeToFirstToFourthParticipants(List<ParticipantTrack> userMediaTracks) {
+  // Ensure there are participants in the list
+  if (userMediaTracks.isEmpty) {
+    print('No participants available to subscribe.');
+    return;
   }
 
-  void _nextPage() {
-    setState(() {
-      if ((_currentPage + 1) * _participantsPerPage <
-          participantTracks.length) {
-        _currentPage++;
-      }
-    });
-  }
+  // Loop through the first 4 participants or the total number of participants if fewer than 4
+  int limit = userMediaTracks.length < 4 ? userMediaTracks.length : 4;
 
-  void _previousPage() {
-    setState(() {
-      if (_currentPage > 0) {
-        _currentPage--;
-      }
-    });
+  for (int i = 0; i < limit; i++) {
+    ParticipantTrack participantTrack = userMediaTracks[i];
+    _subscribeToParticipant(participantTrack);
   }
+}
+
+void _subscribeToParticipant(ParticipantTrack participantTrack) {
+  // Logic to subscribe to the participant
+   if (participantTrack.participant is RemoteParticipant ){
+      final participant = participantTrack.participant as RemoteParticipant;
+      participant.videoTrackPublications.forEach((publication) {
+        if (!publication.subscribed) {
+          publication.subscribe();
+          publication.enable();
+        //  print('Subscribed to ${participantTrack.participant.identity}\'s video track');
+        }
+      });
+
+   }
+}
 
   void _toggleMuteAll(bool muteAll) {
     setState(() {
@@ -874,7 +870,8 @@ class _RoomPageState extends State<RoomPage> {
                                       ParticipantTrackType.kScreenShare;
                                 }).toList(),
                                 participantStatuses: participantsManager,
-                                isLocalHost: localParticipantRole == Role.admin.toString(),
+                                isLocalHost: localParticipantRole ==
+                                    Role.admin.toString(),
                               ),
                       ),
                     ),
