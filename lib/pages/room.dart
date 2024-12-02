@@ -193,6 +193,9 @@ class _RoomPageState extends State<RoomPage> {
     ..on<ParticipantDisconnectedEvent>((event) {
       removeParticipantStatus(event);
       _sortParticipants('ParticipantDisconnectedEvent');
+      final sid = event.participant.sid;
+      final identity = event.participant.identity;
+      _roomDataManageService.removeParticipant(sid,identity);
     })
     ..on<AudioPlaybackStatusChanged>((event) async {
       if (!widget.room.canPlaybackAudio) {

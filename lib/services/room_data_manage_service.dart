@@ -21,6 +21,26 @@ class RoomDataManageService {
     }
   }
 
+  // Method to remove participant for a room
+  Future<void> removeParticipant(sid,identity) async {
+    final url = Uri.parse('$apiServiceUrl/room-data-manage/remove-participant').replace(
+      queryParameters: {
+        'roomId': sid,
+        'participantId': identity,
+      },
+    );    
+    try {
+      final response = await http.delete(url); // or http.post, depending on your API
+      if (response.statusCode == 200) {
+        print('Participant removed successfully');
+      } else {
+        print('Failed to remove participant: ${response.body}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
   // Method to get the latest data for a room
   Future<dynamic> getLatestData(String roomId) async {
     final url = Uri.parse('$apiServiceUrl/room-data-manage/latest-data/$roomId');
