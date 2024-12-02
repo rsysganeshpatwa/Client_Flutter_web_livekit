@@ -194,7 +194,11 @@ class _RoomPageState extends State<RoomPage> {
       _addNewParticipantStatus(event);
     })
     ..on<ParticipantDisconnectedEvent>((event) {
+      print('calling');
       removeParticipantStatus(event);
+      final sid = event.participant.sid;
+      final identity = event.participant.identity;
+      _roomDataManageService.removeParticipant(sid,identity);
     })
     ..on<AudioPlaybackStatusChanged>((event) async {
       if (!widget.room.canPlaybackAudio) {
