@@ -166,102 +166,110 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     final isAnyParticipantRoleAvailableMoreThenOne =
         nonAdminParticipants.length >= 2;
 
-    return Drawer(
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              color: Colors.black.withOpacity(0.8),
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment
-                        .spaceBetween, // To push items to opposite ends
-                    children: [
-                      Text(
-                        'Participants',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  TextField(
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Search participants',
-                      prefixIcon: Icon(Icons.search, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.blueGrey[800],
-                    ),
-                    onChanged: widget.onSearchChanged,
-                  ),
-                  SizedBox(height: 16),
-                  DefaultTabController(
-                    length: 2,
-                    child: Column(
+return Drawer(
+      child: ScrollbarTheme(
+        data: ScrollbarThemeData(
+          thumbColor: WidgetStateProperty.all(Colors.white),
+          trackColor: WidgetStateProperty.all(Colors.white.withOpacity(0.5)),
+          thickness: WidgetStateProperty.all(6.0),
+          radius: const Radius.circular(4.0),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Container(
+                color: Colors.black.withOpacity(0.8),
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment
+                          .spaceBetween, // To push items to opposite ends
                       children: [
-                        TabBar(
-                          labelColor: const Color(0xFF9FF5FF),
-                          unselectedLabelColor: Colors.grey,
-                          indicatorColor: const Color(
-                              0xFF9FF5FF), // Updated indicator color
-                          tabs: [
-                            Tab(text: 'Audio Manage'),
-                            Tab(text: 'Together Mode'),
-                          ],
-                        ),
-                        Container(
-                          // as per drawer height:   // Set the height or use MediaQuery for dynamic sizing
-                          height: MediaQuery.of(context).size.height,
-                          child: TabBarView(
-                            children: [
-                              // Tab 1: Audio Manage
-                              ListView(
-                                children: [
-                                  if (isAnyParticipantRoleAvailableMoreThenOne)
-                                    _selectAllTalkToHostModeParticipants(),
-                                  ..._buildHostParticipants(),
-                                  ..._getHandRaisedParticipants(),
-                                  ..._buildAllParticipants('Audio Manage'),
-                                ],
-                              ),
-                              // Tab 2: Together Mode
-                              ListView(
-                                children: [
-                                  if (isAnyParticipantRoleAvailableMoreThenOne)
-                                    _selectAllTogetherModeParticipants(),
-                                  ..._buildHostParticipants(),
-                                  ..._buildAllParticipants('Together Mode'),
-                                ],
-                              ),
-                            ],
+                        Text(
+                          'Participants',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    SizedBox(height: 16),
+                    TextField(
+                      style: TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Search participants',
+                        prefixIcon: Icon(Icons.search, color: Colors.white),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.blueGrey[800],
+                      ),
+                      onChanged: widget.onSearchChanged,
+                    ),
+                    SizedBox(height: 16),
+                    DefaultTabController(
+                      length: 2,
+                      child: Column(
+                        children: [
+                          TabBar(
+                            labelColor: const Color(0xFF9FF5FF),
+                            unselectedLabelColor: Colors.grey,
+                            indicatorColor: const Color(
+                                0xFF9FF5FF), // Updated indicator color
+                            tabs: [
+                              Tab(text: 'Audio Manage'),
+                              Tab(text: 'Together Mode'),
+                            ],
+                          ),
+                          Container(
+                            // as per drawer height:   // Set the height or use MediaQuery for dynamic sizing
+                            height: MediaQuery.of(context).size.height,
+                            child: TabBarView(
+                              children: [
+                                // Tab 1: Audio Manage
+                                ListView(
+                                  children: [
+                                    if (isAnyParticipantRoleAvailableMoreThenOne)
+                                      _selectAllTalkToHostModeParticipants(),
+                                    ..._buildHostParticipants(),
+                                    ..._getHandRaisedParticipants(),
+                                    ..._buildAllParticipants('Audio Manage'),
+                                  ],
+                                ),
+                                // Tab 2: Together Mode
+                                ListView(
+                                  children: [
+                                    if (isAnyParticipantRoleAvailableMoreThenOne)
+                                      _selectAllTogetherModeParticipants(),
+                                    ..._buildHostParticipants(),
+                                    ..._buildAllParticipants('Together Mode'),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
-  }
+}
 
   List<Widget> _buildAllParticipants(tabName) {
     return widget.filterParticipants(widget.searchQuery).where((track) {

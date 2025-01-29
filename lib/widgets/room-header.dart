@@ -309,7 +309,7 @@ _checkMicrophoneAndCameraStatus();
           // Heading
           Expanded(
             child: Text(
-              'Video Conference Room',
+              'Leadership Conference',
               style: TextStyle(
                 fontSize: 24, // Adjust font size as needed
                 fontWeight: FontWeight.bold,
