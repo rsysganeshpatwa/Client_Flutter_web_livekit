@@ -222,13 +222,14 @@ class _RoomPageState extends State<RoomPage> {
 
   _updateRoomData(participantsManager) async {
     final roomSID = await widget.room.getSid();
+    final roomName =  widget.room.name!;
     //remove duplicate cate participant based on identity
     final uniqueParticipants = participantsManager
         .map((e) => e.toJson())
         .toSet()
         .map((e) => ParticipantStatus.fromJson(e))
         .toList();
-    _roomDataManageService.setLatestData(roomSID, uniqueParticipants);
+    _roomDataManageService.setLatestData(roomSID, roomName, uniqueParticipants);
   }
 
   void handleRoomDisconnected(BuildContext context, Participant participant) {
@@ -270,7 +271,10 @@ class _RoomPageState extends State<RoomPage> {
 
       // get Room Data from server
       final roomSID = await widget.room.getSid();
-      final data = await _roomDataManageService.getLatestData(roomSID);
+
+      final roomName =  widget.room.name!;
+
+      final data = await _roomDataManageService.getLatestData(roomSID,roomName);
       final List<ParticipantStatus> participantsStatusList;
       if (data != null) {
         final participantsStatusList = (data as List)
