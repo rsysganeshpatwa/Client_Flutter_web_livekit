@@ -7,9 +7,8 @@ class RoomDataManageService {
   RoomDataManageService(this.apiServiceUrl);
 
   // Method to set the latest data for a room
-  Future<void> setLatestData(String roomId, dynamic data) async {
-    final url = Uri.parse('$apiServiceUrl/room-data-manage/set-latest-data/$roomId');
-    
+  Future<void> setLatestData(String roomId, String roomName, dynamic data) async {
+    final url = Uri.parse('$apiServiceUrl/room-data-manage/set-latest-data/$roomId?roomName=$roomName');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -22,8 +21,8 @@ class RoomDataManageService {
   }
 
   // Method to get the latest data for a room
-  Future<dynamic> getLatestData(String roomId) async {
-    final url = Uri.parse('$apiServiceUrl/room-data-manage/latest-data/$roomId');
+  Future<dynamic> getLatestData(String roomId, String roomName) async {
+    final url = Uri.parse('$apiServiceUrl/room-data-manage/latest-data/$roomId?roomName=$roomName');
 
     final response = await http.get(url);
 

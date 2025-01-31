@@ -222,6 +222,7 @@ class _RoomPageState extends State<RoomPage> {
 
  _updateRoomData(participantsManager) async {
   final roomSID = await widget.room.getSid();
+    final roomName =  widget.room.name!;
 
   // Use a Set to track unique identities
   final Set<String> seenIdentities = {};
@@ -232,7 +233,7 @@ class _RoomPageState extends State<RoomPage> {
       .map((e) => ParticipantStatus.fromJson(e.toJson()))
       .toList();
 
-  _roomDataManageService.setLatestData(roomSID, uniqueParticipants);
+  _roomDataManageService.setLatestData(roomSID, roomName, uniqueParticipants);
 
   // Print debug information
   print('rohit _updateRoomData $roomSID');
@@ -279,7 +280,10 @@ class _RoomPageState extends State<RoomPage> {
 
       // get Room Data from server
       final roomSID = await widget.room.getSid();
-      final data = await _roomDataManageService.getLatestData(roomSID);
+
+      final roomName =  widget.room.name!;
+
+      final data = await _roomDataManageService.getLatestData(roomSID,roomName);
       final List<ParticipantStatus> participantsStatusList;
       if (data != null) {
         final participantsStatusList = (data as List)
