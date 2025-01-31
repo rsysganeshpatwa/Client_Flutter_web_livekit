@@ -154,7 +154,7 @@ class _RoomPageState extends State<RoomPage> {
           handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
-      //  _sortParticipants('ParticipantEvent');
+       _sortParticipants('ParticipantEvent');
     })
     ..on<RoomRecordingStatusChanged>((event) {
       context.showRecordingStatusChangedDialog(event.activeRecording);
@@ -164,12 +164,12 @@ class _RoomPageState extends State<RoomPage> {
           'Attempting to reconnect ${event.attempt}/${event.maxAttemptsRetry}, '
           '(${event.nextRetryDelaysInMs}ms delay until next attempt)');
     })
-    // ..on<LocalTrackPublishedEvent>((_) => _sortParticipants())
-    // ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
+     ..on<LocalTrackPublishedEvent>((_) => _sortParticipants('LocalTrackPublishedEvent'))
+     ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants('LocalTrackUnpublishedEvent'))
     // // ignore: unnecessary_set_literal
     ..on<TrackSubscribedEvent>((event) {
       _sortParticipants('TrackSubscribedEvent');
-      //  _trackSubscribed(event);
+        //_trackSubscribed(event);
     })
     ..on<TrackUnsubscribedEvent>((event) {
       _sortParticipants('TrackUnsubscribedEvent');
@@ -220,16 +220,25 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  _updateRoomData(participantsManager) async {
-    final roomSID = await widget.room.getSid();
-    //remove duplicate cate participant based on identity
-    final uniqueParticipants = participantsManager
-        .map((e) => e.toJson())
-        .toSet()
-        .map((e) => ParticipantStatus.fromJson(e))
-        .toList();
-    _roomDataManageService.setLatestData(roomSID, uniqueParticipants);
-  }
+ _updateRoomData(participantsManager) async {
+  final roomSID = await widget.room.getSid();
+
+  // Use a Set to track unique identities
+  final Set<String> seenIdentities = {};
+
+  // Remove duplicates based on 'identity'
+  final uniqueParticipants = participantsManager
+      .where((participant) => seenIdentities.add(participant.identity)) // Add returns false if already in set
+      .map((e) => ParticipantStatus.fromJson(e.toJson()))
+      .toList();
+
+  _roomDataManageService.setLatestData(roomSID, uniqueParticipants);
+
+  // Print debug information
+  print('rohit _updateRoomData $roomSID');
+  print(jsonEncode(uniqueParticipants));
+}
+
 
   void handleRoomDisconnected(BuildContext context, Participant participant) {
     if (localParticipantRole == Role.admin.toString()) {
@@ -302,7 +311,7 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
-       print('rohit isNew $isNew');
+      // print('rohit isNew $isNew');
       final role = _getRoleFromMetadata(event.participant.metadata);
       final isAdmin = role == Role.admin.toString();
       if (isNew) {
@@ -317,6 +326,8 @@ class _RoomPageState extends State<RoomPage> {
           // Set other default values for the new participant status
         );
 
+        print('new Join');
+        print(jsonEncode(newParticipantStatus));
         participantsManager.add(newParticipantStatus);
         sendParticipantsStatus(participantsManager);
       }
@@ -517,7 +528,6 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _sortParticipants(String from) {
-    print('called from $from');
     List<ParticipantTrack> userMediaTracks = [];
     List<ParticipantTrack> screenTracks = [];
     final localParticipant = widget.room.localParticipant;
@@ -528,6 +538,8 @@ class _RoomPageState extends State<RoomPage> {
     for (var participant in widget.room.remoteParticipants.values) {
       // Find the corresponding ParticipantStatus
       final participantStatus = _getParticipantStatus(participant.identity);
+      final data = jsonEncode(participantStatus);
+      print('rohit sort $data');
       if (participantStatus.identity.isEmpty) {
         continue;
       }
@@ -544,9 +556,15 @@ class _RoomPageState extends State<RoomPage> {
               (isAudio &&
                   !((isLocalHost || isRemoteParticipantHost) &&
                       !isTalkToHostEnable));
+      final name = participant.identity;
+        print('check name $name is  shouldAudioSubscribe  $shouldAudioSubscribe');
 
       if (shouldAudioSubscribe) {
+        final totalaudioTrackPublications =
+            participant.audioTrackPublications.length;
+        print('rohit audio total $totalaudioTrackPublications');
         participant.audioTrackPublications.forEach((element) {
+          print('rohit audio subscribe $jsonEncode(element)');
           element.subscribe();
         });
       } else {
@@ -569,8 +587,6 @@ class _RoomPageState extends State<RoomPage> {
       }
     }
 
-    final totalParticipantCount = userMediaTracks.length;
-    print('totalParticipantCount $totalParticipantCount');
     // Sort the user media tracks
     _sortUserMediaTracks(userMediaTracks);
 
@@ -795,7 +811,7 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
 
   void _openEndDrawer() {
     //_initializeAllowedToTalk();
-    print('rohit openEndDrawer');
+    //print('rohit openEndDrawer');
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
@@ -816,7 +832,7 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Color(0xFF353535),
+      backgroundColor: const Color(0xFF353535),
       body: SafeArea(
         child: Row(
           // Changed to Row

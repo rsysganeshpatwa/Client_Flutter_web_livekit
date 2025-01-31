@@ -147,7 +147,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
       final token = await _apiService.getToken(identity, roomName, _role.toString(), adminWelcomeMessage);
     
-      await Navigator.push<void>(
+      await Navigator.pushAndRemoveUntil<void>(
         ctx,
         MaterialPageRoute(
           builder: (_) => PreJoinPage(
@@ -166,6 +166,8 @@ class _ConnectPageState extends State<ConnectPage> {
             ),
           ),
         ),
+        (route) => false,
+       
       );
     } catch (error) {
       print('Could not connect $error');

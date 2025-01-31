@@ -261,4 +261,9 @@ void _downloadOriginalImage(Uint8List imageBytes) {
       },
     );
   }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 }

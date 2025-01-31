@@ -42,6 +42,11 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
   }
 
   @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant ParticipantDrawer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.participantsStatusList != widget.participantsStatusList) {

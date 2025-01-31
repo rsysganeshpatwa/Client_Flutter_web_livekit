@@ -29,7 +29,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
   int? previousEndIndex;
   int? previousNumParticipants;
   int _pag = 0;
-
+  final int bufferSize = 4;
 
   void subscribe(List<ParticipantTrack> pageParticipants) {
     for (var i = 0; i < pageParticipants.length; i++) {
@@ -40,6 +40,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
           if (!publication.subscribed) {
             publication.subscribe();
             publication.enable();
+          
 
             print(
                 'Subscribed to ${pageParticipants[i].participant.identity}\'s video track');
@@ -58,6 +59,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
           if (publication.subscribed) {
             publication.unsubscribe();
             publication.disable();
+           // publication.dispose();
             print(
                 'Unsubscribed from ${pageParticipants[i].participant.identity}\'s video track');
           }
@@ -68,7 +70,6 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
 
   @override
   Widget build(BuildContext context) {
-  
     return Padding(
       padding: const EdgeInsets.all(8.0), // Add padding here
       child: LayoutBuilder(
@@ -106,10 +107,33 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                   child: PageView.builder(
                     controller: _pageController,
                     itemCount: pageCount,
-                    onPageChanged: (value) => 
-                    setState(() {
-                      _pag = value;
-                    }),
+                    onPageChanged: (pageIndex) {
+                      setState(() {
+                        _pag = pageIndex;
+                      });
+
+                      int startIndex =
+                          math.max(0, (pageIndex - bufferSize) * itemsPerPage);
+                      int endIndex = math.min(numParticipants,
+                          (pageIndex + 1 + bufferSize) * itemsPerPage);
+
+                      // Get participants to subscribe (current page + buffer)
+                      final bufferParticipants = widget.participantTracks
+                          .sublist(startIndex, endIndex);
+                      print(
+                          '🟢 Subscribing from index $startIndex to $endIndex');
+                      subscribe(bufferParticipants);
+
+                      // Get participants to unsubscribe (outside the buffer range)
+                      final toUnsubscribe =
+                          widget.participantTracks.where((track) {
+                        int index = widget.participantTracks.indexOf(track);
+                        return index < startIndex || index >= endIndex;
+                      }).toList();
+                      print(
+                          '🔴 Unsubscribing outside index $startIndex to $endIndex');
+                      unsubscribe(toUnsubscribe);
+                    },
                     itemBuilder: (context, pageIndex) {
                       final startIndex = pageIndex * itemsPerPage;
                       final endIndex =
@@ -117,41 +141,6 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
 
                       final pageParticipants = widget.participantTracks
                           .sublist(startIndex, endIndex);
-                      // Define a buffer for prefetching participants before and after the current page
-                      int bufferSize = 4; // Adjust the buffer size as needed
-
-// Only update subscriptions when startIndex and endIndex change
-                      
-                      if (startIndex != previousStartIndex ||
-                          endIndex != previousEndIndex ||
-                          numParticipants != previousNumParticipants) {
-                        // Determine the buffer range
-                        int bufferStartIndex = (startIndex - bufferSize)
-                            .clamp(0, widget.participantTracks.length);
-                        int bufferEndIndex = (endIndex + bufferSize)
-                            .clamp(0, widget.participantTracks.length);
-
-                        final bufferParticipants = widget.participantTracks
-                            .sublist(bufferStartIndex, bufferEndIndex);
-
-                        // Subscribe to the current page participants plus the buffer range (next and previous)
-                        // Subscribe to participants in the current page and buffer
-                        subscribe(bufferParticipants);
-
-                        // Unsubscribe from participants who are not in the buffer range
-                        unsubscribe(widget.participantTracks
-                            .where((track) =>
-                                widget.participantTracks.indexOf(track) <
-                                    bufferStartIndex ||
-                                widget.participantTracks.indexOf(track) >=
-                                    bufferEndIndex)
-                            .toList());
-
-                        // Update previous indices
-                        previousStartIndex = startIndex;
-                        previousEndIndex = endIndex;
-                        previousNumParticipants = numParticipants;
-                      }
                       return LayoutBuilder(
                         builder: (context, constraints) {
                           final double availableWidth = constraints.maxWidth;
@@ -204,7 +193,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                     padding: const EdgeInsets.all(0.0),
                     child: pageCount > 4
                         ? Text(
-                            'Page ${_pag+ 1} of $pageCount',
+                            'Page ${_pag + 1} of $pageCount',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16.0,
