@@ -481,17 +481,17 @@ Widget build(BuildContext context) {
               runSpacing: 8, // Vertical space between rows of buttons
               alignment: WrapAlignment.center, // Center buttons within this area
               children: [
-                if (widget.role == Role.admin.toString())
-                  Tooltip(
-                    message: _allMuted ? 'Unmute All Participants' : 'Mute All Participants',
-                    child: _buildControlButton(
-                      _allMuted ? Icons.volume_off : Icons.volume_up,
-                      Colors.white,
-                      _toggleMuteAll,
-                      Colors.black,
-                      isMobile: isMobile
-                    ),
-                  ),
+                // if (widget.role == Role.admin.toString())
+                //   Tooltip(
+                //     message: _allMuted ? 'Unmute All Participants' : 'Mute All Participants',
+                //     child: _buildControlButton(
+                //       _allMuted ? Icons.volume_off : Icons.volume_up,
+                //       Colors.white,
+                //       _toggleMuteAll,
+                //       Colors.black,
+                //       isMobile: isMobile
+                //     ),
+                //   ),
                 Tooltip(
                   message: participant.isMicrophoneEnabled()
                       ? 'Mute Microphone'
