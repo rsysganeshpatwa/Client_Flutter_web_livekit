@@ -64,15 +64,17 @@ class _ConnectPageState extends State<ConnectPage> {
     String? room = "";
     final uri = Uri.base;
     final encryptedParams = uri.queryParameters['data'];
+  
 
     if (encryptedParams != null && encryptedParams.isNotEmpty) {
           final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
        
       final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
       final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
+      print('Decoded Params: $decodedParams');
       room = decodedParams['room'] ?? '';
     }
-    String metadata = await _apiService.getWelcomeMessage(room);
+    //String metadata = await _apiService.getWelcomeMessage(room);
     welcomeMessage = 'Weekly Roundtable Leadership Call';
     _initializeParams();
   }
@@ -80,7 +82,7 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _initializeParams() async {
     final uri = Uri.base;
     final encryptedParams = uri.queryParameters['data'];
-
+      print('Encrypted Params: $encryptedParams');
     if (encryptedParams != null && encryptedParams.isNotEmpty) {
           final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
        
@@ -90,6 +92,7 @@ class _ConnectPageState extends State<ConnectPage> {
       setState(() {
         roomNameFromUrl = decodedParams['room'] ?? '';
         roomRoleFromUrl = decodedParams['role'] ?? '';
+        print('Room Name from URL: $roomNameFromUrl');
         if (roomNameFromUrl != null) {
           _roomCtrl.text = roomNameFromUrl!;
           _isRoomNameInUrl = true;
