@@ -70,10 +70,16 @@ class _RoomPageState extends State<RoomPage> {
   void initState() {
     super.initState();
 
-    html.window.addEventListener('beforeunload', (event) async {
+    html.window.addEventListener('beforeunload', (event)  async {
+      final roomId = await widget.room.getSid();
+      // Get local participant identity
+      final localParticipant = widget.room.localParticipant;
+      final identity = localParticipant?.identity;
+      final roomName = widget.room.name!;
       // Perform your action here, e.g., cleanup or save state
-      print("Tab is closing or reloading");
-      await widget.room.disconnect();
+      print("Tab closing or reloading...");
+      _roomDataManageService.removeParticipant(roomId,roomName,identity);
+      widget.room.disconnect();
       // To display a confirmation dialog (optional):
       // event.returnValue = 'Are you sure you want to leave?';
     });
@@ -110,7 +116,7 @@ class _RoomPageState extends State<RoomPage> {
   // Capture the window close event
 
   @override
-  void dispose() {
+  Future<void> dispose() async {
     (() async {
       if (lkPlatformIs(PlatformType.iOS)) {
         ReplayKitChannel.closeReplayKit();
@@ -122,6 +128,12 @@ class _RoomPageState extends State<RoomPage> {
     })();
     onWindowShouldClose = null;
     _isRunning = false;
+    final roomID = await widget.room.getSid();
+    // Get local participant identity
+    final localParticipant = widget.room.localParticipant;
+    final identity = localParticipant?.identity;
+    final roomName =  widget.room.name!;
+     _roomDataManageService.removeParticipant(roomID,roomName,identity);
     super.dispose();
   }
 
@@ -192,7 +204,7 @@ class _RoomPageState extends State<RoomPage> {
     ..on<ParticipantConnectedEvent>((event) {
       _addNewParticipantStatus(event);
     })
-    ..on<ParticipantDisconnectedEvent>((event) {
+    ..on<ParticipantDisconnectedEvent>((event) async {
       removeParticipantStatus(event);
       _sortParticipants('ParticipantDisconnectedEvent');
     })

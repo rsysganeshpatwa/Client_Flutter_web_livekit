@@ -5,10 +5,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
+import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
+import 'package:video_meeting_room/services/room_data_manage_service.dart';
 
 import '../exts.dart';
 
@@ -56,6 +58,7 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   bool _allMuted = true; // Track mute state for all participants
   bool _isHandRaised = false; // Track the "Raise Hand" state
   bool _showMoreControls = true;
+  final RoomDataManageService _roomDataManageService = GetIt.instance<RoomDataManageService>();
 
   @override
   void initState() {
@@ -309,7 +312,15 @@ class _ControlsWidgetState extends State<ControlsWidget> {
 
   void _onTapDisconnect() async {
     final result = await context.showDisconnectDialog();
-    if (result == true) await widget.room.disconnect();
+    if (result == true){
+      final roomId = await widget.room.getSid();
+      // Get local participant identity
+      final localParticipant = widget.room.localParticipant;
+      final identity = localParticipant?.identity;
+      final roomName =  widget.room.name!;
+      _roomDataManageService.removeParticipant(roomId,roomName,identity);
+      await widget.room.disconnect();
+    }
   }
 
   void _onTapUpdateSubscribePermission() async {
