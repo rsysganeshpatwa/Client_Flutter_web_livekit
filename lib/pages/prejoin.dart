@@ -14,7 +14,7 @@ import 'package:video_meeting_room/exts.dart';
 import 'package:video_meeting_room/main.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
-
+import 'package:video_meeting_room/services/room_data_manage_service.dart';
 import '../theme.dart';
 import 'room.dart';
 
@@ -32,6 +32,7 @@ class JoinArgs {
     this.role = Role.participant,
     this.roomName = '',
     this.identity = '',
+    this.roomId = ''
   });
   final String url;
   final String token;
@@ -45,6 +46,7 @@ class JoinArgs {
   final bool enableBackupVideoCodec;
   final String roomName;
   final String identity;
+  final String roomId;
 }
 
 class PreJoinPage extends StatefulWidget {
@@ -73,6 +75,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   VideoParameters _selectedVideoParameters = VideoParametersPresets.h720_169;
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   late SharedPreferences prefs;
+  final RoomDataManageService _roomDataManageService = GetIt.instance<RoomDataManageService>();
 
   @override
   void initState() {
@@ -187,13 +190,14 @@ class _PreJoinPageState extends State<PreJoinPage> {
     super.dispose();
   }
 
-  Future<bool> _waitForApproval(String participantName, String roomName) async {
+  Future<bool> _waitForApproval(String participantName, String roomName, String roomId) async {
     try {
       // Request approval before joining
       final request = await _approvalService.createApprovalRequest(
           participantName, roomName);
       final requestId = request['id'];
-
+      
+      
       // Initialize timer for 30 seconds
       const int timeout = 30;
       int elapsedTime = 0;
@@ -202,7 +206,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
       while (elapsedTime < timeout) {
         await Future.delayed(Duration(seconds: 5));
         elapsedTime += 5;
-
         final statusResponse =
             await _approvalService.getRequestStatus(requestId);
         final status = statusResponse['status'];
@@ -245,7 +248,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
       // Wait for approval before proceeding
       // final isLoggedIn = prefs.getBool('isLoggedIn');
       if (args.role == Role.participant) {
-        bool isApproved = await _waitForApproval(args.identity, args.roomName);
+        bool isApproved = await _waitForApproval(args.identity, args.roomName, args.roomId);
         if (!isApproved) {
           return;
         }
@@ -266,7 +269,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
     
 
-
+      
       // Try to connect to the room
       // This will throw an Exception if it fails for any reason.
       await room
@@ -309,6 +312,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
             ),
           ).catchError((error) async {
             print('Could not connect $error');
+            _roomDataManageService.removeParticipant('',args.roomName,args.identity);
             await room.disconnect();
             context.showErrorDialog(error);
           });

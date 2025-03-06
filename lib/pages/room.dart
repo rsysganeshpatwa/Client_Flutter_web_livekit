@@ -68,10 +68,16 @@ class _RoomPageState extends State<RoomPage> {
   void initState() {
     super.initState();
 
-    html.window.addEventListener('beforeunload', (event) async {
+    html.window.addEventListener('beforeunload', (event)  async {
+      final roomId = await widget.room.getSid();
+      // Get local participant identity
+      final localParticipant = widget.room.localParticipant;
+      final identity = localParticipant?.identity;
+      final roomName = widget.room.name!;
       // Perform your action here, e.g., cleanup or save state
-      print("Tab is closing or reloading");
-      await widget.room.disconnect();
+      print("Tab closing or reloading...");
+      _roomDataManageService.removeParticipant(roomId,roomName,identity);
+      widget.room.disconnect();
       // To display a confirmation dialog (optional):
       // event.returnValue = 'Are you sure you want to leave?';
     });
@@ -108,7 +114,7 @@ class _RoomPageState extends State<RoomPage> {
   // Capture the window close event
 
   @override
-  void dispose() {
+  Future<void> dispose() async {
     (() async {
       if (lkPlatformIs(PlatformType.iOS)) {
         ReplayKitChannel.closeReplayKit();
@@ -120,6 +126,12 @@ class _RoomPageState extends State<RoomPage> {
     })();
     onWindowShouldClose = null;
     _isRunning = false;
+    final roomID = await widget.room.getSid();
+    // Get local participant identity
+    final localParticipant = widget.room.localParticipant;
+    final identity = localParticipant?.identity;
+    final roomName =  widget.room.name!;
+     _roomDataManageService.removeParticipant(roomID,roomName,identity);
     super.dispose();
   }
 
@@ -154,7 +166,7 @@ class _RoomPageState extends State<RoomPage> {
           handleRoomDisconnected(context, widget.room.localParticipant!));
     })
     ..on<ParticipantEvent>((event) {
-      //  _sortParticipants('ParticipantEvent');
+       _sortParticipants('ParticipantEvent');
     })
     ..on<RoomRecordingStatusChanged>((event) {
       context.showRecordingStatusChangedDialog(event.activeRecording);
@@ -164,12 +176,12 @@ class _RoomPageState extends State<RoomPage> {
           'Attempting to reconnect ${event.attempt}/${event.maxAttemptsRetry}, '
           '(${event.nextRetryDelaysInMs}ms delay until next attempt)');
     })
-    // ..on<LocalTrackPublishedEvent>((_) => _sortParticipants())
-    // ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
+     ..on<LocalTrackPublishedEvent>((_) => _sortParticipants('LocalTrackPublishedEvent'))
+     ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants('LocalTrackUnpublishedEvent'))
     // // ignore: unnecessary_set_literal
     ..on<TrackSubscribedEvent>((event) {
       _sortParticipants('TrackSubscribedEvent');
-      //  _trackSubscribed(event);
+        //_trackSubscribed(event);
     })
     ..on<TrackUnsubscribedEvent>((event) {
       _sortParticipants('TrackUnsubscribedEvent');
@@ -190,7 +202,7 @@ class _RoomPageState extends State<RoomPage> {
     ..on<ParticipantConnectedEvent>((event) {
       _addNewParticipantStatus(event);
     })
-    ..on<ParticipantDisconnectedEvent>((event) {
+    ..on<ParticipantDisconnectedEvent>((event) async {
       removeParticipantStatus(event);
       _sortParticipants('ParticipantDisconnectedEvent');
     })
@@ -306,7 +318,7 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
-       print('rohit isNew $isNew');
+      // print('rohit isNew $isNew');
       final role = _getRoleFromMetadata(event.participant.metadata);
       final isAdmin = role == Role.admin.toString();
       if (isNew) {
@@ -321,6 +333,7 @@ class _RoomPageState extends State<RoomPage> {
           // Set other default values for the new participant status
         );
 
+        
         participantsManager.add(newParticipantStatus);
         sendParticipantsStatus(participantsManager);
       }
@@ -521,7 +534,6 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _sortParticipants(String from) {
-    print('called from $from');
     List<ParticipantTrack> userMediaTracks = [];
     List<ParticipantTrack> screenTracks = [];
     final localParticipant = widget.room.localParticipant;
@@ -532,6 +544,8 @@ class _RoomPageState extends State<RoomPage> {
     for (var participant in widget.room.remoteParticipants.values) {
       // Find the corresponding ParticipantStatus
       final participantStatus = _getParticipantStatus(participant.identity);
+      final data = jsonEncode(participantStatus);
+      print('rohit sort $data');
       if (participantStatus.identity.isEmpty) {
         continue;
       }
@@ -548,9 +562,15 @@ class _RoomPageState extends State<RoomPage> {
               (isAudio &&
                   !((isLocalHost || isRemoteParticipantHost) &&
                       !isTalkToHostEnable));
+      final name = participant.identity;
+        print('check name $name is  shouldAudioSubscribe  $shouldAudioSubscribe');
 
       if (shouldAudioSubscribe) {
+        final totalaudioTrackPublications =
+            participant.audioTrackPublications.length;
+        print('rohit audio total $totalaudioTrackPublications');
         participant.audioTrackPublications.forEach((element) {
+          print('rohit audio subscribe $jsonEncode(element)');
           element.subscribe();
         });
       } else {
@@ -573,8 +593,6 @@ class _RoomPageState extends State<RoomPage> {
       }
     }
 
-    final totalParticipantCount = userMediaTracks.length;
-    print('totalParticipantCount $totalParticipantCount');
     // Sort the user media tracks
     _sortUserMediaTracks(userMediaTracks);
 
@@ -799,7 +817,7 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
 
   void _openEndDrawer() {
     //_initializeAllowedToTalk();
-    print('rohit openEndDrawer');
+    //print('rohit openEndDrawer');
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
@@ -820,7 +838,7 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Color(0xFF353535),
+      backgroundColor: const Color(0xFF353535),
       body: SafeArea(
         child: Row(
           // Changed to Row
