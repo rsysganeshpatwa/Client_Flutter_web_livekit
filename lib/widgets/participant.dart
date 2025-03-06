@@ -246,62 +246,62 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
             // OCR Button
             if (widget.handleExtractText != null)
-        Positioned(
-  top: 8.0,
-  left: 8.0,
-  child: Row(
-    children: [
-      IconButton(
-        icon: Icon(
-          Icons.camera_alt,
-          color: Colors.black,
-        ),
-        onPressed: () {
-          // Call OCR
-          widget.handleExtractText!();
-        },
-        tooltip: 'Perform OCR',
-      ),
-      IconButton(
-        icon: Icon(
-          Icons.zoom_in,
-          color: Colors.black,
-        ),
-        onPressed: () {
-          setState(() {
-            // Increase the scale factor for zooming in, clamp to max scale
-            _scaleFactor =
-                (_scaleFactor + 0.1).clamp(_minScale, _maxScale);
-          });
-        },
-        tooltip: 'Zoom In',
-      ),
-      IconButton(
-        icon: Icon(
-          Icons.zoom_out,
-          color: Colors.black,
-        ),
-        onPressed: () {
-          setState(() {
-            // Decrease the scale factor for zooming out, clamp to min scale
-            _scaleFactor =
-                (_scaleFactor - 0.1).clamp(_minScale, _maxScale);
-          });
-        },
-        tooltip: 'Zoom Out',
-      ),
-      if(_scaleFactor > _zoomThreshold || _offset != Offset.zero)
-      IconButton(
-        icon: Icon(
-          Icons.reset_tv,
-          color: Colors.black,
-        ),
-        onPressed: _resetZoomAndPan,
-        tooltip: 'Reset Zoom',
-      ),
-    ],
-  ),
-),
+              Positioned(
+                top: 8.0,
+                left: 8.0,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.camera_alt,
+                        color: Colors.black,
+                      ),
+                      onPressed: () {
+                        // Call OCR
+                        widget.handleExtractText!();
+                      },
+                      tooltip: 'Perform OCR',
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.zoom_in,
+                        color: Colors.black,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          // Increase the scale factor for zooming in, clamp to max scale
+                          _scaleFactor =
+                              (_scaleFactor + 0.1).clamp(_minScale, _maxScale);
+                        });
+                      },
+                      tooltip: 'Zoom In',
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.zoom_out,
+                        color: Colors.black,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          // Decrease the scale factor for zooming out, clamp to min scale
+                          _scaleFactor =
+                              (_scaleFactor - 0.1).clamp(_minScale, _maxScale);
+                        });
+                      },
+                      tooltip: 'Zoom Out',
+                    ),
+                    if(_scaleFactor > _zoomThreshold || _offset != Offset.zero)
+                    IconButton(
+                      icon: Icon(
+                        Icons.reset_tv,
+                        color: Colors.black,
+                      ),
+                      onPressed: _resetZoomAndPan,
+                      tooltip: 'Reset Zoom',
+                    ),
+                  ],
+                ),
+              ),
 
             // Participant Name Overlay
             Positioned(
@@ -325,6 +325,28 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 ),
               ),
             ),
+
+            // Live Badge for Streamer
+            if (widget.participant.identity == "streamer")
+              Positioned(
+                bottom: 8.0,
+                right: 8.0,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(4.0),
+                  ),
+                  child: Text(
+                    'LIVE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.0,
+                    ),
+                  ),
+                ),
+              ),
 
             // Hand Raised Indicator
             if (!(widget.participant is LocalParticipant) &&

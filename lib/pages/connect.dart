@@ -10,6 +10,7 @@ import '../services/api_service.dart';
 import '../services/permission_service.dart';
 import '../widgets/text_field.dart';
 import '../models/role.dart';
+import 'streamer.dart';
 
 class ConnectPage extends StatefulWidget {
   const ConnectPage({super.key});
