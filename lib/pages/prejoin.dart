@@ -318,9 +318,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
           });
           
 
-      await Navigator.push<void>(
+      await Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => RoomPage(room, listener)),
+        (route) => false,
       );
     } catch (error) {
       print('Could not connect $error');
@@ -345,17 +346,17 @@ class _PreJoinPageState extends State<PreJoinPage> {
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
-          title: const Text(
-            'Back',
-            style: TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () => _actionBack(context),
-          ),
+          // title: const Text(
+          //   'Back',
+          //   style: TextStyle(
+          //     color: Colors.black,
+          //     fontWeight: FontWeight.bold,
+          //   ),
+          // ),
+          // leading: IconButton(
+          //   icon: const Icon(Icons.arrow_back, color: Colors.black),
+          //   onPressed: () => _actionBack(context),
+          // ),
         ),
         body: Container(
             alignment: Alignment.center,

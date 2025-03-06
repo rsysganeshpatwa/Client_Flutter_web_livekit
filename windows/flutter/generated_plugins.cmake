@@ -3,9 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  cloud_firestore
   connectivity_plus
-  firebase_core
   flutter_webrtc
   flutter_window_close
   livekit_client

@@ -232,17 +232,26 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  _updateRoomData(participantsManager) async {
-    final roomSID = await widget.room.getSid();
+ _updateRoomData(participantsManager) async {
+  final roomSID = await widget.room.getSid();
     final roomName =  widget.room.name!;
-    //remove duplicate cate participant based on identity
-    final uniqueParticipants = participantsManager
-        .map((e) => e.toJson())
-        .toSet()
-        .map((e) => ParticipantStatus.fromJson(e))
-        .toList();
-    _roomDataManageService.setLatestData(roomSID, roomName, uniqueParticipants);
-  }
+
+  // Use a Set to track unique identities
+  final Set<String> seenIdentities = {};
+
+  // Remove duplicates based on 'identity'
+  final uniqueParticipants = participantsManager
+      .where((participant) => seenIdentities.add(participant.identity)) // Add returns false if already in set
+      .map((e) => ParticipantStatus.fromJson(e.toJson()))
+      .toList();
+
+  _roomDataManageService.setLatestData(roomSID, roomName, uniqueParticipants);
+
+  // Print debug information
+  print('rohit _updateRoomData $roomSID');
+  print(jsonEncode(uniqueParticipants));
+}
+
 
   void handleRoomDisconnected(BuildContext context, Participant participant) {
     if (localParticipantRole == Role.admin.toString()) {
@@ -333,7 +342,8 @@ class _RoomPageState extends State<RoomPage> {
           // Set other default values for the new participant status
         );
 
-        
+        print('new Join');
+        print(jsonEncode(newParticipantStatus));
         participantsManager.add(newParticipantStatus);
         sendParticipantsStatus(participantsManager);
       }

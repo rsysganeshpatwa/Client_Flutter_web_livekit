@@ -15,7 +15,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final String headLine = 'Revolutionizing Virtual Classrooms\nand Lectures';
+  final String headLine = 'Welcome to R Systems video conferencing solution';
 
   final String _validUsername = 'admin';
   final String _validPassword = 'admin@password';
