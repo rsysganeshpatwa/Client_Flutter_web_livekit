@@ -54,8 +54,6 @@ class _RoomPageState extends State<RoomPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? localParticipantRole;
   List<ParticipantStatus> participantsManager = [];
-  bool _isScreenShareMode = false; // State to toggle view mode
-  bool _isScreenShareModeOnce = false; // State to toggle view mode
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
       GetIt.instance<RoomDataManageService>();
@@ -65,7 +63,6 @@ class _RoomPageState extends State<RoomPage> {
   int _currentPage = 0;
   final int _participantsPerPage = 6;
   bool isParticipantListVisible = false; // Track sidebar visibility
-  bool _isSidebarOpen = false; // Sidebar visibility state
   @override
   void initState() {
     super.initState();
@@ -318,21 +315,48 @@ class _RoomPageState extends State<RoomPage> {
 
       setState(() {
         participantsManager.add(localStatus);
-
         _updateRoomData(participantsManager);
         _sortParticipants('initializeParticipantStatuses');
       });
     }
   }
 
-  void _addNewParticipantStatus(ParticipantConnectedEvent event) {
+  Future<void> _updateParticipantmanagerFromDB() async{
+    final roomId = await widget.room.getSid();
+    final roomName = await widget.room.name!;
+
+    final data = await _roomDataManageService.getLatestData(roomId,roomName);
+    setState(() {
+      participantsManager.clear();
+      if (data != null) {
+        final participantsStatusList = (data as List)
+            .map((item) => ParticipantStatus(
+                  identity: item['identity'],
+                  isAudioEnable: item['isAudioEnable'],
+                  isVideoEnable: item['isVideoEnable'],
+                  isHandRaised: item['isHandRaised'],
+                  isTalkToHostEnable: item['isTalkToHostEnable'],
+                  handRaisedTimeStamp: item['handRaisedTimeStamp'],
+                  role: item['role'],
+                ))
+            .toList();
+        setState(() {
+          participantsManager.addAll(participantsStatusList);
+        });
+      }
+    });
+  }
+
+  void _addNewParticipantStatus(ParticipantConnectedEvent event) async{
+    //final data = await _roomDataManageService.getLatestData(roomSID,roomName);
+    await _updateParticipantmanagerFromDB();
     setState(() {
       final isNew = participantsManager
           .every((element) => element.identity != event.participant.identity);
       // print('rohit isNew $isNew');
       final role = _getRoleFromMetadata(event.participant.metadata);
-      final isAdmin = role == Role.admin.toString() || event.participant.identity == "streamer";
-      print("vikas role: ${isAdmin} : ${role}");
+      final isAdmin = role == Role.admin.toString();
+      //final isAdmin = role == Role.admin.toString() || event.participant.identity == "streamer";
       if (isNew) {
         final newParticipantStatus = ParticipantStatus(
           identity: event.participant.identity,
@@ -341,7 +365,8 @@ class _RoomPageState extends State<RoomPage> {
           isHandRaised: false,
           isTalkToHostEnable: isAdmin,
           handRaisedTimeStamp: 0,
-          role: !isAdmin ? Role.participant.toString() : Role.admin.toString(),
+          role: role.isEmpty ? Role.participant.toString() : role,
+          //role: !isAdmin ? Role.participant.toString() : Role.admin.toString(),
           // Set other default values for the new participant status
         );
 
@@ -454,7 +479,7 @@ class _RoomPageState extends State<RoomPage> {
     setState(() {
       participantsManager = participantsStatus;
       _updateRoomData(participantsManager);
-      _initializeParticipantStatuses();
+      //_initializeParticipantStatuses();
       _sortParticipants('sendParticipantsStatus');
     });
   }
@@ -570,9 +595,10 @@ class _RoomPageState extends State<RoomPage> {
       final isVideo = participantStatus.isVideoEnable;
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
-      final isStreamer = participant.identity == "streamer";
+      //final isStreamer = participant.identity == "streamer";
       final shouldAudioSubscribe =
-          (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost || isStreamer) ) ||
+          (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
+          //(isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost || isStreamer) ) ||
               (isAudio &&
                   !((isLocalHost || isRemoteParticipantHost) &&
                       !isTalkToHostEnable));
@@ -836,23 +862,11 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
   }
 
   // Toggle between view modes
-  void _toggleViewMode() {
-    setState(() {
-      _isScreenShareMode = !_isScreenShareMode;
-    });
-  }
-
   void _toggleParticipantList() {
     setState(() {
       isParticipantListVisible = !isParticipantListVisible;
     });
   }
-
-  void _toggleSidebar() {
-    setState(() {
-      _isSidebarOpen = !_isSidebarOpen;
-    });
-  } 
 
   @override
   Widget build(BuildContext context) {
@@ -869,116 +883,121 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF353535),
       body: SafeArea(
-        child: Row(
+        child: Stack( // Changed from Row to Stack to allow proper positioning
           children: [
-            // Main column with header, grid, and footer
-            Expanded(
-              child: Column(
-                children: [
-                  // Room header
-                  RoomHeader(
-                    room: widget.room,
-                    participantsStatusList: participantsManager,
-                    onToggleRaiseHand: _handleToggleRaiseHand,
-                    isHandRaisedStatusChanged: _isHandleRaiseHand,
-                    isAdmin: localParticipantRole == Role.admin.toString(),
-                  ),
+            Row(
+              children: [
+                // Main column with header, grid, and footer
+                Expanded(
+                  child: Column(
+                    children: [
+                      // Room header
+                      RoomHeader(
+                        room: widget.room,
+                        participantsStatusList: participantsManager,
+                        onToggleRaiseHand: _handleToggleRaiseHand,
+                        isHandRaisedStatusChanged: _isHandleRaiseHand,
+                        isAdmin: localParticipantRole == Role.admin.toString(),
+                      ),
 
-                  // Expanded Grid View (between header and footer)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: isParticipantScreenShared || isStreamer
-                          ? Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: ParticipantGridView(
-                                    participantTracks: participantTracks.where(
-                                      (track) =>
-                                          (track.type ==
-                                                  ParticipantTrackType.kScreenShare ||
-                                              track.participant.identity ==
-                                                  "streamer") &&
-                                          track.participant.identity !=
-                                              widget.room.localParticipant?.identity,
-                                    ).toList(),
-                                    participantStatuses: participantsManager,
-                                    isLocalHost: false,
-                                  ),
+                      // Expanded Grid View (between header and footer)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: isParticipantScreenShared || isStreamer
+                              ? Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: ParticipantGridView(
+                                        participantTracks: participantTracks.where(
+                                          (track) =>
+                                              (track.type ==
+                                                      ParticipantTrackType.kScreenShare ||
+                                                  track.participant.identity ==
+                                                      "streamer") &&
+                                              track.participant.identity !=
+                                                  widget.room.localParticipant?.identity,
+                                        ).toList(),
+                                        participantStatuses: participantsManager,
+                                        isLocalHost: false,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : ParticipantGridView(
+                                  participantTracks: participantTracks.where(
+                                    (track) =>
+                                        track.type != ParticipantTrackType.kScreenShare &&
+                                        track.participant.identity != "streamer",
+                                  ).toList(),
+                                  participantStatuses: participantsManager,
+                                  isLocalHost:
+                                      localParticipantRole == Role.admin.toString(),
                                 ),
-                              ],
-                            )
-                          : ParticipantGridView(
-                              participantTracks: participantTracks.where(
-                                (track) =>
-                                    track.type != ParticipantTrackType.kScreenShare &&
-                                    track.participant.identity != "streamer",
-                              ).toList(),
-                              participantStatuses: participantsManager,
-                              isLocalHost:
-                                  localParticipantRole == Role.admin.toString(),
-                            ),
-                    ),
-                  ),
-
-                  // Sidebar Toggle Button
-                  if (!isMobile && isStreamer)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: GestureDetector(
-                        onTap: _toggleParticipantList,
-                        child: AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isParticipantListVisible ? Icons.arrow_forward : Icons.arrow_back,
-                            color: Colors.white,
-                          ),
                         ),
                       ),
-                    ),
 
-                  // Control Footer
-                  ControlsWidget(
-                    _toggleMuteAll,
-                    _handleToggleRaiseHand,
-                    _openEndDrawer,
-                    () => _copyInviteLinkToClipboard(context),
-                    _muteAll,
-                    _isHandleRaiseHand,
-                    localParticipantRole,
-                    widget.room,
-                    widget.room.localParticipant!,
-                    participantsManager,
+                      // Control Footer
+                      ControlsWidget(
+                        _toggleMuteAll,
+                        _handleToggleRaiseHand,
+                        _openEndDrawer,
+                        () => _copyInviteLinkToClipboard(context),
+                        _muteAll,
+                        _isHandleRaiseHand,
+                        localParticipantRole,
+                        widget.room,
+                        widget.room.localParticipant!,
+                        participantsManager,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                // Sidebar
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  width: (!isMobile &&
+                          widget.room.localParticipant != null &&
+                          isParticipantListVisible)
+                      ? 300
+                      : 0,
+                  color: Color(0xFF404040),
+                  child: isParticipantListVisible
+                      ? ParticipantListView(
+                          participantTracks: participantTracks.where((track) {
+                            return track.type != ParticipantTrackType.kScreenShare &&
+                                track.participant.identity != "streamer";
+                          }).toList(),
+                          participantStatuses: participantsManager,
+                        )
+                      : null,
+                ),
+              ],
             ),
 
-            // Sidebar
-            AnimatedContainer(
-              duration: Duration(milliseconds: 300),
-              width: (!isMobile &&
-                      widget.room.localParticipant != null &&
-                      isParticipantListVisible)
-                  ? 300
-                  : 0,
-              color: Color(0xFF404040),
-              child: isParticipantListVisible
-                  ? ParticipantListView(
-                      participantTracks: participantTracks.where((track) {
-                        return track.type != ParticipantTrackType.kScreenShare &&
-                            track.participant.identity != "streamer";
-                      }).toList(),
-                      participantStatuses: participantsManager,
-                    )
-                  : null,
-            ),
+            // Sidebar Toggle Button - Now Positioned Correctly in the Center-Right
+            if (!isMobile && isStreamer)
+              Positioned(
+                top: MediaQuery.of(context).size.height / 2 - 25, // Centered vertically
+                right: isParticipantListVisible ? 280 : -20, // Adjust dynamically
+                child: GestureDetector(
+                  onTap: _toggleParticipantList,
+                  child: AnimatedContainer(
+                    duration: Duration(milliseconds: 300),
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isParticipantListVisible ? Icons.chevron_right : Icons.chevron_left,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -997,136 +1016,4 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
     );
   }
 
-  // @override
-  // Widget build(BuildContext context) {
-  //   final screenWidth = MediaQuery.of(context).size.width;
-  //   final bool isMobile = screenWidth < 600;
-  //   final bool isParticipantScreenShared = participantTracks.any((track) =>
-  //       track.type == ParticipantTrackType.kScreenShare &&
-  //       track.participant.identity != widget.room.localParticipant?.identity);
-  //   final bool isStreamer = participantTracks.any((track) =>
-  //       track.participant.identity == "streamer" &&
-  //       track.participant.identity != widget.room.localParticipant?.identity);
-
-  //   return Scaffold(
-  //     key: _scaffoldKey,
-  //     backgroundColor: const Color(0xFF353535),
-  //     body: SafeArea(
-  //       child: Row(
-  //         children: [
-  //           // Main column with header, grid, and footer
-  //           Expanded(
-  //             child: Column(
-  //               children: [
-  //                 // Room header
-  //                 RoomHeader(
-  //                   room: widget.room,
-  //                   participantsStatusList: participantsManager,
-  //                   onToggleRaiseHand: _handleToggleRaiseHand,
-  //                   isHandRaisedStatusChanged: _isHandleRaiseHand,
-  //                   isAdmin: localParticipantRole == Role.admin.toString(),
-  //                 ),
-
-  //                 // Expanded Grid View (between header and footer)
-  //                 Expanded(
-  //                   child: Padding(
-  //                     padding: const EdgeInsets.all(8.0),
-  //                     child: isParticipantScreenShared || isStreamer
-  //                         ? Stack(
-  //                             children: [
-  //                               Positioned.fill(
-  //                                 child: ParticipantGridView(
-  //                                   participantTracks: participantTracks.where(
-  //                                     (track) =>
-  //                                         (track.type ==
-  //                                                 ParticipantTrackType
-  //                                                     .kScreenShare ||
-  //                                             track.participant.identity ==
-  //                                                 "streamer") &&
-  //                                         track.participant.identity !=
-  //                                             widget.room.localParticipant
-  //                                                 ?.identity,
-  //                                   ).toList(),
-  //                                   participantStatuses: participantsManager,
-  //                                   isLocalHost: false,
-  //                                 ),
-  //                               ),
-  //                             ],
-  //                           )
-  //                         : ParticipantGridView(
-  //                             participantTracks: participantTracks.where(
-  //                               (track) =>
-  //                                   track.type !=
-  //                                       ParticipantTrackType.kScreenShare &&
-  //                                   track.participant.identity != "streamer",
-  //                             ).toList(),
-  //                             participantStatuses: participantsManager,
-  //                             isLocalHost:
-  //                                 localParticipantRole == Role.admin.toString(),
-  //                           ),
-  //                   ),
-  //                 ),
-
-  //                 // Toggle Button to Show/Hide Participant List
-  //                 if (!isMobile && isStreamer)
-  //                   IconButton(
-  //                     icon: Icon(
-  //                       isParticipantListVisible
-  //                           //? Icons.arrow_forward_ios
-  //                           ? Icons.cancel
-  //                           : Icons.people,
-  //                       color: Colors.white,
-  //                     ),
-  //                     onPressed: _toggleParticipantList,
-  //                   ),
-
-  //                 // Control Footer
-  //                 ControlsWidget(
-  //                   _toggleMuteAll,
-  //                   _handleToggleRaiseHand,
-  //                   _openEndDrawer,
-  //                   () => _copyInviteLinkToClipboard(context),
-  //                   _muteAll,
-  //                   _isHandleRaiseHand,
-  //                   localParticipantRole,
-  //                   widget.room,
-  //                   widget.room.localParticipant!,
-  //                   participantsManager,
-  //                 ),
-  //               ],
-  //             ),
-  //           ),
-
-  //           // Participant List Sidebar (Visible Based on isParticipantListVisible)
-  //           if (!isMobile &&
-  //               widget.room.localParticipant != null &&
-  //               isParticipantListVisible)
-  //             Container(
-  //               width: 300,
-  //               color: Color(0xFF404040),
-  //               child: ParticipantListView(
-  //                 participantTracks: participantTracks.where((track) {
-  //                   return track.type != ParticipantTrackType.kScreenShare &&
-  //                       track.participant.identity != "streamer";
-  //                 }).toList(),
-  //                 participantStatuses: participantsManager,
-  //               ),
-  //             ),
-  //         ],
-  //       ),
-  //     ),
-  //     endDrawer: ParticipantDrawer(
-  //       searchQuery: searchQuery,
-  //       onSearchChanged: (value) {
-  //         setState(() {
-  //           searchQuery = value;
-  //         });
-  //       },
-  //       filterParticipants: _filterParticipants,
-  //       localParticipant: widget.room.localParticipant,
-  //       onParticipantsStatusChanged: sendParticipantsStatus,
-  //       participantsStatusList: participantsManager,
-  //     ),
-  //   );
-  // }
 }

@@ -272,7 +272,26 @@ class _ConnectPageState extends State<ConnectPage> {
         children: [
           buildMainContent(),
           //if (!isMobile) buildSidebar(),
-         // if (isMobile) buildFloatingActionButton(),
+          // if (isMobile) buildFloatingActionButton(),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => LiveKitIngressPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 39, 38, 104),
+              ),
+              child: const Text(
+                'Create Stream',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
         ],
       ),
     );
