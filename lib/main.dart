@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:logging/logging.dart';
-import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:video_meeting_room/pages/login.dart';
+import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 import 'package:video_meeting_room/service_locator.dart';
 import 'package:video_meeting_room/theme.dart';
 // Adjust import as necessary
 import 'utils.dart';
 
 void main() async {
-  final format = DateFormat('HH:mm:ss');
   // configure logs for debugging
   Logger.root.level = Level.FINE;
   Logger.root.onRecord.listen((record) {
@@ -27,20 +27,25 @@ void main() async {
   }
   setup();
 
-  // ErrorWidget.builder = (FlutterErrorDetails details) {
-  //   print('ganesh Error: ${details.exception} ${details.stack} ${details.library}');
-  //   return Container(
-  //     color: Colors.white,
-  //     child: Center(
-  //       child: Text(
-  //         'An error occurred. Please restart the app.',
-  //         style: TextStyle(color: Colors.red),
-  //       ),
-  //     ),
-  //   );
-  // };
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    print('ganesh Error: ${details.exception} ${details.stack} ${details.library}');
+    return Container(
+      color: Colors.white,
+      child: const Center(
+        child: Text(
+          'An error occurred. Please restart the app.',
+          style: TextStyle(color: Colors.red),
+        ),
+      ),
+    );
+  };
 
-  runApp(const LiveKitExampleApp());
+  runApp(
+    ChangeNotifierProvider(create: (_) => PinnedParticipantProvider(),
+     child: const LiveKitExampleApp(),
+      ),
+  );
+  
 }
 
 class LiveKitExampleApp extends StatelessWidget {
@@ -66,7 +71,7 @@ class LiveKitExampleApp extends StatelessWidget {
                 child: Container(
                   color:
                       Colors.transparent, // Ensure the container is transparent
-                  child: LoginPage(),
+                  child: const LoginPage(),
                 ),
               ),
             ],

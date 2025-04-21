@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:provider/provider.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
+import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
+import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
-
+import 'package:video_meeting_room/helper_widgets/ParticipantControlIcon.dart';
 class ParticipantDrawer extends StatefulWidget {
   final String searchQuery;
   final ValueChanged<String> onSearchChanged;
@@ -12,6 +15,8 @@ class ParticipantDrawer extends StatefulWidget {
   final Participant? localParticipant;
   final List<ParticipantStatus> participantsStatusList;
   final void Function(List<ParticipantStatus>) onParticipantsStatusChanged;
+ 
+
 
   const ParticipantDrawer({
     Key? key,
@@ -38,6 +43,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
     _selectAllAudio = _areAllParticipantsSelected('audio');
     _selectAllVideo = _areAllParticipantsSelected('video');
     _selectMuteAll = !_areAllParticipantsSelected('talkToHost');
+  
     // print('initState Select Mute All: $_selectMuteAll');
   }
 
@@ -53,6 +59,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       _selectAllAudio = _areAllParticipantsSelected('audio');
       _selectAllVideo = _areAllParticipantsSelected('video');
      _selectMuteAll = !_areAllParticipantsSelected('talkToHost');
+     //sortParticipants();
    //   // print('didUpdateWidget Select Mute All: $_selectMuteAll');
     }
   }
@@ -70,6 +77,10 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
           .every((status) => status.isTalkToHostEnable);
     }
   }
+
+
+
+
 
   void _toggleSelectAll(String type, bool value) {
     // print('Toggle select all: $type, $value');
@@ -110,6 +121,25 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       isTalkToHostEnable: isAudio, // Auto enable talk to host if audio is enabled
     );
     _triggerParticipantsStatusUpdate(updatedStatus);
+  }
+
+  void updateSpotLightStatus(ParticipantStatus participantStatus, bool isSpotlight) {
+
+
+    final updatedStatus = participantStatus.copyWith(
+      isSpotlight: isSpotlight,
+      isTalkToHostEnable: isSpotlight || participantStatus.isTalkToHostEnable, // Auto enable talk to host if pinned
+      isAudioEnable: isSpotlight || participantStatus.isAudioEnable,
+      isVideoEnable: isSpotlight || participantStatus.isVideoEnable
+    );
+    // print('Pin and spotlight status updated: ${updatedStatus.toJson()}');
+      
+         List<ParticipantStatus> updatedStatuses = updateSpotlightStatus(
+      participantList: widget.participantsStatusList,
+      updatedStatus: updatedStatus,
+    );
+
+    widget.onParticipantsStatusChanged(updatedStatuses);
   }
 
   void updateAllowToTalkStatus(
@@ -192,7 +222,7 @@ return Drawer(
                       mainAxisAlignment: MainAxisAlignment
                           .spaceBetween, // To push items to opposite ends
                       children: [
-                        Text(
+                       const  Text(
                           'Participants',
                           style: TextStyle(
                             color: Colors.white,
@@ -201,7 +231,7 @@ return Drawer(
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close, color: Colors.white),
+                          icon: const Icon(Icons.close, color: Colors.white),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
@@ -246,8 +276,7 @@ return Drawer(
                                   children: [
                                     if (isAnyParticipantRoleAvailableMoreThenOne)
                                       _selectAllTalkToHostModeParticipants(),
-                                    ..._buildHostParticipants(),
-                                    ..._getHandRaisedParticipants(),
+                              
                                     ..._buildAllParticipants('Audio Manage'),
                                   ],
                                 ),
@@ -256,7 +285,7 @@ return Drawer(
                                   children: [
                                     if (isAnyParticipantRoleAvailableMoreThenOne)
                                       _selectAllTogetherModeParticipants(),
-                                    ..._buildHostParticipants(),
+                                   
                                     ..._buildAllParticipants('Together Mode'),
                                   ],
                                 ),
@@ -275,44 +304,89 @@ return Drawer(
       ),
     );
 }
+List<Widget> _buildAllParticipants(String tabName) {
+  final participants = widget.filterParticipants(widget.searchQuery);
+  final pinnedProvider = Provider.of<PinnedParticipantProvider>(context);
 
-  List<Widget> _buildAllParticipants(tabName) {
-    return widget.filterParticipants(widget.searchQuery).where((track) {
-      final metadata = track.participant.metadata;
-      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-       final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      return role != Role.admin.toString() && participantStatus?.isHandRaised == false;
-    }).map((track) {
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      final participantName = track.participant.name ?? 'Unknown';
+  // Extract participant info
+  final participantInfoList = participants.map((track) {
+    final metadata = track.participant.metadata;
+    final role = metadata != null ? jsonDecode(metadata)['role'] : null;
+    final status = _getParticipantStatus(track.participant.identity);
 
-      return _buildParticipantTile(context,
-          name: participantName,
-          participantStatus: participantStatus,
-          tabName: tabName);
-    }).toList();
-  }
+    return {
+      'track': track,
+      'role': role,
+      'status': status,
+    };
+  }).toList();
 
-  List<Widget> _buildHostParticipants() {
-    return widget.filterParticipants(widget.searchQuery).where((track) {
-      final metadata = track.participant.metadata;
-      final role = metadata != null ? jsonDecode(metadata)['role'] : null;
-      return role == Role.admin.toString();
-    }).map((track) {
-      final isLocal =
-          track.participant.identity == widget.localParticipant?.identity;
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      final participantName = track.participant.name ?? 'Unknown';
-      final displayName =
-          isLocal ? '$participantName (you) (host)' : '$participantName (host)';
+  // Prepare sorted list of hand raised participants (for ranking)
+  final handRaisedList = participantInfoList
+      .where((info) =>
+          info['status']?.isHandRaised == true &&
+          info['status']?.handRaisedTimeStamp != null)
+      .toList()
+    ..sort((a, b) => a['status']
+        .handRaisedTimeStamp
+        .compareTo(b['status'].handRaisedTimeStamp));
 
-      return _buildParticipantTile(context,
-          name: displayName, participantStatus: participantStatus, tabName: '');
-    }).toList();
-  }
+  // Apply primary sort logic
+  participantInfoList.sort((a, b) {
+    final aStatus = a['status'];
+    final bStatus = b['status'];
+
+    int getRank(Map info) {
+      final status = info['status'];
+      final role = info['role'];
+      if (status?.isSpotlight == true) return 0;
+      if (pinnedProvider.isPinned(status?.identity) == true) return 1;
+      if (status?.isHandRaised == true) return 2;
+      if (role == Role.admin.toString()) return 3;
+      return 4;
+    }
+
+    final rankA = getRank(a);
+    final rankB = getRank(b);
+
+    if (rankA != rankB) return rankA.compareTo(rankB);
+
+    // Tie-break: sort hand raised by timestamp
+    if (rankA == 2 &&
+        aStatus?.handRaisedTimeStamp != null &&
+        bStatus?.handRaisedTimeStamp != null) {
+      return aStatus.handRaisedTimeStamp
+          .compareTo(bStatus.handRaisedTimeStamp);
+    }
+
+    return 0;
+  });
+
+  return participantInfoList.map((info) {
+    final track = info['track'];
+    final status = info['status'];
+    final participantName = track.participant.name ?? 'Unknown';
+
+    // Compute rank index for hand raised if applicable
+    int? handRaiseRank;
+    if (status?.isHandRaised == true &&
+        status?.handRaisedTimeStamp != null) {
+      handRaiseRank = handRaisedList.indexWhere((e) =>
+          e['track'].participant.identity ==
+          track.participant.identity);
+    }
+
+    return _buildParticipantTile(
+      context,
+      name: participantName,
+      participantStatus: status,
+      tabName: tabName,
+      handRaiseRank: handRaiseRank != -1 ? handRaiseRank : null,
+    );
+  }).toList();
+}
+
+
 
 Column _selectAllTalkToHostModeParticipants() {
   return Column(
@@ -422,68 +496,118 @@ Column _selectAllTalkToHostModeParticipants() {
   );
 }
 
-  List<Widget> _getHandRaisedParticipants() {
-    final handRaisedParticipants =
-        widget.filterParticipants(widget.searchQuery).where((track) {
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      return participantStatus?.isHandRaised ?? false;
-    }).toList()
-          ..sort((a, b) {
-            final statusA = _getParticipantStatus(a.participant.identity);
-            final statusB = _getParticipantStatus(b.participant.identity);
-            return (statusA?.handRaisedTimeStamp ?? 0) -
-                (statusB?.handRaisedTimeStamp ?? 0);
-          });
 
-    return handRaisedParticipants.map((track) {
-      final participantStatus =
-          _getParticipantStatus(track.participant.identity);
-      final participantName = track.participant.name ?? 'Unknown';
-
-      final index = handRaisedParticipants.indexOf(track) + 1;
-      final handRaisedText = '$participantName (#$index)';
-
-      return _buildParticipantTile(context,
-          name: handRaisedText, participantStatus: participantStatus, tabName: 'Audio Manage', isFromHandRaised: true);
-    }).toList();
-  }
-
-  Widget _buildParticipantTile(BuildContext context,
-      {required String name, ParticipantStatus? participantStatus, tabName, bool isFromHandRaised = false}) {
-    // print('Participant Status: ${participantStatus?.toJson()}');
-    return Column(
+Widget _buildParticipantTile(
+  BuildContext context, {
+  required String name,
+  ParticipantStatus? participantStatus,
+  String? tabName,
+  int? handRaiseRank, // NEW
+  bool isFromHandRaised = false,
+}) {
+   final pinnedProvider = Provider.of<PinnedParticipantProvider>(context);
+    
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ListTile(
-          leading: const Icon(Icons.account_circle,
-              size: 40, color: Colors.white), // Black icon for contrast
+          leading: Stack(
+  clipBehavior: Clip.none,
+  children: [
+    const Icon(Icons.account_circle, size: 36, color: Colors.white),
+    if (participantStatus?.isHandRaised == true)
+      const Positioned(
+        right: -2,
+        top: -2,
+        child: Icon(
+          Icons.pan_tool,
+          size: 20,
+          color: Colors.orangeAccent,
+        ),
+      ),
+  ],
+),
           title: Text(
             name,
             style: const TextStyle(
               fontWeight: FontWeight.normal,
-              color: Colors.white, // Adjusted for light background
+              color: Colors.white,
+              fontSize: 16,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
+          subtitle: () {
+            List<Widget> labels = [];
 
+            if (participantStatus?.isSpotlight == true) {
+              labels.add(const Text(
+                'Spotlighted',
+                style: TextStyle(color: Colors.orange, fontSize: 12),
+              ));
+            }
+
+            if (pinnedProvider.isPinned(participantStatus!.identity)) {
+              labels.add(const Text(
+                'Pinned',
+                style: TextStyle(color: Colors.blueAccent, fontSize: 12),
+              ));
+            }
+
+            if (participantStatus?.role == Role.admin.toString() &&
+                participantStatus?.identity != widget.localParticipant?.identity) {
+              labels.add(const Text(
+                'Host',
+                style: TextStyle(color: Colors.green, fontSize: 12),
+              ));
+            }
+
+            if (participantStatus?.identity == widget.localParticipant?.identity &&
+                participantStatus?.role == Role.admin.toString()) {
+              labels.add(const Text(
+                'You (Host)',
+                style: TextStyle(color: Colors.tealAccent, fontSize: 12),
+              ));
+            }
+
+            if (handRaiseRank != null) {
+              final rankLabel = ['1st', '2nd', '3rd'];
+              final suffix = handRaiseRank < 3
+                  ? rankLabel[handRaiseRank]
+                  : '${handRaiseRank + 1}th';
+
+              labels.add(Text(
+                'Hand Raised ($suffix)',
+                style: const TextStyle(color: Colors.orange, fontSize: 12),
+              ));
+            }
+
+            if (labels.isEmpty) return null;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: labels,
+            );
+          }(),
           trailing: tabName == 'Audio Manage'
               ? _getAudioManageTrailingIcons(participantStatus!, isFromHandRaised)
               : tabName == 'Together Mode'
                   ? _getTogetherModeTrailingIcons(participantStatus!)
                   : null,
         ),
-        Divider(
-          thickness: 0.2,
-        ),
+        const Divider(thickness: 0.2, color: Colors.white30),
       ],
-    );
-  }
+    ),
+  );
+}
 
 Row _getAudioManageTrailingIcons(ParticipantStatus participantStatus,bool isFromHandRaised) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       Tooltip(
-        message: (participantStatus.isTalkToHostEnable ?? false)
+        message: (participantStatus.isTalkToHostEnable)
             ? 'Disallow to talk'
             : 'Allow to talk',
         child: IconButton(
@@ -494,22 +618,22 @@ Row _getAudioManageTrailingIcons(ParticipantStatus participantStatus,bool isFrom
             ),
             padding: EdgeInsets.all(1), // Padding to make it a circle
             child: Icon(
-              (participantStatus.isTalkToHostEnable ?? false)
+              (participantStatus.isTalkToHostEnable)
                   ? Icons.mic
                   : Icons.mic_off,
-              color: (participantStatus.isTalkToHostEnable ?? false)
+              color: (participantStatus.isTalkToHostEnable )
                   ? Colors.black
                   : Colors.red,
             ),
           ),
           onPressed: () {
             final newAllowToTalkStatus =
-                !(participantStatus.isTalkToHostEnable ?? false);
+                !(participantStatus.isTalkToHostEnable );
             updateAllowToTalkStatus(participantStatus, newAllowToTalkStatus);
           },
         ),
       ),
-      if (isFromHandRaised && participantStatus.isHandRaised ?? false)
+      if (isFromHandRaised && participantStatus.isHandRaised )
         Tooltip(
           message: 'Raised hand',
           child: Container(
@@ -525,64 +649,97 @@ Row _getAudioManageTrailingIcons(ParticipantStatus participantStatus,bool isFrom
   );
 }
 
-Row _getTogetherModeTrailingIcons(ParticipantStatus participantStatus) {
+Widget _getTogetherModeTrailingIcons(ParticipantStatus participantStatus) {
+  final pinnedProvider =
+      Provider.of<PinnedParticipantProvider>(context);
+  final isPinned = pinnedProvider.isPinned(participantStatus.identity);
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Tooltip(
-        message: (participantStatus.isAudioEnable ?? false) ? 'Mute' : 'Unmute',
-        child: IconButton(
-          icon: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white, // White circle background
-            ),
-            padding: EdgeInsets.all(1), // Add some padding to make it a circle
-            child: Icon(
-              (participantStatus.isAudioEnable ?? false)
-                  ? Icons.volume_up
-                  : Icons.volume_off,
-              color: participantStatus.isAudioEnable ?? false
-                  ? Colors.black
-                  : Colors.red,
+    
+      ParticipantControlIcon(
+        isActive: participantStatus.isAudioEnable ,
+        iconOn: Icons.volume_up,
+        iconOff: Icons.volume_off,
+        tooltipOn: 'Mute',
+        tooltipOff: 'Unmute',
+        colorActive: Colors.black,
+        colorInactive: Colors.red,
+        onTap: () {
+          final newAudio = !(participantStatus.isAudioEnable );
+          updateAudioVideoStatus(
+              participantStatus, newAudio, participantStatus.isVideoEnable);
+        },
+      ),
+      const SizedBox(width: 6),
+    
+      ParticipantControlIcon(
+        isActive: participantStatus.isVideoEnable ,
+        iconOn: Icons.videocam,
+        iconOff: Icons.videocam_off,
+        tooltipOn: 'Turn off video',
+        tooltipOff: 'Turn on video',
+        colorActive: Colors.black,
+        colorInactive: Colors.red,
+        onTap: () {
+          final newVideo = !(participantStatus.isVideoEnable );
+          updateAudioVideoStatus(
+              participantStatus, participantStatus.isAudioEnable, newVideo);
+        },
+      ),
+      const SizedBox(width: 6),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'pin',
+            child: Row(
+              children: [
+                Icon(
+                  isPinned 
+                      ? Icons.push_pin
+                      : Icons.push_pin_outlined,
+                  color: isPinned 
+                      ? Colors.blue
+                      : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Text(isPinned  ? 'Unpin' : 'Pin'),
+              ],
             ),
           ),
-          onPressed: () {
-            final newAudioStatus = !(participantStatus.isAudioEnable ?? false);
-            updateAudioVideoStatus(
-                participantStatus, newAudioStatus, participantStatus.isVideoEnable);
-          },
-        ),
-      ),
-      Tooltip(
-        message: (participantStatus.isVideoEnable ?? false)
-            ? 'Turn off video'
-            : 'Turn on video',
-        child: IconButton(
-          icon: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white, // White circle background
-            ),
-            padding: EdgeInsets.all(1), // Add some padding to make it a circle
-            child: Icon(
-              (participantStatus.isVideoEnable ?? false)
-                  ? Icons.videocam
-                  : Icons.videocam_off,
-               color: participantStatus.isVideoEnable ?? false
-                  ? Colors.black
-                  : Colors.red,
-                  
+          PopupMenuItem(
+            value: 'spotlight',
+            child: Row(
+              children: [
+                Icon(
+                  participantStatus.isSpotlight 
+                      ? Icons.highlight
+                      : Icons.highlight_outlined,
+                  color: participantStatus.isSpotlight 
+                      ? Colors.orange
+                      : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Text(participantStatus.isSpotlight 
+                    ? 'Remove Spotlight'
+                    : 'Spotlight'),
+              ],
             ),
           ),
-          onPressed: () {
-            final newVideoStatus = !(participantStatus.isVideoEnable ?? false);
-            updateAudioVideoStatus(participantStatus,
-                participantStatus.isAudioEnable, newVideoStatus);
-          },
-        ),
-      ),
+        ],
+        onSelected: (value) {
+          if (value == 'pin') {
+            pinnedProvider.togglePin(participantStatus.identity);
+          } else if (value == 'spotlight') {
+            final newSpotlight = !(participantStatus.isSpotlight );
+            updateSpotLightStatus(
+                participantStatus, newSpotlight);
+          }
+        },
+      )
     ],
   );
 }
+
 }

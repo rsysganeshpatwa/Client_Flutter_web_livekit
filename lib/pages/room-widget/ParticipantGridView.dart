@@ -11,12 +11,15 @@ class ParticipantGridView extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
   final List<ParticipantStatus> participantStatuses;
   final bool isLocalHost;
+  //onParticipantsStatusChanged
+   final Function(List<ParticipantStatus>) onParticipantsStatusChanged;
 
   const ParticipantGridView({
     super.key,
     required this.participantTracks,
     required this.participantStatuses,
     required this.isLocalHost,
+    required this.onParticipantsStatusChanged,
   });
 
   @override
@@ -96,6 +99,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
               gridHeight: adjustedGridHeight,
               participantStatuses: widget.participantStatuses,
               isLocalHost: widget.isLocalHost,
+              onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
             );
           } else {
             const int itemsPerPage = 4;
@@ -156,6 +160,8 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                             gridHeight: gridHeight,
                             participantStatuses: widget.participantStatuses,
                             isLocalHost: widget.isLocalHost,
+                            onParticipantsStatusChanged:
+                                widget.onParticipantsStatusChanged,
                           );
                         },
                       );

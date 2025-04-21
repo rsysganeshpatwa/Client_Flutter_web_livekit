@@ -1,10 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:provider/provider.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
+import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 
 import 'no_video.dart';
 import 'participant_info.dart';
@@ -15,7 +20,11 @@ abstract class ParticipantWidget extends StatefulWidget {
       ParticipantTrack participantTrack, ParticipantStatus participantStatus,
       {bool showStatsLayer = false,
       int participantIndex = 0,
-      VoidCallback? handleExtractText}) {
+      VoidCallback? handleExtractText,
+      //onParticipantsStatusChanged
+      required Function(ParticipantStatus) onParticipantsStatusChanged,
+      bool isLocalHost =false,
+      }) {
     if (participantTrack.participant is LocalParticipant) {
       return LocalParticipantWidget(
           participantTrack.participant as LocalParticipant,
@@ -23,7 +32,10 @@ abstract class ParticipantWidget extends StatefulWidget {
           showStatsLayer,
           participantStatus,
           participantIndex,
-          handleExtractText);
+          handleExtractText,
+          onParticipantsStatusChanged,
+          isLocalHost,
+          );
     } else if (participantTrack.participant is RemoteParticipant) {
       return RemoteParticipantWidget(
           participantTrack.participant as RemoteParticipant,
@@ -31,7 +43,10 @@ abstract class ParticipantWidget extends StatefulWidget {
           showStatsLayer,
           participantStatus,
           participantIndex,
-          handleExtractText);
+          handleExtractText,
+          onParticipantsStatusChanged,
+          isLocalHost
+          );
     }
     throw UnimplementedError('Unknown participant type');
   }
@@ -44,6 +59,8 @@ abstract class ParticipantWidget extends StatefulWidget {
   abstract final ParticipantStatus participantStatus;
   abstract final int participantIndex;
   abstract final VoidCallback? handleExtractText;
+  abstract final Function(ParticipantStatus) onParticipantsStatusChanged;
+  abstract final bool isLocalHost;
 
   const ParticipantWidget({
     this.quality = VideoQuality.MEDIUM,
@@ -66,13 +83,23 @@ class LocalParticipantWidget extends ParticipantWidget {
   @override
   final ParticipantStatus participantStatus;
 
+  @override
+  final Function(ParticipantStatus) onParticipantsStatusChanged;
+
+  @override
+  final bool isLocalHost;
+
   const LocalParticipantWidget(
     this.participant,
     this.type,
     this.showStatsLayer,
     this.participantStatus,
     this.participantIndex,
-    this.handleExtractText, {
+    this.handleExtractText,
+    this.onParticipantsStatusChanged,
+    this.isLocalHost,
+          
+     {
     super.key,
   });
 
@@ -93,6 +120,10 @@ class RemoteParticipantWidget extends ParticipantWidget {
   final int participantIndex;
   @override
   final VoidCallback? handleExtractText;
+  @override
+  final Function(ParticipantStatus) onParticipantsStatusChanged;
+  @override
+  final bool isLocalHost;
 
   const RemoteParticipantWidget(
     this.participant,
@@ -100,7 +131,10 @@ class RemoteParticipantWidget extends ParticipantWidget {
     this.showStatsLayer,
     this.participantStatus,
     this.participantIndex,
-    this.handleExtractText, {
+    this.handleExtractText, 
+    this.onParticipantsStatusChanged,
+    this.isLocalHost,
+    {
     super.key,
   });
 
@@ -143,7 +177,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
         print('Transcription: ${seg.text} ${seg.isFinal}');
       }
     });
-
+      print('Participant isLocalHost: ${widget.isLocalHost}');
     widget.participant.addListener(_onParticipantChanged);
     _onParticipantChanged();
   }
@@ -161,14 +195,29 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
     widget.participant.addListener(_onParticipantChanged);
     _onParticipantChanged();
     super.didUpdateWidget(oldWidget);
+  
   }
 
   void _onParticipantChanged() => setState(() {});
+ void updateSpotLightStatus(ParticipantStatus participantStatus, bool isSpotlight) {
+     
+    final updatedStatus = participantStatus.copyWith(
+      isSpotlight: isSpotlight,
+    );
+    widget.onParticipantsStatusChanged(updatedStatus);
+
+  }
+
 
   List<Widget> extraWidgets(bool isScreenShare) => [];
 
   @override
   Widget build(BuildContext ctx) {
+    
+
+   final pinnedProvider = Provider.of<PinnedParticipantProvider>(ctx);
+   final bool isPinned = pinnedProvider.isPinned(widget.participantStatus.identity);
+     
     String formatName(String name) {
       if (name.isEmpty) return name;
       return name
@@ -191,9 +240,22 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               ? Border.all(width: 5, color: Colors.green)
               : null,
         ),
-        decoration: BoxDecoration(
-          color: Color(0xFF747474),
-        ),
+       decoration: BoxDecoration(
+  color: widget.participantStatus.isSpotlight
+      ? const Color(0xFFFFD700) // Gold for spotlight
+      : isPinned
+          ? const Color(0xFF2196F3) // Blue for pinned
+          : const Color(0xFF747474), // Default gray
+  border: Border.all(
+    color: widget.participantStatus.isSpotlight
+        ? Colors.orangeAccent
+        : isPinned
+            ? Colors.blueAccent
+            : Colors.transparent,
+    width: 3.0,
+  ),
+  borderRadius: BorderRadius.circular(8.0),
+),
         child: Stack(
           children: [
             // GestureDetector for scaling and panning
@@ -304,27 +366,77 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               ),
 
             // Participant Name Overlay
-            Positioned(
-              bottom: 8.0,
-              left: 8.0,
-              child: Container(
-                padding: EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Color(0xFF000000).withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(4.0),
-                ),
-                child: Text(
-                  widget.participant.name.isNotEmpty
-                      ? formatName(widget.participant.name)
-                      : widget.participant.identity,
-                  style: TextStyle(
-                    fontSize: 20 * 0.65,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+         Positioned(
+  bottom: 8.0,
+  left: 8.0,
+  child: Row(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: const Color(0xFF000000).withOpacity(0.5),
+          borderRadius: BorderRadius.circular(4.0),
+        ),
+        child: Text(
+          widget.participant.name.isNotEmpty
+              ? formatName(widget.participant.name)
+              : widget.participant.identity,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+      
+      const SizedBox(width: 2),
+      if (widget.isLocalHost)
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, color: Colors.white, size: 18),
+        color: Colors.grey[900],
+        onSelected: (value) {
+        
+          switch (value) {
+            case 'pin':
+              pinnedProvider.togglePin(widget.participantStatus.identity);
+              break;
+            case 'unpin':
+            pinnedProvider.togglePin(widget.participantStatus.identity);
+              break;
+            case 'spotlight':
+              updateSpotLightStatus(widget.participantStatus, true);
+              break;
+            case 'unspotlight':
+              updateSpotLightStatus(widget.participantStatus, false);
+              break;
+          }
+        },
+        itemBuilder: (BuildContext context) {
+          final status = widget.participantStatus;
+          final isPinned = pinnedProvider.isPinned(widget.participantStatus.identity);
+          final isSpotlight = status?.isSpotlight ?? false;
+
+          return [
+            PopupMenuItem<String>(
+              value: isPinned ? 'unpin' : 'pin',
+              child: Text(
+                isPinned ? 'Unpin' : 'Pin for Me',
+                style: const TextStyle(color: Colors.white),
               ),
             ),
+            PopupMenuItem<String>(
+              value: isSpotlight ? 'unspotlight' : 'spotlight',
+              child: Text(
+                isSpotlight ? 'Remove Spotlight' : 'Spotlight for Everyone',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ];
+        },
+      ),
+    ],
+  ),
+),
 
             // Live Badge for Streamer
             if (widget.participant.identity == "streamer")
@@ -382,7 +494,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 title: widget.participant.name.isNotEmpty
                     ? '${widget.participant.name} (${widget.participant.identity})'
                     : widget.participant.identity,
-                audioAvailable: audioPublication?.muted == false,
+                audioAvailable: widget.participant.isMicrophoneEnabled(),
                 publicAudioDisabled: audioPublication?.subscribed == false,
                 connectionQuality: widget.participant.connectionQuality,
                 isScreenShare: isScreenShare,

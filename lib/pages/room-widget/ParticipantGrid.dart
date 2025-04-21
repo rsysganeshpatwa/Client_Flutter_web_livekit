@@ -9,8 +9,10 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/service_locator.dart';
 import 'package:video_meeting_room/services/textract_service.dart'; // Import your service
+import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
+
 
 class ParticipantGrid extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
@@ -18,6 +20,7 @@ class ParticipantGrid extends StatefulWidget {
   final double gridHeight;
   final List<ParticipantStatus> participantStatuses;
   final bool isLocalHost;
+  final Function(List<ParticipantStatus>) onParticipantsStatusChanged;
 
   ParticipantGrid({
     Key? key,
@@ -26,6 +29,7 @@ class ParticipantGrid extends StatefulWidget {
     required this.gridHeight,
     required this.participantStatuses,
     required this.isLocalHost,
+    required this.onParticipantsStatusChanged,
   }) : super(key: key);
 
   @override
@@ -196,71 +200,105 @@ void _downloadOriginalImage(Uint8List imageBytes) {
   html.Url.revokeObjectUrl(url);
 }
   
+
+ void _handlePinAndSpotlightStatusChanged(ParticipantStatus status) {
+    // Update the participant status
+    List<ParticipantStatus> updatedStatuses = updateSpotlightStatus(
+      participantList: widget.participantStatuses,
+      updatedStatus: status,
+    );
+
+    // Call the callback function with the updated statuses
+    widget.onParticipantsStatusChanged(updatedStatuses);
+  }
+
+
+
   @override
-  Widget build(BuildContext context) {
-    final bool isMobile = widget.gridWidth < 600;
-    final int numParticipants = widget.participantTracks.length;
+ @override
+Widget build(BuildContext context) {
+  final bool isMobile = widget.gridWidth < 600;
+  final int numParticipants = widget.participantTracks.length;
+  final bool isLocalHost = widget.isLocalHost;
+  print("is grid localhost: $isLocalHost");
 
-    final int crossAxisCount = (isMobile && numParticipants == 2)
-        ? 1
-        : (numParticipants > 1)
-            ? (widget.gridWidth / (widget.gridWidth / math.sqrt(numParticipants))).ceil()
-            : 1;
-
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        childAspectRatio: (widget.gridWidth / crossAxisCount) / (widget.gridHeight / ((numParticipants / crossAxisCount).ceil())),
-        crossAxisSpacing: 12.0,
-        mainAxisSpacing: 12.0,
+  if (numParticipants == 0) {
+    return const Center(
+      child: Text(
+        "No participants",
+        style: TextStyle(color: Colors.white, fontSize: 16),
       ),
-      itemCount: widget.participantTracks.length,
-      itemBuilder: (context, index) {
-        ParticipantStatus? status = widget.participantStatuses.firstWhere(
-          (status) => status.identity == widget.participantTracks[index].participant.identity,
-          orElse: () => ParticipantStatus(
-            identity: '',
-            isAudioEnable: false,
-            isVideoEnable: false,
-            isHandRaised: false,
-            isTalkToHostEnable: false,
-          ),
-        );
-
-        return GestureDetector(
-          onTap: () {
-         //   _onParticipantTap(context, widget.participantTracks[index]);
-          },
-          child: Card(
-            elevation: 4.0,
-            child: Column(
-              children: [
-                Expanded(
-                  child: ParticipantWidget.widgetFor(
-                    widget.participantTracks[index],
-                    status,
-                    showStatsLayer: false,
-                    participantIndex: index,
-                    handleExtractText: widget.isLocalHost ? () {
-                      print('Extracting text...');
-                      _onParticipantTap(context, widget.participantTracks[index]);
-                    }: null,
-                  ),
-                ),
-                // IconButton(
-                //   icon: const Icon(Icons.camera_alt), // OCR icon
-                //   onPressed: () {
-                //     _onParticipantTap(context, widget.participantTracks[index]); // Call OCR
-                //   },
-                //   tooltip: 'Perform OCR',
-                // ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
+
+  final int estimatedCrossAxis = (isMobile && numParticipants == 2)
+      ? 1
+      : (numParticipants > 1)
+          ? (widget.gridWidth /
+                  (widget.gridWidth / math.sqrt(numParticipants)))
+              .ceil()
+          : 1;
+
+  final int safeCrossAxisCount = estimatedCrossAxis > 0 ? estimatedCrossAxis : 1;
+  final int rows = (numParticipants / safeCrossAxisCount).ceil();
+  final double safeGridHeight = widget.gridHeight > 0 ? widget.gridHeight : 1;
+  final double aspectRatio = (widget.gridWidth / safeCrossAxisCount) /
+      (safeGridHeight / (rows > 0 ? rows : 1));
+  final double safeAspectRatio = aspectRatio > 0 ? aspectRatio : 1.0;
+
+  return GridView.builder(
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: safeCrossAxisCount,
+      childAspectRatio: safeAspectRatio,
+      crossAxisSpacing: 12.0,
+      mainAxisSpacing: 12.0,
+    ),
+    itemCount: numParticipants,
+    itemBuilder: (context, index) {
+      final track = widget.participantTracks[index];
+      final status = widget.participantStatuses.firstWhere(
+        (s) => s.identity == track.participant.identity,
+        orElse: () => ParticipantStatus(
+          identity: '',
+          isAudioEnable: false,
+          isVideoEnable: false,
+          isHandRaised: false,
+          isTalkToHostEnable: false,
+        ),
+      );
+
+      return GestureDetector(
+        onTap: () {
+          // Uncomment to handle OCR/tap event
+          // _onParticipantTap(context, track);
+        },
+        child: Card(
+          elevation: 4.0,
+          child: Column(
+            children: [
+              Expanded(
+                child: ParticipantWidget.widgetFor(
+                  track,
+                  status,
+                  showStatsLayer: false,
+                  participantIndex: index,
+                  handleExtractText: widget.isLocalHost
+                      ? () {
+                          print('Extracting text...');
+                          _onParticipantTap(context, track);
+                        }
+                      : null,
+                  onParticipantsStatusChanged: _handlePinAndSpotlightStatusChanged,
+                  isLocalHost: isLocalHost
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
   @override
   void dispose() {

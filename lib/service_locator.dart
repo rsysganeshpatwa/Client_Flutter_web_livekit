@@ -1,4 +1,3 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:video_meeting_room/app_config.dart';
 import 'package:video_meeting_room/services/approval_service.dart';

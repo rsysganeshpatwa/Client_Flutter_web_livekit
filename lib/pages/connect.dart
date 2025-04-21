@@ -8,7 +8,6 @@ import 'package:video_meeting_room/pages/prejoin.dart';
 import 'package:video_meeting_room/utils.dart';
 import '../services/api_service.dart';
 import '../services/permission_service.dart';
-import '../widgets/text_field.dart';
 import '../models/role.dart';
 import 'streamer.dart';
 
@@ -72,7 +71,7 @@ class _ConnectPageState extends State<ConnectPage> {
        
       final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
       final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
-      print('Decoded Params: $decodedParams');
+  
       room = decodedParams['room'] ?? '';
     }
     //String metadata = await _apiService.getWelcomeMessage(room);
@@ -83,7 +82,7 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _initializeParams() async {
     final uri = Uri.base;
     final encryptedParams = uri.queryParameters['data'];
-      print('Encrypted Params: $encryptedParams');
+     
     if (encryptedParams != null && encryptedParams.isNotEmpty) {
           final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
        
@@ -93,7 +92,7 @@ class _ConnectPageState extends State<ConnectPage> {
       setState(() {
         roomNameFromUrl = decodedParams['room'] ?? '';
         roomRoleFromUrl = decodedParams['role'] ?? '';
-        print('Room Name from URL: $roomNameFromUrl');
+    
         if (roomNameFromUrl != null) {
           _roomCtrl.text = roomNameFromUrl!;
           _isRoomNameInUrl = true;
@@ -109,7 +108,7 @@ class _ConnectPageState extends State<ConnectPage> {
     } else {
       // Handle the case where no encrypted parameters are present
       // For example, show an error or redirect to another page
-      print('No encrypted parameters found in the URL.');
+   
     }
   }
 
@@ -147,9 +146,9 @@ class _ConnectPageState extends State<ConnectPage> {
 
  
       final adminWelcomeMessage = _welcomeMessageCtrl.text;
-      final _role = _selectedRole == Role.admin ? Role.admin : Role.participant;
+      final role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 
-      final token = await _apiService.getToken(identity, roomName, _role.toString(), adminWelcomeMessage);
+      final token = await _apiService.getToken(identity, roomName, role.toString(), adminWelcomeMessage);
     
       await Navigator.pushAndRemoveUntil<void>(
         ctx,
@@ -164,7 +163,7 @@ class _ConnectPageState extends State<ConnectPage> {
               preferredCodec: 'Preferred Codec',
               enableBackupVideoCodec:
                   ['VP9', 'AV1'].contains('Preferred Codec'),
-              role: _role,
+              role: role,
               roomName: roomName,
               identity: identity,
             ),
@@ -238,7 +237,7 @@ class _ConnectPageState extends State<ConnectPage> {
                                 ),
                                 onTap: () {
                                   setState(() {
-                                    selectedRoom = roomList![index];
+                                    selectedRoom = roomList[index];
                                     _roomCtrl.text = roomList[index];
                                     Navigator.pop(context); // Close the modal
                                     _isRoomNameInUrl = false;

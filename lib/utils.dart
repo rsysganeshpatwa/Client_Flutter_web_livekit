@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:encrypt/encrypt.dart' as  erc;
 import 'package:flutter/services.dart';
+import 'package:video_meeting_room/models/room_models.dart';
 
 
 FutureOr<void> Function()? onWindowShouldClose;
@@ -92,6 +93,44 @@ class ValidateTextField {
       }),
     ];
   }
+}
+
+
+List<ParticipantStatus> updateSpotlightStatus({
+  required List<ParticipantStatus> participantList,
+  required ParticipantStatus updatedStatus,
+  int maxPinned = 3,
+}) {
+  final updatedList = <ParticipantStatus>[];
+
+  // Step 1: Spotlight logic — only one can be spotlighted
+  if (updatedStatus.isSpotlight) {
+    for (final status in participantList) {
+      if (status.identity == updatedStatus.identity) continue;
+      updatedList.add(status.copyWith(isSpotlight: false));
+    }
+
+    // Auto-enable audio/video/talk-to-host if spotlighted
+    updatedStatus = updatedStatus.copyWith(
+      isTalkToHostEnable: true,
+      isAudioEnable: true,
+      isVideoEnable: true,
+    );
+  } else {
+    // Preserve other spotlight states if not changing spotlight
+    for (final status in participantList) {
+      if (status.identity != updatedStatus.identity) {
+        updatedList.add(status);
+      }
+    }
+  }
+
+
+  // Step 3: Add or update the current participant status
+  updatedList.removeWhere((s) => s.identity == updatedStatus.identity);
+  updatedList.add(updatedStatus);
+
+  return updatedList;
 }
 
 

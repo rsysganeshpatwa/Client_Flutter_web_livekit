@@ -3,6 +3,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
+import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'dart:math' as math;
 
@@ -11,11 +12,14 @@ import 'package:video_meeting_room/widgets/participant_info.dart';
 class ParticipantListView extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
   final List<ParticipantStatus> participantStatuses;
+  //onParticipantsStatusChanged
+  final Function(List<ParticipantStatus>)? onParticipantsStatusChanged;
 
   const ParticipantListView({
     super.key,
     required this.participantTracks,
     required this.participantStatuses,
+    this.onParticipantsStatusChanged,
   });
 
   @override
@@ -64,6 +68,19 @@ class _ParticipantListViewState extends State<ParticipantListView> {
       }
     }
   }
+
+ void _handlePinAndSpotlightStatusChanged(ParticipantStatus status) {
+    // Update the participant status
+    
+    List<ParticipantStatus> updatedStatuses = updateSpotlightStatus(
+      participantList: widget.participantStatuses,
+      updatedStatus: status,
+    );
+
+    // Call the callback function with the updated statuses
+    widget.onParticipantsStatusChanged!(updatedStatuses);
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +131,14 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                   widget.participantStatuses[index],
                                   showStatsLayer: false,
                                   participantIndex: index,
+                                  onParticipantsStatusChanged: (updatedStatus) {
+                                    // Handle participant status changes
+                                    if (widget.onParticipantsStatusChanged != null) {
+                                      _handlePinAndSpotlightStatusChanged(
+                                        updatedStatus,
+                                      );
+                                    }
+                                  },
                                 ),
                               ),
                             ),
@@ -211,6 +236,16 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                             widget.participantStatuses[widget.participantTracks.indexOf(pageParticipants[index])],
                                             showStatsLayer: false,
                                             participantIndex: index,
+                                            onParticipantsStatusChanged: (updatedStatus) {
+                                              // Handle participant status changes
+                                              if (widget.onParticipantsStatusChanged != null) {
+                                                _handlePinAndSpotlightStatusChanged(
+                                                  updatedStatus,
+                                            
+                                                );
+                                              
+                                              }
+                                            },
                                           ),
                                         ),
                                       ),

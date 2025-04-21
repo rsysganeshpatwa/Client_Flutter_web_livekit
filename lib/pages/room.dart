@@ -1,25 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:js_interop';
-import 'dart:math' as math;
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:provider/provider.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/login.dart';
 import 'package:video_meeting_room/pages/room-widget/AdminApprovalDialog.dart';
 import 'package:video_meeting_room/pages/room-widget/CopyInviteLinkDialog.dart';
+import 'package:video_meeting_room/pages/room-widget/DraggableParticipantWidget.dart';
 import 'package:video_meeting_room/pages/room-widget/HandRaiseNotification.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantListView.dart';
 import 'package:video_meeting_room/pages/room-widget/NewParticipantDialog.dart';
+import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
+import 'package:video_meeting_room/widgets/participant.dart';
 
 import 'package:video_meeting_room/widgets/room-header.dart';
 import 'package:video_meeting_room/widgets/thank_you.dart';
@@ -43,46 +43,45 @@ class RoomPage extends StatefulWidget {
   State<StatefulWidget> createState() => _RoomPageState();
 }
 
-class _RoomPageState extends State<RoomPage> {
-  List<ParticipantTrack> participantTracks = [];
-  EventsListener<RoomEvent> get _listener => widget.listener;
-  bool get fastConnection => widget.room.engine.fastConnectOptions != null;
-  bool _flagStartedReplayKit = false;
+class PrioritizedTracksResult {
+  final List<ParticipantTrack> tracks;
+  final bool isPiP;
+  final bool isSideBarShouldVisible;
+
+  PrioritizedTracksResult(this.tracks, this.isPiP,this.isSideBarShouldVisible);
+}
+
+class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
+  // ==================== Properties/Fields ====================
+  Map<String, SyncedParticipant> syncedParticipants = {};
+  final List<ParticipantStatus> participantsStatusList = [];
+
   bool _muteAll = true;
   bool _isHandleRaiseHand = false;
-  String searchQuery = '';
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool isParticipantListVisible = false; // Track sidebar visibility
+  bool _isRunning = true; // Control flag for the loop
   String? localParticipantRole;
-  List<ParticipantStatus> participantsManager = [];
+  String searchQuery = '';
+  bool _isPiP = false;
+  bool _isSideBarShouldVisible = false;
+
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
       GetIt.instance<RoomDataManageService>();
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Map<String, BuildContext> _dialogContexts =
       {}; // Map to store dialog contexts
-  bool _isRunning = true; // Control flag for the loop
-  int _currentPage = 0;
-  final int _participantsPerPage = 6;
-  bool isParticipantListVisible = false; // Track sidebar visibility
+
+  EventsListener<RoomEvent> get _listener => widget.listener;
+  bool get fastConnection => widget.room.engine.fastConnectOptions != null;
+
+  // ==================== Lifecycle Methods ====================
   @override
   void initState() {
     super.initState();
-
-    html.window.addEventListener('beforeunload', (event)  async {
-      final roomId = await widget.room.getSid();
-      // Get local participant identity
-      final localParticipant = widget.room.localParticipant;
-      final identity = localParticipant?.identity;
-      final roomName = widget.room.name!;
-      // Perform your action here, e.g., cleanup or save state
-      print("Tab closing or reloading...");
-      _roomDataManageService.removeParticipant(roomId,roomName,identity);
-      widget.room.disconnect();
-      // To display a confirmation dialog (optional):
-      // event.returnValue = 'Are you sure you want to leave?';
-    });
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
-    // Set up role for the local participant
     _initializeLocalParticipantRole();
     _sortParticipants('initState');
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -106,11 +105,7 @@ class _RoomPageState extends State<RoomPage> {
             duration: const Duration(seconds: 5));
       };
     }
-
-    //sendParticipant call every 5 second
-    //exchangeData();
   }
-  // Capture the window close event
 
   @override
   Future<void> dispose() async {
@@ -118,22 +113,109 @@ class _RoomPageState extends State<RoomPage> {
       if (lkPlatformIs(PlatformType.iOS)) {
         ReplayKitChannel.closeReplayKit();
       }
-      print('RoomPage dispose');
+
       widget.room.removeListener(_onRoomDidUpdate);
       await _listener.dispose();
       await widget.room.dispose();
+      await removeParticipantFromDB();
     })();
     onWindowShouldClose = null;
     _isRunning = false;
-    final roomID = await widget.room.getSid();
-    // Get local participant identity
-    final localParticipant = widget.room.localParticipant;
-    final identity = localParticipant?.identity;
-    final roomName =  widget.room.name!;
-     _roomDataManageService.removeParticipant(roomID,roomName,identity);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  // ==================== Room Management Methods ====================
+  void _onRoomDidUpdate() {
+    setState(() {
+      _sortUserMediaTracks();
+    });
+  }
+
+  void _setUpListeners() => _listener
+    ..on<RoomDisconnectedEvent>((event) async {
+      if (event.reason != null) {}
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) =>
+          handleRoomDisconnected(context, widget.room.localParticipant!));
+    })
+    ..on<ParticipantEvent>((event) {
+      _sortParticipants('ParticipantEvent');
+    })
+    ..on<RoomRecordingStatusChanged>((event) {
+      context.showRecordingStatusChangedDialog(event.activeRecording);
+    })
+    ..on<RoomAttemptReconnectEvent>((event) {})
+    ..on<LocalTrackPublishedEvent>(
+        (_) => _sortParticipants('LocalTrackPublishedEvent'))
+    ..on<LocalTrackUnpublishedEvent>(
+        (_) => _sortParticipants('LocalTrackUnpublishedEvent'))
+    ..on<TrackSubscribedEvent>((event) {
+      _sortParticipants('TrackSubscribedEvent');
+    })
+    ..on<TrackUnsubscribedEvent>((event) {
+      _sortParticipants('TrackUnsubscribedEvent');
+    })
+    ..on<DataReceivedEvent>((event) async {
+      try {
+        _receivedHandRaiseRequest(utf8.decode(event.data));
+        updateParticipantStatusFromMetadata(utf8.decode(event.data));
+      } catch (_) {}
+    })
+    ..on<ParticipantConnectedEvent>((event) async {
+      await _updateParticipantmanagerFromDB();
+      _sortParticipants('TrackSubscribedEvent');
+    })
+    ..on<ParticipantDisconnectedEvent>((event) async {
+      await _updateParticipantmanagerFromDB();
+      _sortParticipants('ParticipantDisconnectedEvent');
+    })
+    ..on<AudioPlaybackStatusChanged>((event) async {
+      if (!widget.room.canPlaybackAudio) {
+        bool? yesno = await context.showPlayAudioManuallyDialog();
+        if (yesno == true) {
+          await widget.room.startAudio();
+        }
+      }
+    });
+
+  void _askPublish() async {
+    final result = await context.showPublishDialog();
+    if (result != true) return;
+    try {
+      await widget.room.localParticipant?.setCameraEnabled(true);
+    } catch (error) {
+      await context.showErrorDialog(error);
+    }
+    try {
+      await widget.room.localParticipant?.setMicrophoneEnabled(true);
+    } catch (error) {
+      await context.showErrorDialog(error);
+    }
+  }
+
+  Future<void> removeParticipantFromDB() async {
+    final roomId = await widget.room.getSid();
+    final localParticipant = widget.room.localParticipant;
+    final identity = localParticipant?.identity;
+    final roomName = widget.room.name!;
+    await _roomDataManageService.removeParticipant(roomId, roomName, identity);
+  }
+
+  void handleRoomDisconnected(BuildContext context, Participant participant) {
+    if (localParticipantRole == Role.admin.toString()) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ThankYouWidget()),
+      );
+    }
+  }
+
+  // ==================== Participant Management Methods ====================
   void _initializeLocalParticipantRole() {
     final localParticipant = widget.room.localParticipant;
     if (localParticipant != null) {
@@ -156,129 +238,276 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  void _setUpListeners() => _listener
-    ..on<RoomDisconnectedEvent>((event) async {
-      if (event.reason != null) {
-        print('Room disconnected: reason => ${event.reason}');
-      }
-      WidgetsBinding.instance.addPostFrameCallback((timeStamp) =>
-          handleRoomDisconnected(context, widget.room.localParticipant!));
-    })
-    ..on<ParticipantEvent>((event) {
-       _sortParticipants('ParticipantEvent');
-    })
-    ..on<RoomRecordingStatusChanged>((event) {
-      context.showRecordingStatusChangedDialog(event.activeRecording);
-    })
-    ..on<RoomAttemptReconnectEvent>((event) {
-      print(
-          'Attempting to reconnect ${event.attempt}/${event.maxAttemptsRetry}, '
-          '(${event.nextRetryDelaysInMs}ms delay until next attempt)');
-    })
-     ..on<LocalTrackPublishedEvent>((_) => _sortParticipants('LocalTrackPublishedEvent'))
-     ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants('LocalTrackUnpublishedEvent'))
-    // // ignore: unnecessary_set_literal
-    ..on<TrackSubscribedEvent>((event) {
-      _sortParticipants('TrackSubscribedEvent');
-        //_trackSubscribed(event);
-    })
-    ..on<TrackUnsubscribedEvent>((event) {
-      _sortParticipants('TrackUnsubscribedEvent');
-      //   _trackUnsubscribed(event);
-    })
-    // ..on<ParticipantNameUpdatedEvent>((event) {
-    //   _sortParticipants();
-    // })
-  
-    ..on<DataReceivedEvent>((event) {
-      try {
-        _receivedHandRaiseRequest(utf8.decode(event.data));
-        updateParticipantStatusFromMetadata(utf8.decode(event.data));
-      } catch (_) {
-        print('Failed to decode: $_');
-      }
-    })
-    ..on<ParticipantConnectedEvent>((event) {
-      _addNewParticipantStatus(event);
-    })
-    ..on<ParticipantDisconnectedEvent>((event) async {
-      removeParticipantStatus(event);
-      _sortParticipants('ParticipantDisconnectedEvent');
-    })
-    ..on<AudioPlaybackStatusChanged>((event) async {
-      if (!widget.room.canPlaybackAudio) {
-        bool? yesno = await context.showPlayAudioManuallyDialog();
-        if (yesno == true) {
-          await widget.room.startAudio();
+  void _sortParticipants(String from) {
+    final localParticipant = widget.room.localParticipant;
+    final bool isLocalHost = localParticipant != null &&
+        localParticipantRole == Role.admin.toString();
+
+    // Clear synced list before re-building
+    syncedParticipants.clear();
+
+    for (var participant in widget.room.remoteParticipants.values) {
+      final identity = participant.identity;
+      final participantStatus = _getParticipantStatus(identity);
+
+      if (participantStatus == null) continue;
+
+      final isRemoteParticipantHost =
+          _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
+
+      final isVideo = participantStatus.isVideoEnable;
+      final isAudio = participantStatus.isAudioEnable;
+      final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
+
+      final shouldAudioSubscribe =
+          (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
+              (isAudio &&
+                  !((isLocalHost || isRemoteParticipantHost) &&
+                      !isTalkToHostEnable));
+
+      for (var element in participant.audioTrackPublications) {
+        if (shouldAudioSubscribe) {
+          element.subscribe();
+        } else if (!(isLocalHost && isRemoteParticipantHost)) {
+          element.unsubscribe();
         }
       }
+
+      if (participant.isScreenShareEnabled()) {
+        syncedParticipants[identity] = SyncedParticipant(
+          identity: identity,
+          track: ParticipantTrack(
+            participant: participant,
+            type: ParticipantTrackType.kScreenShare,
+          ),
+          status: participantStatus,
+        );
+      } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
+        syncedParticipants[identity] = SyncedParticipant(
+          identity: identity,
+          track: ParticipantTrack(participant: participant),
+          status: participantStatus,
+        );
+      }
+    }
+    _sortUserMediaTracks();
+
+    setState(() {});
+  }
+
+  void _sortUserMediaTracks() {
+    List<SyncedParticipant> userMediaParticipants = syncedParticipants.values
+        .where((participant) => participant.track != null)
+        .toList();
+
+    userMediaParticipants.sort((a, b) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final fiveSecondsAgo = now - 10000;
+
+      final aSpokeAt =
+          a.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+      final bSpokeAt =
+          b.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+
+      final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
+      final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
+
+      if (aSpokeRecently != bSpokeRecently) {
+        return aSpokeRecently ? -1 : 1;
+      }
+
+      if (a.track?.participant.hasVideo != b.track?.participant.hasVideo) {
+        return a.track?.participant.hasVideo == true ? -1 : 1;
+      }
+
+      return a.track?.participant.joinedAt.millisecondsSinceEpoch ??
+          0 - (b.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0);
     });
 
-  void _askPublish() async {
-    final result = await context.showPublishDialog();
-    if (result != true) return;
-    try {
-      await widget.room.localParticipant?.setCameraEnabled(true);
-    } catch (error) {
-      print('could not publish video: $error');
-      await context.showErrorDialog(error);
-    }
-    try {
-      await widget.room.localParticipant?.setMicrophoneEnabled(true);
-    } catch (error) {
-      print('could not publish audio: $error');
-      await context.showErrorDialog(error);
-    }
-  }
+    userMediaParticipants.sort((a, b) {
+      final statusA = a.status;
+      final statusB = b.status;
 
- _updateRoomData(participantsManager) async {
-  final roomSID = await widget.room.getSid();
-    final roomName =  widget.room.name!;
+      final isHandRaisedA = statusA?.isHandRaised ?? false;
+      final isHandRaisedB = statusB?.isHandRaised ?? false;
 
-  // Use a Set to track unique identities
-  final Set<String> seenIdentities = {};
+      if (!isHandRaisedA && !isHandRaisedB) {
+        return 0;
+      } else if (!isHandRaisedA) {
+        return 1;
+      } else if (!isHandRaisedB) {
+        return -1;
+      }
 
-  // Remove duplicates based on 'identity'
-  final uniqueParticipants = participantsManager
-      .where((participant) => seenIdentities.add(participant.identity)) // Add returns false if already in set
-      .map((e) => ParticipantStatus.fromJson(e.toJson()))
-      .toList();
+      return (statusA?.handRaisedTimeStamp ?? 0) -
+          (statusB?.handRaisedTimeStamp ?? 0);
+    });
 
-  _roomDataManageService.setLatestData(roomSID, roomName, uniqueParticipants);
-
-  // Print debug information
-  print('rohit _updateRoomData $roomSID');
-  print(jsonEncode(uniqueParticipants));
-}
-
-
-  void handleRoomDisconnected(BuildContext context, Participant participant) {
-    if (localParticipantRole == Role.admin.toString()) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const ThankYouWidget()),
-      );
-    }
-  }
-
-  void _onRoomDidUpdate() {
     setState(() {
-      //print('rohit _onRoomDidUpdate');
-      _sortUserMediaTracks(participantTracks);
+      syncedParticipants = {for (var p in userMediaParticipants) p.identity: p};
     });
+
+    _addLocalParticipant();
+    subscribeToFirstToFourthParticipants();
   }
 
-  Future<void> _initializeParticipantStatuses() async {
-    participantsManager.clear();
+  void _addLocalParticipant() {
+    final localParticipant = widget.room.localParticipant;
 
-    // Initialize status for the local participant
+    if (localParticipant == null) {
+      print('[DEBUG] No local participant found.');
+      return;
+    }
+
+    final localIdentity = localParticipant.identity;
+    final localTrack = ParticipantTrack(participant: localParticipant);
+
+    final existingStatus = _getParticipantStatus(localIdentity) ??
+        ParticipantStatus(
+          identity: localIdentity,
+          isAudioEnable: true,
+          isVideoEnable: true,
+          isTalkToHostEnable: false,
+          isHandRaised: false,
+          isPinned: false,
+          isSpotlight: false,
+          role: localParticipantRole!,
+        );
+
+    print('[DEBUG] Adding local participant: $localIdentity');
+    print(
+        '[DEBUG] Existing syncedParticipants count: ${syncedParticipants.length}');
+    print('[DEBUG] Existing Status: $existingStatus');
+
+    // Remove existing entry if present (avoid duplicates)
+    final wasRemoved = syncedParticipants.remove(localIdentity) != null;
+    if (wasRemoved) {
+      print('[DEBUG] Removed existing local participant from synced list');
+    }
+
+    // Convert to list to control order
+    final entries = syncedParticipants.entries.toList();
+
+    if (entries.length >= 3) {
+      print(
+          '[DEBUG] More than 3 participants exist. Inserting local at index 3.');
+      entries.insert(
+          3,
+          MapEntry(
+            localIdentity,
+            SyncedParticipant(
+              identity: localIdentity,
+              track: localTrack,
+              status: existingStatus,
+            ),
+          ));
+    } else {
+      print('[DEBUG] Less than 3 participants. Adding local normally.');
+      entries.add(MapEntry(
+        localIdentity,
+        SyncedParticipant(
+          identity: localIdentity,
+          track: localTrack,
+          status: existingStatus,
+        ),
+      ));
+    }
+
+    // Rebuild map from ordered list
+    syncedParticipants
+      ..clear()
+      ..addEntries(entries);
+
+    print(
+        '[DEBUG] Final syncedParticipants count: ${syncedParticipants.length}');
+    print('[DEBUG] Synced identities: ${syncedParticipants.keys.toList()}');
+  }
+
+  void subscribeToFirstToFourthParticipants() {
+    if (syncedParticipants.isEmpty) {
+      return;
+    }
+
+    List<SyncedParticipant> sortedParticipants =
+        syncedParticipants.values.where((p) => p.track != null).toList();
+
+    sortedParticipants.sort((a, b) {
+      final aSpokeAt =
+          a.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+      final bSpokeAt =
+          b.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+
+      final aSpokeRecently =
+          aSpokeAt > (DateTime.now().millisecondsSinceEpoch - 10000);
+      final bSpokeRecently =
+          bSpokeAt > (DateTime.now().millisecondsSinceEpoch - 10000);
+
+      if (aSpokeRecently != bSpokeRecently) {
+        return aSpokeRecently ? -1 : 1;
+      }
+
+      return a.track?.participant.joinedAt.millisecondsSinceEpoch ??
+          0 - (b.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0);
+    });
+
+    int limit = sortedParticipants.length < 4 ? sortedParticipants.length : 4;
+
+    for (int i = 0; i < limit; i++) {
+      SyncedParticipant syncedParticipant = sortedParticipants[i];
+      _subscribeToParticipant(syncedParticipant.track!);
+    }
+  }
+
+  void _subscribeToParticipant(ParticipantTrack participantTrack) {
+    if (participantTrack.participant is RemoteParticipant) {
+      final participant = participantTrack.participant as RemoteParticipant;
+      for (var publication in participant.videoTrackPublications) {
+        if (!publication.subscribed) {
+          publication.subscribe();
+          publication.enable();
+        }
+      }
+    }
+  }
+
+  List<ParticipantTrack> _filterParticipants(String searchQuery) {
+    final localParticipant = widget.room.localParticipant;
+
+    final filteredParticipants =
+        syncedParticipants.values.where((syncedParticipant) {
+      final participantName =
+          syncedParticipant.track!.participant.name.toLowerCase();
+      return participantName.contains(searchQuery.toLowerCase());
+    }).toList();
+
+    final participantTracks = filteredParticipants.map((syncedParticipant) {
+      return ParticipantTrack(
+          participant: syncedParticipant.track!.participant);
+    }).toList();
+
+    if (localParticipant != null) {
+      participantTracks
+          .removeWhere((track) => track.participant == localParticipant);
+      participantTracks.insert(
+          0, ParticipantTrack(participant: localParticipant));
+    }
+
+    return participantTracks;
+  }
+
+  String _getRoleFromMetadata(String? metadata) {
+    if (metadata != null && metadata.isNotEmpty) {
+      final decodedMetadata = jsonDecode(metadata);
+      return decodedMetadata['role'] ?? '';
+    }
+    return '';
+  }
+
+  // ==================== Participant Status Methods ====================
+  Future<void> _initializeParticipantStatuses() async {
     final localParticipant = widget.room.localParticipant;
     if (localParticipant != null) {
+      await _updateParticipantmanagerFromDB();
       final localStatus = ParticipantStatus(
         identity: localParticipant.identity,
         isAudioEnable: localParticipantRole == Role.admin.toString(),
@@ -287,201 +516,40 @@ class _RoomPageState extends State<RoomPage> {
         role: localParticipantRole!,
       );
 
-      // Initialize status for remote participants
-
-      // get Room Data from server
-      final roomSID = await widget.room.getSid();
-
-      final roomName =  widget.room.name!;
-
-      final data = await _roomDataManageService.getLatestData(roomSID,roomName);
-      final List<ParticipantStatus> participantsStatusList;
-      if (data != null) {
-        final participantsStatusList = (data as List)
-            .map((item) => ParticipantStatus(
-                  identity: item['identity'],
-                  isAudioEnable: item['isAudioEnable'],
-                  isVideoEnable: item['isVideoEnable'],
-                  isHandRaised: item['isHandRaised'],
-                  isTalkToHostEnable: item['isTalkToHostEnable'],
-                  handRaisedTimeStamp: item['handRaisedTimeStamp'],
-                  role: item['role'],
-                ))
-            .toList();
-        setState(() {
-          participantsManager.addAll(participantsStatusList);
-        });
-      }
-
       setState(() {
-        participantsManager.add(localStatus);
-        _updateRoomData(participantsManager);
-        _sortParticipants('initializeParticipantStatuses');
+        participantsStatusList.add(localStatus);
+
+        _updateRoomData(participantsStatusList);
+        sendParticipantsStatus();
       });
     }
   }
 
-  Future<void> _updateParticipantmanagerFromDB() async{
+  Future<void> _updateParticipantmanagerFromDB() async {
     final roomId = await widget.room.getSid();
-    final roomName = await widget.room.name!;
+    final roomName = widget.room.name!;
 
-    final data = await _roomDataManageService.getLatestData(roomId,roomName);
-    setState(() {
-      participantsManager.clear();
-      if (data != null) {
-        final participantsStatusList = (data as List)
-            .map((item) => ParticipantStatus(
-                  identity: item['identity'],
-                  isAudioEnable: item['isAudioEnable'],
-                  isVideoEnable: item['isVideoEnable'],
-                  isHandRaised: item['isHandRaised'],
-                  isTalkToHostEnable: item['isTalkToHostEnable'],
-                  handRaisedTimeStamp: item['handRaisedTimeStamp'],
-                  role: item['role'],
-                ))
-            .toList();
-        setState(() {
-          participantsManager.addAll(participantsStatusList);
-        });
-      }
-    });
-  }
-
-  void _addNewParticipantStatus(ParticipantConnectedEvent event) async{
-    //final data = await _roomDataManageService.getLatestData(roomSID,roomName);
-    await _updateParticipantmanagerFromDB();
-    setState(() {
-      final isNew = participantsManager
-          .every((element) => element.identity != event.participant.identity);
-      // print('rohit isNew $isNew');
-      final role = _getRoleFromMetadata(event.participant.metadata);
-      final isAdmin = role == Role.admin.toString();
-      //final isAdmin = role == Role.admin.toString() || event.participant.identity == "streamer";
-      if (isNew) {
-        final newParticipantStatus = ParticipantStatus(
-          identity: event.participant.identity,
-          isAudioEnable: isAdmin,
-          isVideoEnable: isAdmin,
-          isHandRaised: false,
-          isTalkToHostEnable: isAdmin,
-          handRaisedTimeStamp: 0,
-          role: role.isEmpty ? Role.participant.toString() : role,
-          //role: !isAdmin ? Role.participant.toString() : Role.admin.toString(),
-          // Set other default values for the new participant status
+    final data = await _roomDataManageService.getLatestData(roomId, roomName);
+    if (data != null) {
+      final participantsStatusDataList = (data as List).map((item) {
+        return ParticipantStatus(
+          identity: item['identity'],
+          isAudioEnable: item['isAudioEnable'],
+          isVideoEnable: item['isVideoEnable'],
+          isHandRaised: item['isHandRaised'],
+          isTalkToHostEnable: item['isTalkToHostEnable'],
+          handRaisedTimeStamp: item['handRaisedTimeStamp'],
+          isPinned: item['isPinned'],
+          isSpotlight: item['isSpotlight'],
+          role: item['role'],
         );
+      }).toList();
 
-        print('new Join');
-        print(jsonEncode(newParticipantStatus));
-        participantsManager.add(newParticipantStatus);
-        sendParticipantsStatus(participantsManager);
-      }
-    });
-  }
-
-  void removeParticipantStatus(ParticipantDisconnectedEvent event) {
-    setState(() {
-      participantsManager.removeWhere(
-          (status) => status.identity == event.participant.identity);
-    });
-  }
-
-  Future<void> _checkForPendingRequests() async {
-    while (_isRunning) {
-      try {
-        final requests =
-            await _approvalService.fetchPendingRequests(widget.room.name!);
-        final currentRequestIds =
-            requests.map((request) => request['id'].toString()).toSet();
-
-        // Close dialogs for requests not found
-        _dialogContexts.keys.toList().forEach((requestId) {
-          if (!currentRequestIds.contains(requestId)) {
-            _closeDialog(requestId);
-          }
-        });
-
-        // Close all dialogs if no pending requests
-        if (requests.isEmpty && _dialogContexts.isNotEmpty) {
-          _dialogContexts.keys.toList().forEach((requestId) {
-            _closeDialog(requestId);
-          });
-        }
-
-        // Check for new requests
-        for (var request in requests) {
-          final requestId = request['id'].toString();
-          if (!_dialogContexts.containsKey(requestId)) {
-            _showApprovalDialog(request);
-          }
-        }
-      } catch (error) {
-        // print('Error fetching pending requests: $error');
-      }
-      await Future.delayed(
-          const Duration(seconds: 5)); // Check every 10 seconds
-    }
-  }
-
-  void _closeDialog(String requestId) {
-    final dialogContext = _dialogContexts[requestId];
-    if (dialogContext != null) {
-      Navigator.of(dialogContext).pop(); // Close the dialog
       setState(() {
-        _dialogContexts.remove(requestId); // Remove the context from the map
+        participantsStatusList.clear();
+        participantsStatusList.addAll(participantsStatusDataList);
       });
     }
-  }
-
-  void _showApprovalDialog(dynamic request) {
-    final requestId = request['id'].toString(); // Use request ID as the key
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        // Store the context with the dialog's unique ID
-        _dialogContexts[requestId] = context;
-
-        return AdminApprovalDialog(
-          participantName: request['participantName'],
-          roomName: request['roomName'],
-          onDecision: (approved) async {
-            await _approvalService.approveRequest(request['id'], approved);
-            _closeDialog(requestId); // Close this specific dialog
-          },
-        );
-      },
-    ).then((_) {
-      // Clean up after the dialog is closed
-      _dialogContexts.remove(requestId);
-    });
-  }
-
-  Future<void> sendParticipantsStatus(
-      List<ParticipantStatus> participantsStatus) async {
-    // Convert the list of ParticipantStatus objects to a list of JSON objects
-    final participantsJsonList =
-        participantsStatus.map((status) => status.toJson()).toList();
-
-    // Wrap the list in an object with additional keys
-    final metadata = jsonEncode({
-      'type':
-          'participantsStatusUpdate', // Example key to describe the type of metadata
-      'timestamp':
-          DateTime.now().toIso8601String(), // Example key to add a timestamp
-      'participants':
-          participantsJsonList, // The actual list of participant statuses
-    });
-
-    await widget.room.localParticipant
-        ?.publishData(utf8.encode(metadata), reliable: true);
-    // Send the entire metadata object at once
-
-    setState(() {
-      participantsManager = participantsStatus;
-      _updateRoomData(participantsManager);
-      //_initializeParticipantStatuses();
-      _sortParticipants('sendParticipantsStatus');
-    });
   }
 
   void updateParticipantStatusFromMetadata(String metadata) {
@@ -490,21 +558,26 @@ class _RoomPageState extends State<RoomPage> {
 
     if (decodedMetadata['type'] == 'participantsStatusUpdate') {
       // Extract the list of participant status data from the 'participants' key
-      final participantsStatusList = (decodedMetadata['participants'] as List)
-          .map((item) => ParticipantStatus(
-                identity: item['identity'],
-                isAudioEnable: item['isAudioEnable'],
-                isVideoEnable: item['isVideoEnable'],
-                isHandRaised: item['isHandRaised'],
-                isTalkToHostEnable: item['isTalkToHostEnable'],
-                handRaisedTimeStamp: item['handRaisedTimeStamp'],
-                role: item['role'],
-              ))
-          .toList();
+      final participantsStatusDataList =
+          (decodedMetadata['participants'] as List)
+              .map((item) => ParticipantStatus(
+                    identity: item['identity'],
+                    isAudioEnable: item['isAudioEnable'],
+                    isVideoEnable: item['isVideoEnable'],
+                    isHandRaised: item['isHandRaised'],
+                    isTalkToHostEnable: item['isTalkToHostEnable'],
+                    handRaisedTimeStamp: item['handRaisedTimeStamp'],
+                    isPinned: item['isPinned'],
+                    isSpotlight: item['isSpotlight'],
+                    role: item['role'],
+                  ))
+              .toList();
 
       // Update the state with the new participants status list
       setState(() {
-        participantsManager = participantsStatusList;
+        participantsStatusList.clear();
+        participantsStatusList.addAll(participantsStatusDataList);
+
         for (var element in participantsStatusList) {
           if (element.identity == widget.room.localParticipant?.identity) {
             _isHandleRaiseHand = element.isHandRaised;
@@ -515,6 +588,61 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
+  Future<void> sendParticipantsStatus() async {
+    final participantsJsonList =
+        participantsStatusList.map((status) => status.toJson()).toList();
+
+    final metadata = jsonEncode({
+      'type': 'participantsStatusUpdate',
+      'timestamp': DateTime.now().toIso8601String(),
+      'participants': participantsJsonList,
+    });
+
+    await widget.room.localParticipant
+        ?.publishData(utf8.encode(metadata), reliable: true);
+    await _updateRoomData(participantsStatusList);
+    _sortParticipants('sendParticipantsStatus');
+  }
+
+void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
+  final updatedIdentities = updatedStatuses.map((p) => p.identity).toSet();
+
+  setState(() {
+    // Remove existing ones with the same identity
+    participantsStatusList.removeWhere((p) => updatedIdentities.contains(p.identity));
+    
+    // Add updated participants
+    participantsStatusList.addAll(updatedStatuses);
+
+    // Update and sync
+    _updateRoomData(participantsStatusList).then((_) {
+      sendParticipantsStatus();
+    });
+  });
+}
+
+
+  Future<void> _updateRoomData(List<ParticipantStatus> statuslist) async {
+    final roomSID = await widget.room.getSid();
+    final roomName = widget.room.name!;
+
+    final participantStatuses =
+        statuslist.map((status) => status.toJson()).toList();
+    _roomDataManageService.setLatestData(
+        roomSID, roomName, participantStatuses);
+  }
+
+  ParticipantStatus? _getParticipantStatus(String identity) {
+    try {
+      return participantsStatusList.firstWhere(
+        (status) => status.identity == identity,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ==================== Hand Raise Methods ====================
   void _receivedHandRaiseRequest(String metadata) {
     final decodedMetadata = jsonDecode(metadata);
 
@@ -528,303 +656,39 @@ class _RoomPageState extends State<RoomPage> {
 
   void _handleRaiseHandFromParticipant(String identity, bool isHandRaised) {
     setState(() {
-      // Find the participant status by identity
       final participantStatus = _getParticipantStatus(identity);
-      final participant = participantTracks
-          .firstWhere((track) => track.participant.identity == identity)
-          .participant;
 
-      // Update the handraise status
+      if (participantStatus == null) {
+        return;
+      }
+
+      final participantTrack = syncedParticipants[identity]?.track;
+
+      final participant = participantTrack!.participant;
+
       participantStatus.isHandRaised = isHandRaised;
 
-      // If the hand is being raised, store the current timestamp
       if (isHandRaised) {
         participantStatus.handRaisedTimeStamp =
             DateTime.now().millisecondsSinceEpoch;
       }
 
-      // Handle the local participant's hand raise status
       if (widget.room.localParticipant?.identity == identity) {
         _isHandleRaiseHand = isHandRaised;
       }
 
-      // Show notification if the hand is raised and the local participant is an admin
       if (isHandRaised && localParticipantRole == Role.admin.toString()) {
         _showHandRaiseNotification(context, participant);
       }
+
       _sortParticipants('handleRaiseHandFromParticipant');
     });
   }
 
-  _getParticipantStatus(String identity) {
-    final list =
-        participantsManager.firstWhere((status) => status.identity == identity,
-            orElse: () => ParticipantStatus(
-                  identity: identity,
-                  isAudioEnable: false,
-                  isVideoEnable: false,
-                  isHandRaised: false,
-                  isTalkToHostEnable: false,
-                  handRaisedTimeStamp: 0,
-                  role: Role.participant.toString(),
-                ));
-
-    return list;
-  }
-
-  void _sortParticipants(String from) {
-    List<ParticipantTrack> userMediaTracks = [];
-    List<ParticipantTrack> screenTracks = [];
-    final localParticipant = widget.room.localParticipant;
-
-    bool isLocalHost = localParticipant != null &&
-        localParticipantRole == Role.admin.toString();
-
-    for (var participant in widget.room.remoteParticipants.values) {
-      // Find the corresponding ParticipantStatus
-      final participantStatus = _getParticipantStatus(participant.identity);
-      final data = jsonEncode(participantStatus);
-      print('rohit sort $data');
-      if (participantStatus.identity.isEmpty) {
-        continue;
-      }
-
-      final isRemoteParticipantHost =
-          _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
-
-      final isVideo = participantStatus.isVideoEnable;
-      final isAudio = participantStatus.isAudioEnable;
-      final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
-      //final isStreamer = participant.identity == "streamer";
-      final shouldAudioSubscribe =
-          (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
-          //(isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost || isStreamer) ) ||
-              (isAudio &&
-                  !((isLocalHost || isRemoteParticipantHost) &&
-                      !isTalkToHostEnable));
-      final name = participant.identity;
-        print('check name $name is  shouldAudioSubscribe  $shouldAudioSubscribe');
-
-      if (shouldAudioSubscribe) {
-        final totalaudioTrackPublications =
-            participant.audioTrackPublications.length;
-        print('rohit audio total $totalaudioTrackPublications');
-        participant.audioTrackPublications.forEach((element) {
-          print('rohit audio subscribe $jsonEncode(element)');
-          element.subscribe();
-        });
-      } else {
-        participant.audioTrackPublications.forEach((element) {
-          if (!(isLocalHost && isRemoteParticipantHost)) {
-            element.unsubscribe();
-          }
-        });
-      }
-
-      if (participant.isScreenShareEnabled()) {
-        print('rohit screen share $participant');
-        screenTracks.add(ParticipantTrack(
-          participant: participant,
-          type: ParticipantTrackType.kScreenShare,
-        ));
-      } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
-      //  print('rohit isVideo $participant');
-        userMediaTracks.add(ParticipantTrack(participant: participant));
-      }
-    }
-
-    // Sort the user media tracks
-    _sortUserMediaTracks(userMediaTracks);
-
-    // Add the local participant to the user media tracks
-   // _addLocalParticipant(userMediaTracks);
-
-    // Update the state with the combined participant tracks
-    setState(() {
-      participantTracks = [...screenTracks, ...userMediaTracks];
-    });
-  }
-
-  void _sortUserMediaTracks(List<ParticipantTrack> userMediaTracks) {
-    userMediaTracks.sort((a, b) {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final fiveSecondsAgo = now - 10000; // 10000 milliseconds = 10 seconds
-
-      // lastSpokeAt in milliseconds, default to 0 if null
-      final aSpokeAt = a.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
-      final bSpokeAt = b.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
-
-      // Sort by whether they spoke within the last 10 seconds
-      final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
-      final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
-
-      if (aSpokeRecently != bSpokeRecently) {
-        return aSpokeRecently ? -1 : 1;
-      }
-
-      // Sort by video status if spoken within last 10 seconds is the same
-      if (a.participant.hasVideo != b.participant.hasVideo) {
-        return a.participant.hasVideo ? -1 : 1;
-      }
-
-      // Sort by joinedAt if both spoke recently or not recently
-      return a.participant.joinedAt.millisecondsSinceEpoch -
-          b.participant.joinedAt.millisecondsSinceEpoch;
-    });
-
-    userMediaTracks.sort((a, b) {
-      final statusA = _getParticipantStatus(a.participant.identity);
-      final statusB = _getParticipantStatus(b.participant.identity);
-
-      // Check if both participants have raised their hands
-      final isHandRaisedA = statusA?.isHandRaised ?? false;
-      final isHandRaisedB = statusB?.isHandRaised ?? false;
-
-      if (!isHandRaisedA && !isHandRaisedB) {
-        // Neither have raised hands, keep them in the same order
-        return 0;
-      } else if (!isHandRaisedA) {
-        // A hasn't raised hand, so move A down
-        return 1;
-      } else if (!isHandRaisedB) {
-        // B hasn't raised hand, so move B down
-        return -1;
-      }
-
-      // If both have raised hands, sort by handRaisedTimeStamp
-      // Earlier timestamps (raised first) should come first
-      return (statusA?.handRaisedTimeStamp ?? 0) -
-          (statusB?.handRaisedTimeStamp ?? 0);
-    });
-
-_addLocalParticipant(userMediaTracks );
-subscribeToFirstToFourthParticipants(userMediaTracks);
-    
-  }
-void _addLocalParticipant(List<ParticipantTrack> userMediaTracks) {
-  final localParticipant = widget.room.localParticipant;
-
-  if (localParticipant != null) {
-    final localParticipantTrack = ParticipantTrack(participant: localParticipant);
-
-    // Remove localParticipant if it already exists in the list
-    userMediaTracks.removeWhere((track) => track.participant == localParticipant);
-
-    // If there are more than 3 participants, insert localParticipant at the 4th position
-    if (userMediaTracks.length >= 3) {
-      userMediaTracks.insert(3, localParticipantTrack); // Insert at index 3 (4th position)
-    } else {
-      // If 3 or fewer participants, add the local participant to the end of the list
-      userMediaTracks.add(localParticipantTrack);
-    }
-  }
-}
-
-void subscribeToFirstToFourthParticipants(List<ParticipantTrack> userMediaTracks) {
-  // Ensure there are participants in the list
-  if (userMediaTracks.isEmpty) {
-    print('No participants available to subscribe.');
-    return;
-  }
-
-  // Loop through the first 4 participants or the total number of participants if fewer than 4
-  int limit = userMediaTracks.length < 4 ? userMediaTracks.length : 4;
-
-  for (int i = 0; i < limit; i++) {
-    ParticipantTrack participantTrack = userMediaTracks[i];
-    _subscribeToParticipant(participantTrack);
-  }
-}
-
-void _subscribeToParticipant(ParticipantTrack participantTrack) {
-  // Logic to subscribe to the participant
-   if (participantTrack.participant is RemoteParticipant ){
-      final participant = participantTrack.participant as RemoteParticipant;
-      participant.videoTrackPublications.forEach((publication) {
-        if (!publication.subscribed) {
-          publication.subscribe();
-          publication.enable();
-        //  print('Subscribed to ${participantTrack.participant.identity}\'s video track');
-        }
-      });
-
-   }
-}
-
-  void _toggleMuteAll(bool muteAll) {
-    setState(() {
-      _muteAll = muteAll;
-      // Update the participantsManager with new participants
-      final participants = participantsManager.where((participantStatus) {
-        return participantStatus.role != Role.admin.toString();
-      });
-      for (var participantStatus in participants) {
-        participantStatus.isTalkToHostEnable = !muteAll;
-      }
-
-      // Trigger the callback with the updated list
-      sendParticipantsStatus(participantsManager);
-    });
-  }
-
-  String _getRoleFromMetadata(String? metadata) {
-    if (metadata != null && metadata.isNotEmpty) {
-      final decodedMetadata = jsonDecode(metadata);
-      return decodedMetadata['role'] ?? '';
-    }
-    return '';
-  }
-
-  List<ParticipantTrack> _filterParticipants(String searchQuery) {
-    final localParticipant = widget.room.localParticipant;
-
-    // Filter participants based on the search query
-    final filteredParticipants = participantTracks.where((track) {
-      final participantName = track.participant.name.toLowerCase();
-      return participantName.contains(searchQuery.toLowerCase());
-    }).toList();
-
-    // Move the local participant to the top of the list
-    if (localParticipant != null) {
-      filteredParticipants
-          .removeWhere((track) => track.participant == localParticipant);
-      filteredParticipants.insert(
-          0, ParticipantTrack(participant: localParticipant));
-    }
-
-    return filteredParticipants;
-  }
-
-  void _allowSpeak(Participant participant) {
-    setState(() {
-      // Find the corresponding participantsManager by participant identity
-      final participantStatus = _getParticipantStatus(participant.identity);
-
-      // Update the isTalkToHostEnable field to true
-      participantStatus.isTalkToHostEnable = true;
-      participantStatus.isHandRaised = false;
-      sendParticipantsStatus(participantsManager);
-    });
-  }
-
-  void _denySpeak(Participant participant) {
-    setState(() {
-      // Find the corresponding participantsManager by participant identity
-      final participantStatus = _getParticipantStatus(participant.identity);
-
-      // Update the isTalkToHostEnable field to false
-      participantStatus.isTalkToHostEnable = false;
-      participantStatus.isHandRaised = false;
-      sendParticipantsStatus(participantsManager);
-    });
-  }
-
   void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
-    // Create the metadata with the updated hand raise status
     final handRaiseData = jsonEncode(
         {'identity': participant.identity, 'handraise': isHandRaised});
 
-    // Publish the data to the room so that other participants can receive it
     await widget.room.localParticipant?.publishData(
       utf8.encode(handRaiseData),
     );
@@ -836,108 +700,292 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
     _toggleRaiseHand(widget.room.localParticipant as Participant, isHandRaised);
   }
 
-  Future<void> _copyInviteLinkToClipboard(BuildContext context) async {
-    //showCopyInviteDialog(context);
-    CopyInviteLinkDialog.show(context, widget.room.name!);
+  // ==================== Admin Control Methods ====================
+  Future<void> _checkForPendingRequests() async {
+    while (_isRunning) {
+      try {
+        final requests =
+            await _approvalService.fetchPendingRequests(widget.room.name!);
+        final currentRequestIds =
+            requests.map((request) => request['id'].toString()).toSet();
+
+        _dialogContexts.keys.toList().forEach((requestId) {
+          if (!currentRequestIds.contains(requestId)) {
+            _closeDialog(requestId);
+          }
+        });
+
+        if (requests.isEmpty && _dialogContexts.isNotEmpty) {
+          _dialogContexts.keys.toList().forEach((requestId) {
+            _closeDialog(requestId);
+          });
+        }
+
+        for (var request in requests) {
+          final requestId = request['id'].toString();
+          if (!_dialogContexts.containsKey(requestId)) {
+            _showApprovalDialog(request);
+          }
+        }
+        // ignore: empty_catches
+      } catch (error) {}
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
+  void _showApprovalDialog(dynamic request) {
+    final requestId = request['id'].toString();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        _dialogContexts[requestId] = context;
+
+        return AdminApprovalDialog(
+          participantName: request['participantName'],
+          roomName: request['roomName'],
+          onDecision: (approved) async {
+            await _approvalService.approveRequest(request['id'], approved);
+            _closeDialog(requestId);
+          },
+        );
+      },
+    ).then((_) {
+      _dialogContexts.remove(requestId);
+    });
+  }
+
+  void _closeDialog(String requestId) {
+    final dialogContext = _dialogContexts[requestId];
+    if (dialogContext != null) {
+      Navigator.of(dialogContext).pop();
+      setState(() {
+        _dialogContexts.remove(requestId);
+      });
+    }
+  }
+
+  void _toggleMuteAll(bool muteAll) {
+    setState(() {
+      _muteAll = muteAll;
+
+      for (var participant in syncedParticipants.values) {
+        if (participant.status?.role != Role.admin.toString()) {
+          participant.status?.isTalkToHostEnable = !muteAll;
+        }
+      }
+
+      sendParticipantsStatus();
+    });
+  }
+
+  void _allowSpeak(Participant participant) {
+    final syncedParticipant = syncedParticipants[participant.identity];
+    if (syncedParticipant != null && syncedParticipant.status != null) {
+      setState(() {
+        syncedParticipant.status!.isTalkToHostEnable = true;
+        syncedParticipant.status!.isHandRaised = false;
+        sendParticipantsStatus();
+      });
+    }
+  }
+
+  void _denySpeak(Participant participant) {
+    final syncedParticipant = syncedParticipants[participant.identity];
+    if (syncedParticipant != null && syncedParticipant.status != null) {
+      setState(() {
+        syncedParticipant.status!.isTalkToHostEnable = false;
+        syncedParticipant.status!.isHandRaised = false;
+        sendParticipantsStatus();
+      });
+    }
+  }
+
+  // ==================== UI Control Methods ====================
   void _showHandRaiseNotification(
       BuildContext context, Participant participant) {
     HandRaiseNotification.show(context, participant, _allowSpeak, _denySpeak);
   }
 
-  Future<void> _showParticipantSelectionDialog(context) async {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-
-    if (isMobile) {
-      _scaffoldKey.currentState?.openEndDrawer();
-    }
+  Future<void> _copyInviteLinkToClipboard(BuildContext context) async {
+    CopyInviteLinkDialog.show(context, widget.room.name!);
   }
 
   void _openEndDrawer() {
-    //_initializeAllowedToTalk();
-    //print('rohit openEndDrawer');
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
-  // Toggle between view modes
   void _toggleParticipantList() {
     setState(() {
       isParticipantListVisible = !isParticipantListVisible;
     });
   }
 
+  List<ParticipantTrack> getPrioritizedTracks(
+    Map<String, SyncedParticipant> participants,
+    List<String> pinnedIds,
+    String? localIdentity,
+    void Function(bool isPiP)? onPiPChanged, // optional callback to set state
+    void Function(bool isSideBarShouldVisible)? onSideBarShouldVisible,
+  ) {
+    bool isPiP = false;
+    bool isSideBarShouldVisible = false;
+
+    // Screen share has highest priority (excluding local)
+    final screenShares = participants.values
+        .where((p) =>
+            p.track?.type == ParticipantTrackType.kScreenShare &&
+            p.identity != localIdentity)
+        .map((p) => p.track!)
+        .toList();
+    if (screenShares.isNotEmpty) {
+      onPiPChanged?.call(true);
+      onSideBarShouldVisible?.call(true);
+      return screenShares;
+    }
+
+    // Spotlighted participants (excluding local)
+    final spotlights = participants.values
+        .where(
+            (p) => p.status?.isSpotlight == true && p.identity != localIdentity)
+        .map((p) => p.track!)
+        .toList();
+    if (spotlights.isNotEmpty) {
+      onPiPChanged?.call(true);
+       onSideBarShouldVisible?.call(true);
+       print('Spotlights: ${spotlights.length}');
+      print('Spotlights: ${spotlights.map((e) => e.participant.name)}');
+      return spotlights;
+    }
+
+    // Pinned participants (can include local)
+    final pinned = participants.values
+        .where((p) => pinnedIds.contains(p.identity))
+        .map((p) => p.track!)
+        .toList();
+    if (pinned.isNotEmpty) {
+      onPiPChanged?.call(true);
+       onSideBarShouldVisible?.call(true);
+      return pinned;
+    }
+
+    // Default grid participants
+ final defaultGrid = participants.values
+    .where((p) {
+      final isSpotlight = p.status?.isSpotlight == true;
+      final isScreenShare =
+          p.track?.type == ParticipantTrackType.kScreenShare;
+      final isLocal = p.identity == localIdentity;
+
+      return !isScreenShare &&
+          (!isSpotlight || (isSpotlight && isLocal == false));
+    })
+    .map((p) => p.track!)
+    .toList();
+
+    // Enable PiP if more than 4 participants
+    if (defaultGrid.length > 4) {
+      isPiP = true;
+       defaultGrid.removeWhere((track) {
+        return track.participant.identity == localIdentity;
+      });
+    } 
+
+    onPiPChanged?.call(isPiP);
+    onSideBarShouldVisible?.call(isSideBarShouldVisible);
+    print('Default Grid: ${defaultGrid.length}');
+    print('Default Grid: ${defaultGrid.map((e) => e.participant.name)}');
+    return defaultGrid;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pinnedProvider = Provider.of<PinnedParticipantProvider>(context);
+    final localIdentity = widget.room.localParticipant?.identity;
+
+    final localParticipant = syncedParticipants[localIdentity];
+
+    final localParticipantTrack = localParticipant?.track;
+    final localParticipantStatus = localParticipant?.status;
+
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
-    final bool isParticipantScreenShared = participantTracks.any((track) =>
-        track.type == ParticipantTrackType.kScreenShare &&
-        track.participant.identity != widget.room.localParticipant?.identity);
-    final bool isStreamer = participantTracks.any((track) =>
-        track.participant.identity == "streamer" &&
-        track.participant.identity != widget.room.localParticipant?.identity);
+
+    final prioritizedTracks = getPrioritizedTracks(
+      syncedParticipants,
+      pinnedProvider.pinnedIdentities,
+      localIdentity,
+      (bool value) {
+        if (_isPiP != value) {
+          setState(() {
+            _isPiP = value;
+          });
+        }
+      },
+      (bool value) {
+        if (_isSideBarShouldVisible != value) {
+          setState(() {
+            _isSideBarShouldVisible = value;
+          });
+        }
+      },
+    );
+
+    final shownIds = prioritizedTracks
+        .map((track) => track.participant.identity)
+        .toSet(); // So we can exclude these
+
+   final sidebarTracks = syncedParticipants.values
+    .where((p) =>
+        p.track != null &&
+        p.identity != localIdentity && // Exclude local participant
+        !shownIds.contains(p.identity) &&
+        p.track?.type != ParticipantTrackType.kScreenShare) // Avoid screenshare
+    .map((p) => p.track!)
+    .toList();
+    if(sidebarTracks.isEmpty) {
+      setState(() {
+      _isSideBarShouldVisible =false;
+    });
+    }
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF353535),
       body: SafeArea(
-        child: Stack( // Changed from Row to Stack to allow proper positioning
+        child: Stack(
           children: [
             Row(
               children: [
-                // Main column with header, grid, and footer
                 Expanded(
                   child: Column(
                     children: [
-                      // Room header
                       RoomHeader(
                         room: widget.room,
-                        participantsStatusList: participantsManager,
+                        participantsStatusList: syncedParticipants.values
+                            .map((e) => e.status)
+                            .whereType<ParticipantStatus>()
+                            .toList(),
                         onToggleRaiseHand: _handleToggleRaiseHand,
                         isHandRaisedStatusChanged: _isHandleRaiseHand,
                         isAdmin: localParticipantRole == Role.admin.toString(),
                       ),
-
-                      // Expanded Grid View (between header and footer)
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.all(8.0),
-                          child: isParticipantScreenShared || isStreamer
-                              ? Stack(
-                                  children: [
-                                    Positioned.fill(
-                                      child: ParticipantGridView(
-                                        participantTracks: participantTracks.where(
-                                          (track) =>
-                                              (track.type ==
-                                                      ParticipantTrackType.kScreenShare ||
-                                                  track.participant.identity ==
-                                                      "streamer") &&
-                                              track.participant.identity !=
-                                                  widget.room.localParticipant?.identity,
-                                        ).toList(),
-                                        participantStatuses: participantsManager,
-                                        isLocalHost: false,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : ParticipantGridView(
-                                  participantTracks: participantTracks.where(
-                                    (track) =>
-                                        track.type != ParticipantTrackType.kScreenShare &&
-                                        track.participant.identity != "streamer",
-                                  ).toList(),
-                                  participantStatuses: participantsManager,
-                                  isLocalHost:
-                                      localParticipantRole == Role.admin.toString(),
-                                ),
+                          child: ParticipantGridView(
+                            participantTracks: prioritizedTracks,
+                            participantStatuses: syncedParticipants.values
+                                .map((e) => e.status)
+                                .whereType<ParticipantStatus>()
+                                .toList(),
+                            isLocalHost:
+                                localParticipantRole == Role.admin.toString(),
+                            onParticipantsStatusChanged:
+                                updateParticipantsStatus,
+                          ),
                         ),
                       ),
-
-                      // Control Footer
                       ControlsWidget(
                         _toggleMuteAll,
                         _handleToggleRaiseHand,
@@ -948,55 +996,65 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
                         localParticipantRole,
                         widget.room,
                         widget.room.localParticipant!,
-                        participantsManager,
+                        syncedParticipants.values
+                            .map((e) => e.status)
+                            .whereType<ParticipantStatus>()
+                            .toList(),
                       ),
                     ],
                   ),
                 ),
-
-                // Sidebar
                 AnimatedContainer(
-                  duration: Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 300),
                   width: (!isMobile &&
                           widget.room.localParticipant != null &&
-                          isParticipantListVisible)
+                          isParticipantListVisible && _isSideBarShouldVisible)
                       ? 300
                       : 0,
-                  color: Color(0xFF404040),
-                  child: isParticipantListVisible
+                  color: const Color(0xFF404040),
+                  child: _isSideBarShouldVisible
                       ? ParticipantListView(
-                          participantTracks: participantTracks.where((track) {
-                            return track.type != ParticipantTrackType.kScreenShare &&
-                                track.participant.identity != "streamer";
-                          }).toList(),
-                          participantStatuses: participantsManager,
+                          participantTracks: sidebarTracks,
+                          participantStatuses: syncedParticipants.values
+                              .map((e) => e.status)
+                              .whereType<ParticipantStatus>()
+                              .toList(),
+                          onParticipantsStatusChanged: updateParticipantsStatus,
                         )
                       : null,
                 ),
               ],
             ),
-
-            // Sidebar Toggle Button - Now Positioned Correctly in the Center-Right
-            if (!isMobile && isStreamer)
+            if (!isMobile && _isSideBarShouldVisible)
               Positioned(
-                top: MediaQuery.of(context).size.height / 2 - 25, // Centered vertically
-                right: isParticipantListVisible ? 280 : -20, // Adjust dynamically
+                top: MediaQuery.of(context).size.height / 2 - 25,
+                right: isParticipantListVisible ? 280 : -20,
                 child: GestureDetector(
                   onTap: _toggleParticipantList,
                   child: AnimatedContainer(
-                    duration: Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 300),
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
+                      // ignore: deprecated_member_use
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isParticipantListVisible ? Icons.chevron_right : Icons.chevron_left,
+                      isParticipantListVisible
+                          ? Icons.chevron_right
+                          : Icons.chevron_left,
                       color: Colors.black,
                     ),
                   ),
                 ),
+              ),
+            if (!isMobile && _isPiP)
+              DraggableParticipantWidget(
+                localParticipantTrack: localParticipantTrack!,
+                localParticipantStatus: localParticipantStatus!,
+                localParticipantRole: localParticipantRole!,
+                updateParticipantsStatus: updateParticipantsStatus,
               ),
           ],
         ),
@@ -1010,10 +1068,12 @@ void _subscribeToParticipant(ParticipantTrack participantTrack) {
         },
         filterParticipants: _filterParticipants,
         localParticipant: widget.room.localParticipant,
-        onParticipantsStatusChanged: sendParticipantsStatus,
-        participantsStatusList: participantsManager,
+        onParticipantsStatusChanged: updateParticipantsStatus,
+        participantsStatusList: syncedParticipants.values
+            .map((e) => e.status)
+            .whereType<ParticipantStatus>()
+            .toList(),
       ),
     );
   }
-
 }

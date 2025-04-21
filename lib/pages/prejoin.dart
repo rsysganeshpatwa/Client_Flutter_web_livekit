@@ -11,11 +11,10 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/exts.dart';
-import 'package:video_meeting_room/main.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
-import '../theme.dart';
+
 import 'room.dart';
 
 class JoinArgs {
@@ -85,9 +84,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
     Hardware.instance.enumerateDevices().then(_loadDevices);
   }
 
-  _initializePreferences() async {
-    prefs = await SharedPreferences.getInstance();
-  }
 
   @override
   void deactivate() {
@@ -242,7 +238,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
     setState(() {});
 
     var args = widget.args;
-    var prefs = await SharedPreferences.getInstance();
+    
 
     try {
       // Wait for approval before proceeding
@@ -334,11 +330,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
     }
   }
 
-  void _actionBack(BuildContext context) async {
-    await _setEnableVideo(false);
-    await _setEnableAudio(false);
-    Navigator.of(context).pop();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,17 +337,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
-          // title: const Text(
-          //   'Back',
-          //   style: TextStyle(
-          //     color: Colors.black,
-          //     fontWeight: FontWeight.bold,
-          //   ),
-          // ),
-          // leading: IconButton(
-          //   icon: const Icon(Icons.arrow_back, color: Colors.black),
-          //   onPressed: () => _actionBack(context),
-          // ),
         ),
         body: Container(
             alignment: Alignment.center,
