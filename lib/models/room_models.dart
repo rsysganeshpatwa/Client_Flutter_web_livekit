@@ -10,6 +10,7 @@ class ParticipantStatus {
    bool isSpotlight = false;
 
    int handRaisedTimeStamp = 0;
+    int lastShownAt = 0;
    String role = '';
 
   ParticipantStatus({
@@ -21,6 +22,7 @@ class ParticipantStatus {
     this.isPinned = false,
     this.isSpotlight = false,
     this.handRaisedTimeStamp = 0,
+    this.lastShownAt = 0,
     this.role = '',
   });
 
@@ -92,6 +94,7 @@ class SyncedParticipant {
   final String identity;
   ParticipantTrack? track;
   ParticipantStatus? status;
+  int lastShownAt = 0;
 
   SyncedParticipant({
     required this.identity,
@@ -105,4 +108,12 @@ class SyncedParticipant {
   bool get isSpotlight => status?.isSpotlight ?? false;
   bool get isHandRaised => status?.isHandRaised ?? false;
   String get role => status?.role ?? '';
+}
+
+class PrioritizedTracksResult {
+  final List<ParticipantTrack> tracks;
+  final bool isPiP;
+  final bool isSideBarShouldVisible;
+
+  PrioritizedTracksResult(this.tracks, this.isPiP, this.isSideBarShouldVisible);
 }

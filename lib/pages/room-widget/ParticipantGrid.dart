@@ -9,10 +9,9 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/service_locator.dart';
 import 'package:video_meeting_room/services/textract_service.dart'; // Import your service
-import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/participant_info.dart';
-
+import 'package:video_meeting_room/widgets/MemoizedParticipantCard.dart';
 
 class ParticipantGrid extends StatefulWidget {
   final List<ParticipantTrack> participantTracks;
@@ -20,7 +19,7 @@ class ParticipantGrid extends StatefulWidget {
   final double gridHeight;
   final List<ParticipantStatus> participantStatuses;
   final bool isLocalHost;
-  final Function(List<ParticipantStatus>) onParticipantsStatusChanged;
+  final Function(ParticipantStatus) onParticipantsStatusChanged;
 
   ParticipantGrid({
     Key? key,
@@ -78,7 +77,6 @@ class _ParticipantGridState extends State<ParticipantGrid> {
     }
   }
 
-
   void _showErrorDialog(BuildContext context, String errorMessage) {
     showDialog(
       context: context,
@@ -96,209 +94,175 @@ class _ParticipantGridState extends State<ParticipantGrid> {
       },
     );
   }
-  
-void _showResultDialog(BuildContext context, String resultText, Uint8List imageBytes) {
-  // Clean up the resultText by ensuring \n is properly handled
-  String cleanedText = jsonDecode(resultText)['text'].replaceAll(RegExp(r'\\n'), '\n');  // Extract text and replace escaped \n with actual newlines
 
-  showDialog(
-    context: context,
-    barrierDismissible: false, // Prevent dismissing the dialog by tapping outside
-    builder: (BuildContext context) {
-      return Dialog(
-        backgroundColor: Colors.white, // Set background color to white
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.5, // Width 90% of screen width
-          height: MediaQuery.of(context).size.height * 0.8, // Height 80% of screen height
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top-left close button
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.black, size: 28),
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Close dialog
-                  },
+  void _showResultDialog(BuildContext context, String resultText, Uint8List imageBytes) {
+    // Clean up the resultText by ensuring \n is properly handled
+    String cleanedText = jsonDecode(resultText)['text'].replaceAll(RegExp(r'\\n'), '\n'); // Extract text and replace escaped \n with actual newlines
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent dismissing the dialog by tapping outside
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white, // Set background color to white
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.5, // Width 90% of screen width
+            height: MediaQuery.of(context).size.height * 0.8, // Height 80% of screen height
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top-left close button
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.black, size: 28),
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close dialog
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "OCR Result",
-                style: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              // Scrollable area for the extracted text
-              Expanded(
-                child: SingleChildScrollView(
-                  clipBehavior: Clip.antiAlias,
-                  child: TextField(
-            
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
+                const SizedBox(height: 8),
+                const Text(
+                  "OCR Result",
+                  style: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                // Scrollable area for the extracted text
+                Expanded(
+                  child: SingleChildScrollView(
+                    clipBehavior: Clip.antiAlias,
+                    child: TextField(
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      controller: TextEditingController(text: cleanedText.isEmpty ? 'No Text Found !' : cleanedText), // Use cleaned text
+                      style: const TextStyle(color: Colors.black),
+                      maxLines: null, // Allow the TextField to expand for all lines
+                      minLines: 5, // Minimum height of the text field
                     ),
-                    controller: TextEditingController(text: cleanedText.isEmpty ? 'No Text Found !' :cleanedText ), // Use cleaned text
-                    style: const TextStyle(color: Colors.black),
-                    maxLines: null, // Allow the TextField to expand for all lines
-                    minLines: 5, // Minimum height of the text field
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              // Row for the Copy and Download buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Copy text to clipboard
-                      Clipboard.setData(ClipboardData(text: cleanedText));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Text copied to clipboard")),
-                      );
-                    },
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copy'),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Download the original image
-                      _downloadOriginalImage(imageBytes);
-                    },
-                    icon: const Icon(Icons.download),
-                    label: const Text('Download Image'),
-                  ),
-                ],
-              ),
-            ],
+                const SizedBox(height: 10),
+                // Row for the Copy and Download buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // Copy text to clipboard
+                        Clipboard.setData(ClipboardData(text: cleanedText));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Text copied to clipboard")),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy'),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // Download the original image
+                        _downloadOriginalImage(imageBytes);
+                      },
+                      icon: const Icon(Icons.download),
+                      label: const Text('Download Image'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
-
-// Function to download original image using Anchor for Flutter Web
-void _downloadOriginalImage(Uint8List imageBytes) {
-  // Create a Blob from the Uint8List image bytes
-  final blob = html.Blob([imageBytes]);
-
-  // Create a URL for the Blob
-  final url = html.Url.createObjectUrlFromBlob(blob);
-
-  // Create an anchor element
-  final anchor = html.AnchorElement(href: url)
-    ..setAttribute("download", "downloaded_image.png") // Set the filename
-    ..click(); // Trigger the download by simulating a click
-
-  // Clean up the URL object after download
-  html.Url.revokeObjectUrl(url);
-}
-  
-
- void _handlePinAndSpotlightStatusChanged(ParticipantStatus status) {
-    // Update the participant status
-    List<ParticipantStatus> updatedStatuses = updateSpotlightStatus(
-      participantList: widget.participantStatuses,
-      updatedStatus: status,
+        );
+      },
     );
-
-    // Call the callback function with the updated statuses
-    widget.onParticipantsStatusChanged(updatedStatuses);
   }
 
+  // Function to download original image using Anchor for Flutter Web
+  void _downloadOriginalImage(Uint8List imageBytes) {
+    // Create a Blob from the Uint8List image bytes
+    final blob = html.Blob([imageBytes]);
 
+    // Create a URL for the Blob
+    final url = html.Url.createObjectUrlFromBlob(blob);
+
+    // Create an anchor element
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute("download", "downloaded_image.png") // Set the filename
+      ..click(); // Trigger the download by simulating a click
+
+    // Clean up the URL object after download
+    html.Url.revokeObjectUrl(url);
+  }
 
   @override
- @override
-Widget build(BuildContext context) {
-  final bool isMobile = widget.gridWidth < 600;
-  final int numParticipants = widget.participantTracks.length;
-  final bool isLocalHost = widget.isLocalHost;
-  print("is grid localhost: $isLocalHost");
+  Widget build(BuildContext context) {
+    final bool isMobile = widget.gridWidth < 600;
+    final int numParticipants = widget.participantTracks.length;
+    final bool isLocalHost = widget.isLocalHost;
 
-  if (numParticipants == 0) {
-    return const Center(
-      child: Text(
-        "No participants",
-        style: TextStyle(color: Colors.white, fontSize: 16),
+
+    if (numParticipants == 0) {
+      return const Center(
+        child: Text(
+          "No participants",
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+      );
+    }
+
+    final int estimatedCrossAxis = (isMobile && numParticipants == 2)
+        ? 1
+        : (numParticipants > 1)
+            ? (widget.gridWidth /
+                    (widget.gridWidth / math.sqrt(numParticipants)))
+                .ceil()
+            : 1;
+
+    final int safeCrossAxisCount = estimatedCrossAxis > 0 ? estimatedCrossAxis : 1;
+    final int rows = (numParticipants / safeCrossAxisCount).ceil();
+    final double safeGridHeight = widget.gridHeight > 0 ? widget.gridHeight : 1;
+    final double aspectRatio = (widget.gridWidth / safeCrossAxisCount) /
+        (safeGridHeight / (rows > 0 ? rows : 1));
+    final double safeAspectRatio = aspectRatio > 0 ? aspectRatio : 1.0;
+
+    return GridView.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: safeCrossAxisCount,
+        childAspectRatio: safeAspectRatio,
+        crossAxisSpacing: 12.0,
+        mainAxisSpacing: 12.0,
       ),
+      itemCount: numParticipants,
+      itemBuilder: (context, index) {
+        final track = widget.participantTracks[index];
+        final status = widget.participantStatuses.firstWhere(
+          (s) => s.identity == track.participant.identity,
+          orElse: () => ParticipantStatus(
+            identity: '',
+            isAudioEnable: false,
+            isVideoEnable: false,
+            isHandRaised: false,
+            isTalkToHostEnable: false,
+          ),
+        );
+
+        return MemoizedParticipantCard(
+          key: ValueKey(track.participant.identity),
+          track: track,
+          status: status,
+          index: index,
+          isLocalHost: isLocalHost,
+          width: isMobile ? widget.gridWidth * 0.4 : widget.gridWidth * 0.9,
+          height: isMobile ? widget.gridHeight * 0.15 : widget.gridHeight * 0.2,
+          onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
+          onTap: widget.isLocalHost ? () => _onParticipantTap(context, track) : null,
+        );
+      },
     );
   }
-
-  final int estimatedCrossAxis = (isMobile && numParticipants == 2)
-      ? 1
-      : (numParticipants > 1)
-          ? (widget.gridWidth /
-                  (widget.gridWidth / math.sqrt(numParticipants)))
-              .ceil()
-          : 1;
-
-  final int safeCrossAxisCount = estimatedCrossAxis > 0 ? estimatedCrossAxis : 1;
-  final int rows = (numParticipants / safeCrossAxisCount).ceil();
-  final double safeGridHeight = widget.gridHeight > 0 ? widget.gridHeight : 1;
-  final double aspectRatio = (widget.gridWidth / safeCrossAxisCount) /
-      (safeGridHeight / (rows > 0 ? rows : 1));
-  final double safeAspectRatio = aspectRatio > 0 ? aspectRatio : 1.0;
-
-  return GridView.builder(
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: safeCrossAxisCount,
-      childAspectRatio: safeAspectRatio,
-      crossAxisSpacing: 12.0,
-      mainAxisSpacing: 12.0,
-    ),
-    itemCount: numParticipants,
-    itemBuilder: (context, index) {
-      final track = widget.participantTracks[index];
-      final status = widget.participantStatuses.firstWhere(
-        (s) => s.identity == track.participant.identity,
-        orElse: () => ParticipantStatus(
-          identity: '',
-          isAudioEnable: false,
-          isVideoEnable: false,
-          isHandRaised: false,
-          isTalkToHostEnable: false,
-        ),
-      );
-
-      return GestureDetector(
-        onTap: () {
-          // Uncomment to handle OCR/tap event
-          // _onParticipantTap(context, track);
-        },
-        child: Card(
-          elevation: 4.0,
-          child: Column(
-            children: [
-              Expanded(
-                child: ParticipantWidget.widgetFor(
-                  track,
-                  status,
-                  showStatsLayer: false,
-                  participantIndex: index,
-                  handleExtractText: widget.isLocalHost
-                      ? () {
-                          print('Extracting text...');
-                          _onParticipantTap(context, track);
-                        }
-                      : null,
-                  onParticipantsStatusChanged: _handlePinAndSpotlightStatusChanged,
-                  isLocalHost: isLocalHost
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
 
   @override
   void dispose() {

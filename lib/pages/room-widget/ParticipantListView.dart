@@ -3,22 +3,22 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
-import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/participant.dart';
+import 'package:video_meeting_room/widgets/MemoizedParticipantCard.dart';
 import 'dart:math' as math;
 
 import 'package:video_meeting_room/widgets/participant_info.dart';
 
 class ParticipantListView extends StatefulWidget {
-  final List<ParticipantTrack> participantTracks;
-  final List<ParticipantStatus> participantStatuses;
   //onParticipantsStatusChanged
-  final Function(List<ParticipantStatus>)? onParticipantsStatusChanged;
+  final List<SyncedParticipant>? syncedParticipant;
+  final Function(ParticipantStatus)? onParticipantsStatusChanged;
+  final bool isLocalHost;
 
   const ParticipantListView({
     super.key,
-    required this.participantTracks,
-    required this.participantStatuses,
+    this.syncedParticipant,
+    required this.isLocalHost,
     this.onParticipantsStatusChanged,
   });
 
@@ -29,12 +29,49 @@ class ParticipantListView extends StatefulWidget {
 class _ParticipantListViewState extends State<ParticipantListView> {
   final PageController _pageController = PageController();
 
+  final List<ParticipantTrack> participantTracks = [];
+  final List<ParticipantStatus> participantStatuses = [];
+
+// update state
+  @override
+  void initState() {
+    super.initState();
+    if (widget.syncedParticipant != null) {
+      updateState(widget.syncedParticipant!);
+    }
+  }
+
+  @override
+  void didUpdateWidget(ParticipantListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.syncedParticipant != null &&
+        widget.syncedParticipant != oldWidget.syncedParticipant) {
+      updateState(widget.syncedParticipant!);
+    }
+  }
+
+  void updateState(List<SyncedParticipant> syncedParticipants) {
+    final newTracks = <ParticipantTrack>[];
+    final newStatuses = <ParticipantStatus>[];
+    
+    for (var participant in syncedParticipants) {
+      newTracks.add(participant.track!);
+      newStatuses.add(participant.status!);
+    }
+    
+    setState(() {
+      // Clear existing lists before adding new items
+      participantTracks.clear();
+      participantStatuses.clear();
+      participantTracks.addAll(newTracks);
+      participantStatuses.addAll(newStatuses);
+    });
+  }
 
   int? previousStartIndex;
   int? previousEndIndex;
   int? previousNumParticipants;
-    int _pag = 0;
-
+  int _pag = 0;
   void subscribe(List<ParticipantTrack> pageParticipants) {
     for (var i = 0; i < pageParticipants.length; i++) {
       final participant = pageParticipants[i].participant;
@@ -44,8 +81,6 @@ class _ParticipantListViewState extends State<ParticipantListView> {
           if (!publication.subscribed) {
             publication.subscribe();
             publication.enable();
-            print(
-                'Subscribed to ${pageParticipants[i].participant.identity}\'s video track');
           }
         });
       }
@@ -61,26 +96,12 @@ class _ParticipantListViewState extends State<ParticipantListView> {
           if (publication.subscribed) {
             publication.unsubscribe();
             publication.disable();
-            print(
-                'Unsubscribed from ${pageParticipants[i].participant.identity}\'s video track');
           }
         });
       }
     }
   }
-
- void _handlePinAndSpotlightStatusChanged(ParticipantStatus status) {
-    // Update the participant status
-    
-    List<ParticipantStatus> updatedStatuses = updateSpotlightStatus(
-      participantList: widget.participantStatuses,
-      updatedStatus: status,
-    );
-
-    // Call the callback function with the updated statuses
-    widget.onParticipantsStatusChanged!(updatedStatuses);
-  }
-
+  
 
   @override
   Widget build(BuildContext context) {
@@ -95,55 +116,26 @@ class _ParticipantListViewState extends State<ParticipantListView> {
             padding: const EdgeInsets.all(8.0),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final int numParticipants = widget.participantTracks.length;
+                final int numParticipants = participantTracks.length;
                 final bool hasPagination = numParticipants > 4;
-             
+
                 if (numParticipants <= 4) {
-                  subscribe(widget.participantTracks);
+                  subscribe(participantTracks);
                   return ListView.builder(
                     scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
                     itemCount: numParticipants,
                     itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () {
-                          // Add interaction logic here
-                        },
-                        child: Card(
-                          elevation: 4.0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(0),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(0),
-                              child: SizedBox(
-                                width: isMobile
-                                    ? screenSize.width * 0.4 // Smaller width for horizontal scroll on mobile
-                                    : screenSize.width * 0.9, // Default width for vertical scroll
-                                height: isMobile
-                                    ? screenSize.height * 0.15 // Smaller height for horizontal scroll on mobile
-                                    : screenSize.height * 0.2, // Default height for vertical scroll
-                                child: ParticipantWidget.widgetFor(
-                                  widget.participantTracks[index],
-                                  widget.participantStatuses[index],
-                                  showStatsLayer: false,
-                                  participantIndex: index,
-                                  onParticipantsStatusChanged: (updatedStatus) {
-                                    // Handle participant status changes
-                                    if (widget.onParticipantsStatusChanged != null) {
-                                      _handlePinAndSpotlightStatusChanged(
-                                        updatedStatus,
-                                      );
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
+                      return MemoizedParticipantCard(
+                        key: ValueKey(participantTracks[index].participant.identity),
+                        track: participantTracks[index],
+                        status: participantStatuses.firstWhere(
+                          (status) => status.identity == participantTracks[index].participant.identity,
                         ),
+                        index: index,
+                        isLocalHost: widget.isLocalHost,
+                        width: isMobile ? screenSize.width * 0.4 : screenSize.width * 0.9,
+                        height: isMobile ? screenSize.height * 0.15 : screenSize.height * 0.2,
+                        onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
                       );
                     },
                   );
@@ -155,14 +147,14 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                     children: [
                       Positioned.fill(
                         child: PageView.builder(
-                          scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
+                          scrollDirection:
+                              isMobile ? Axis.horizontal : Axis.vertical,
                           controller: _pageController,
                           itemCount: pageCount,
-                          
                           onPageChanged: (pageIndex) {
-                            
                             final startIndex = pageIndex * itemsPerPage;
-                            final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
+                            final endIndex = math.min(
+                                startIndex + itemsPerPage, numParticipants);
                             setState(() {
                               _pag = pageIndex;
                             });
@@ -175,22 +167,22 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                 numParticipants != previousNumParticipants) {
                               // Determine the buffer range
                               int bufferStartIndex = (startIndex - bufferSize)
-                                  .clamp(0, widget.participantTracks.length);
+                                  .clamp(0, participantTracks.length);
                               int bufferEndIndex = (endIndex + bufferSize)
-                                  .clamp(0, widget.participantTracks.length);
+                                  .clamp(0, participantTracks.length);
 
-                              final bufferParticipants = widget.participantTracks
+                              final bufferParticipants = participantTracks
                                   .sublist(bufferStartIndex, bufferEndIndex);
 
                               // Subscribe to current page participants and buffer participants
                               subscribe(bufferParticipants);
 
                               // Unsubscribe participants not in the buffer range
-                              unsubscribe(widget.participantTracks
+                              unsubscribe(participantTracks
                                   .where((track) =>
-                                      widget.participantTracks.indexOf(track) <
+                                      participantTracks.indexOf(track) <
                                           bufferStartIndex ||
-                                      widget.participantTracks.indexOf(track) >=
+                                      participantTracks.indexOf(track) >=
                                           bufferEndIndex)
                                   .toList());
 
@@ -202,55 +194,27 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                           },
                           itemBuilder: (context, pageIndex) {
                             final startIndex = pageIndex * itemsPerPage;
-                            final endIndex = math.min(startIndex + itemsPerPage, numParticipants);
-                            final pageParticipants = widget.participantTracks.sublist(startIndex, endIndex);
+                            final endIndex = math.min(
+                                startIndex + itemsPerPage, numParticipants);
+                            final pageParticipants =
+                                participantTracks.sublist(startIndex, endIndex);
 
                             return ListView.builder(
-                              scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
+                              scrollDirection:
+                                  isMobile ? Axis.horizontal : Axis.vertical,
                               itemCount: pageParticipants.length,
                               itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    // Add interaction logic here
-                                  },
-                                  child: Card(
-                                    elevation: 4.0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(0),
-                                    ),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(0),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(0),
-                                        child: SizedBox(
-                                          width: isMobile
-                                              ? screenSize.width * 0.4 // Smaller width for horizontal scroll on mobile
-                                              : screenSize.width * 0.9, // Default width for vertical scroll
-                                          height: isMobile
-                                              ? screenSize.height * 0.15 // Smaller height for horizontal scroll on mobile
-                                              : screenSize.height * 0.2, // Default height for vertical scroll
-                                          child: ParticipantWidget.widgetFor(
-                                            pageParticipants[index],
-                                            widget.participantStatuses[widget.participantTracks.indexOf(pageParticipants[index])],
-                                            showStatsLayer: false,
-                                            participantIndex: index,
-                                            onParticipantsStatusChanged: (updatedStatus) {
-                                              // Handle participant status changes
-                                              if (widget.onParticipantsStatusChanged != null) {
-                                                _handlePinAndSpotlightStatusChanged(
-                                                  updatedStatus,
-                                            
-                                                );
-                                              
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                return MemoizedParticipantCard(
+                                  key: ValueKey(pageParticipants[index].participant.identity),
+                                  track: pageParticipants[index],
+                                  status: participantStatuses[
+                                      participantTracks.indexOf(
+                                          pageParticipants[index])],
+                                  index: index,
+                                  isLocalHost: widget.isLocalHost,
+                                  width: isMobile ? screenSize.width * 0.4 : screenSize.width * 0.9,
+                                  height: isMobile ? screenSize.height * 0.15 : screenSize.height * 0.2,
+                                  onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
                                 );
                               },
                             );
@@ -263,25 +227,25 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
                             child: pageCount > 4
-                        ? Text(
-                            'Page ${_pag+ 1} of $pageCount',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16.0,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        :  SmoothPageIndicator(
-                              controller: _pageController,
-                              count: pageCount,
-                              effect: JumpingDotEffect(
-                                dotWidth: 10.0,
-                                dotHeight: 10.0,
-                                spacing: 10.0,
-                                dotColor: Colors.white,
-                                activeDotColor: Colors.black,
-                              ),
-                            ),
+                                ? Text(
+                                    'Page ${_pag + 1} of $pageCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16.0,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : SmoothPageIndicator(
+                                    controller: _pageController,
+                                    count: pageCount,
+                                    effect: const JumpingDotEffect(
+                                      dotWidth: 10.0,
+                                      dotHeight: 10.0,
+                                      spacing: 10.0,
+                                      dotColor: Colors.white,
+                                      activeDotColor: Colors.black,
+                                    ),
+                                  ),
                           ),
                         ),
                       if (hasPagination)
@@ -321,6 +285,12 @@ class _ParticipantListViewState extends State<ParticipantListView> {
 
   @override
   void dispose() {
+    // Clean up all subscriptions
+    for (var track in participantTracks) {
+      if (track.participant is RemoteParticipant) {
+        unsubscribe([track]);
+      }
+    }
     _pageController.dispose();
     super.dispose();
   }

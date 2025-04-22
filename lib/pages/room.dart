@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -19,7 +20,6 @@ import 'package:video_meeting_room/pages/room-widget/NewParticipantDialog.dart';
 import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
-import 'package:video_meeting_room/widgets/participant.dart';
 
 import 'package:video_meeting_room/widgets/room-header.dart';
 import 'package:video_meeting_room/widgets/thank_you.dart';
@@ -43,14 +43,6 @@ class RoomPage extends StatefulWidget {
   State<StatefulWidget> createState() => _RoomPageState();
 }
 
-class PrioritizedTracksResult {
-  final List<ParticipantTrack> tracks;
-  final bool isPiP;
-  final bool isSideBarShouldVisible;
-
-  PrioritizedTracksResult(this.tracks, this.isPiP,this.isSideBarShouldVisible);
-}
-
 class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   // ==================== Properties/Fields ====================
   Map<String, SyncedParticipant> syncedParticipants = {};
@@ -64,7 +56,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   String searchQuery = '';
   bool _isPiP = false;
   bool _isSideBarShouldVisible = false;
-
+  
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
       GetIt.instance<RoomDataManageService>();
@@ -296,13 +288,33 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _sortUserMediaTracks() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final fiveSecondsAgo = now - 10000;
+
+    final pinnedSet = Set<String>.from(
+      context.read<PinnedParticipantProvider>().pinnedIdentities,
+    );
+
     List<SyncedParticipant> userMediaParticipants = syncedParticipants.values
         .where((participant) => participant.track != null)
         .toList();
 
     userMediaParticipants.sort((a, b) {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final fiveSecondsAgo = now - 10000;
+      final aPinned = pinnedSet.contains(a.identity);
+      final bPinned = pinnedSet.contains(b.identity);
+      if (aPinned != bPinned) return aPinned ? -1 : 1;
+
+      final aStatus = a.status;
+      final bStatus = b.status;
+      final aHandRaised = aStatus?.isHandRaised ?? false;
+      final bHandRaised = bStatus?.isHandRaised ?? false;
+
+      if (aHandRaised != bHandRaised) return aHandRaised ? -1 : 1;
+      if (aHandRaised && bHandRaised) {
+        final aTime = aStatus?.handRaisedTimeStamp ?? 0;
+        final bTime = bStatus?.handRaisedTimeStamp ?? 0;
+        return aTime.compareTo(bTime);
+      }
 
       final aSpokeAt =
           a.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
@@ -312,40 +324,44 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
       final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
 
-      if (aSpokeRecently != bSpokeRecently) {
-        return aSpokeRecently ? -1 : 1;
+      if (aSpokeRecently != bSpokeRecently) return aSpokeRecently ? -1 : 1;
+
+      // Fair exposure logic: participant not shown recently gets higher priority
+      final aLastShown = a.lastShownAt ?? 0;
+      final bLastShown = b.lastShownAt ?? 0;
+      if (aLastShown != bLastShown) {
+        return aLastShown.compareTo(bLastShown); // Older lastShownAt comes first
       }
 
+      // Prefer participants with video
       if (a.track?.participant.hasVideo != b.track?.participant.hasVideo) {
         return a.track?.participant.hasVideo == true ? -1 : 1;
       }
 
-      return a.track?.participant.joinedAt.millisecondsSinceEpoch ??
-          0 - (b.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0);
+      // Fallback: earlier join time
+      return (a.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0)
+          .compareTo(b.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0);
     });
 
-    userMediaParticipants.sort((a, b) {
-      final statusA = a.status;
-      final statusB = b.status;
+    final currentOrder = syncedParticipants.values
+        .where((participant) => participant.track != null)
+        .map((p) => p.identity)
+        .toList();
 
-      final isHandRaisedA = statusA?.isHandRaised ?? false;
-      final isHandRaisedB = statusB?.isHandRaised ?? false;
+    final newOrder = userMediaParticipants.map((p) => p.identity).toList();
 
-      if (!isHandRaisedA && !isHandRaisedB) {
-        return 0;
-      } else if (!isHandRaisedA) {
-        return 1;
-      } else if (!isHandRaisedB) {
-        return -1;
+    if (!listEquals(currentOrder, newOrder)) {
+      // Update lastShownAt for top 4 participants only
+      for (int i = 0; i < userMediaParticipants.length && i < 4; i++) {
+        userMediaParticipants[i].lastShownAt = now;
       }
 
-      return (statusA?.handRaisedTimeStamp ?? 0) -
-          (statusB?.handRaisedTimeStamp ?? 0);
-    });
-
-    setState(() {
-      syncedParticipants = {for (var p in userMediaParticipants) p.identity: p};
-    });
+      setState(() {
+        syncedParticipants = {
+          for (var p in userMediaParticipants) p.identity: p
+        };
+      });
+    }
 
     _addLocalParticipant();
     subscribeToFirstToFourthParticipants();
@@ -355,7 +371,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     final localParticipant = widget.room.localParticipant;
 
     if (localParticipant == null) {
-      print('[DEBUG] No local participant found.');
       return;
     }
 
@@ -374,23 +389,13 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
           role: localParticipantRole!,
         );
 
-    print('[DEBUG] Adding local participant: $localIdentity');
-    print(
-        '[DEBUG] Existing syncedParticipants count: ${syncedParticipants.length}');
-    print('[DEBUG] Existing Status: $existingStatus');
-
     // Remove existing entry if present (avoid duplicates)
-    final wasRemoved = syncedParticipants.remove(localIdentity) != null;
-    if (wasRemoved) {
-      print('[DEBUG] Removed existing local participant from synced list');
-    }
+    syncedParticipants.remove(localIdentity);
 
     // Convert to list to control order
     final entries = syncedParticipants.entries.toList();
 
     if (entries.length >= 3) {
-      print(
-          '[DEBUG] More than 3 participants exist. Inserting local at index 3.');
       entries.insert(
           3,
           MapEntry(
@@ -402,7 +407,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
             ),
           ));
     } else {
-      print('[DEBUG] Less than 3 participants. Adding local normally.');
       entries.add(MapEntry(
         localIdentity,
         SyncedParticipant(
@@ -417,10 +421,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     syncedParticipants
       ..clear()
       ..addEntries(entries);
-
-    print(
-        '[DEBUG] Final syncedParticipants count: ${syncedParticipants.length}');
-    print('[DEBUG] Synced identities: ${syncedParticipants.keys.toList()}');
   }
 
   void subscribeToFirstToFourthParticipants() {
@@ -430,25 +430,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
     List<SyncedParticipant> sortedParticipants =
         syncedParticipants.values.where((p) => p.track != null).toList();
-
-    sortedParticipants.sort((a, b) {
-      final aSpokeAt =
-          a.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
-      final bSpokeAt =
-          b.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
-
-      final aSpokeRecently =
-          aSpokeAt > (DateTime.now().millisecondsSinceEpoch - 10000);
-      final bSpokeRecently =
-          bSpokeAt > (DateTime.now().millisecondsSinceEpoch - 10000);
-
-      if (aSpokeRecently != bSpokeRecently) {
-        return aSpokeRecently ? -1 : 1;
-      }
-
-      return a.track?.participant.joinedAt.millisecondsSinceEpoch ??
-          0 - (b.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0);
-    });
 
     int limit = sortedParticipants.length < 4 ? sortedParticipants.length : 4;
 
@@ -604,23 +585,41 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     _sortParticipants('sendParticipantsStatus');
   }
 
-void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
-  final updatedIdentities = updatedStatuses.map((p) => p.identity).toSet();
+  void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
+    final updatedIdentities = updatedStatuses.map((p) => p.identity).toSet();
 
-  setState(() {
-    // Remove existing ones with the same identity
-    participantsStatusList.removeWhere((p) => updatedIdentities.contains(p.identity));
-    
-    // Add updated participants
-    participantsStatusList.addAll(updatedStatuses);
+    // Compute new list outside of setState
+    final newList = [
+      // Keep existing that are not being updated
+      ...participantsStatusList
+          .where((p) => !updatedIdentities.contains(p.identity)),
 
-    // Update and sync
-    _updateRoomData(participantsStatusList).then((_) {
+      // Add the new/updated participants
+      ...updatedStatuses,
+    ];
+
+    setState(() {
+      participantsStatusList
+        ..clear()
+        ..addAll(newList);
+    });
+
+    // Sync after state updated
+    _updateRoomData(newList).then((_) {
       sendParticipantsStatus();
     });
-  });
-}
+  }
 
+  void _handlePinAndSpotlightStatusChanged(ParticipantStatus status) {
+    // Update the participant status
+    List<ParticipantStatus> updatedStatuses = updateSpotlightStatus(
+      participantList: participantsStatusList,
+      updatedStatus: status,
+    );
+
+    // Call the callback function with the updated statuses
+    updateParticipantsStatus(updatedStatuses);
+  }
 
   Future<void> _updateRoomData(List<ParticipantStatus> statuslist) async {
     final roomSID = await widget.room.getSid();
@@ -821,7 +820,7 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
     });
   }
 
-  List<ParticipantTrack> getPrioritizedTracks(
+  List<SyncedParticipant> getPrioritizedTracks(
     Map<String, SyncedParticipant> participants,
     List<String> pinnedIds,
     String? localIdentity,
@@ -836,7 +835,7 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
         .where((p) =>
             p.track?.type == ParticipantTrackType.kScreenShare &&
             p.identity != localIdentity)
-        .map((p) => p.track!)
+        .map((p) => p!)
         .toList();
     if (screenShares.isNotEmpty) {
       onPiPChanged?.call(true);
@@ -848,54 +847,74 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
     final spotlights = participants.values
         .where(
             (p) => p.status?.isSpotlight == true && p.identity != localIdentity)
-        .map((p) => p.track!)
+        .map((p) => p)
         .toList();
     if (spotlights.isNotEmpty) {
       onPiPChanged?.call(true);
-       onSideBarShouldVisible?.call(true);
-       print('Spotlights: ${spotlights.length}');
-      print('Spotlights: ${spotlights.map((e) => e.participant.name)}');
+      onSideBarShouldVisible?.call(true);
       return spotlights;
     }
 
     // Pinned participants (can include local)
     final pinned = participants.values
         .where((p) => pinnedIds.contains(p.identity))
-        .map((p) => p.track!)
+        .map((p) => p)
         .toList();
     if (pinned.isNotEmpty) {
       onPiPChanged?.call(true);
-       onSideBarShouldVisible?.call(true);
+      onSideBarShouldVisible?.call(true);
       return pinned;
     }
 
     // Default grid participants
- final defaultGrid = participants.values
-    .where((p) {
-      final isSpotlight = p.status?.isSpotlight == true;
-      final isScreenShare =
-          p.track?.type == ParticipantTrackType.kScreenShare;
-      final isLocal = p.identity == localIdentity;
-
-      return !isScreenShare &&
-          (!isSpotlight || (isSpotlight && isLocal == false));
-    })
-    .map((p) => p.track!)
-    .toList();
+    final defaultGrid = participants.values
+        .where((p) {
+          final isSpotlight = p.status?.isSpotlight == true;
+          final isScreenShare =
+              p.track?.type == ParticipantTrackType.kScreenShare;
+          final isLocal = p.identity == localIdentity;
+          return !isScreenShare && (!isSpotlight || isLocal);
+        })
+        .map((p) => p)
+        .toList();
 
     // Enable PiP if more than 4 participants
     if (defaultGrid.length > 4) {
       isPiP = true;
-       defaultGrid.removeWhere((track) {
-        return track.participant.identity == localIdentity;
+      defaultGrid.removeWhere((p) {
+        return p.track!.participant.identity == localIdentity;
       });
-    } 
+    }
 
     onPiPChanged?.call(isPiP);
     onSideBarShouldVisible?.call(isSideBarShouldVisible);
-    print('Default Grid: ${defaultGrid.length}');
-    print('Default Grid: ${defaultGrid.map((e) => e.participant.name)}');
     return defaultGrid;
+  }
+
+  List<SyncedParticipant> getSidebarParticipants(
+    List<SyncedParticipant> prioritizedTracks,
+    String localIdentity,
+  ) {
+    final shownIds = prioritizedTracks
+        .map((p) => p.track!.participant.identity)
+        .toSet(); // IDs already shown in grid or PiP
+
+    final sidebarTracks = syncedParticipants.values
+        .where((p) =>
+            p.track != null &&
+            p.identity != localIdentity &&
+            !shownIds.contains(p.identity) &&
+            p.track?.type != ParticipantTrackType.kScreenShare)
+        .toList();
+
+    if (sidebarTracks.isNotEmpty) {
+      setState(() {
+        _isSideBarShouldVisible = true;
+      });
+    }
+    // Optional: toggle sidebar visibility state
+
+    return sidebarTracks;
   }
 
   @override
@@ -930,24 +949,10 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
         }
       },
     );
-
-    final shownIds = prioritizedTracks
-        .map((track) => track.participant.identity)
-        .toSet(); // So we can exclude these
-
-   final sidebarTracks = syncedParticipants.values
-    .where((p) =>
-        p.track != null &&
-        p.identity != localIdentity && // Exclude local participant
-        !shownIds.contains(p.identity) &&
-        p.track?.type != ParticipantTrackType.kScreenShare) // Avoid screenshare
-    .map((p) => p.track!)
-    .toList();
-    if(sidebarTracks.isEmpty) {
-      setState(() {
-      _isSideBarShouldVisible =false;
-    });
-    }
+    final sidebarTracks = getSidebarParticipants(
+      prioritizedTracks,
+      localIdentity!,
+    );
 
     return Scaffold(
       key: _scaffoldKey,
@@ -974,15 +979,11 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
                         child: Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: ParticipantGridView(
-                            participantTracks: prioritizedTracks,
-                            participantStatuses: syncedParticipants.values
-                                .map((e) => e.status)
-                                .whereType<ParticipantStatus>()
-                                .toList(),
+                            syncedParticipant: prioritizedTracks,
                             isLocalHost:
                                 localParticipantRole == Role.admin.toString(),
                             onParticipantsStatusChanged:
-                                updateParticipantsStatus,
+                                _handlePinAndSpotlightStatusChanged,
                           ),
                         ),
                       ),
@@ -1008,18 +1009,18 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
                   duration: const Duration(milliseconds: 300),
                   width: (!isMobile &&
                           widget.room.localParticipant != null &&
-                          isParticipantListVisible && _isSideBarShouldVisible)
+                          isParticipantListVisible &&
+                          _isSideBarShouldVisible)
                       ? 300
                       : 0,
                   color: const Color(0xFF404040),
                   child: _isSideBarShouldVisible
                       ? ParticipantListView(
-                          participantTracks: sidebarTracks,
-                          participantStatuses: syncedParticipants.values
-                              .map((e) => e.status)
-                              .whereType<ParticipantStatus>()
-                              .toList(),
-                          onParticipantsStatusChanged: updateParticipantsStatus,
+                          syncedParticipant: sidebarTracks,
+                          isLocalHost:
+                              localParticipantRole == Role.admin.toString(),
+                          onParticipantsStatusChanged:
+                              _handlePinAndSpotlightStatusChanged,
                         )
                       : null,
                 ),
@@ -1054,7 +1055,7 @@ void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
                 localParticipantTrack: localParticipantTrack!,
                 localParticipantStatus: localParticipantStatus!,
                 localParticipantRole: localParticipantRole!,
-                updateParticipantsStatus: updateParticipantsStatus,
+                updateParticipantsStatus: _handlePinAndSpotlightStatusChanged,
               ),
           ],
         ),

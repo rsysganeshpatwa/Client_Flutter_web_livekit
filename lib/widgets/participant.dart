@@ -173,11 +173,9 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
     super.initState();
     _listener = widget.participant.createListener();
     _listener?.on<TranscriptionEvent>((e) {
-      for (var seg in e.segments) {
-        print('Transcription: ${seg.text} ${seg.isFinal}');
-      }
+     
     });
-      print('Participant isLocalHost: ${widget.isLocalHost}');
+    
     widget.participant.addListener(_onParticipantChanged);
     _onParticipantChanged();
   }

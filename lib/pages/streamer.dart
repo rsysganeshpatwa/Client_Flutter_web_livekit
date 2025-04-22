@@ -16,9 +16,9 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
   List<Map<String, dynamic>> ingressList = [];
   List<Map<String, dynamic>> egressList = [];
   
-  final TextEditingController _roomNameController = TextEditingController(text: "ganesh");
+  final TextEditingController _roomNameController = TextEditingController(text: "");
   final TextEditingController _streamerNameController = TextEditingController(text: "Streamer");
-  final TextEditingController _youtubeKeyController = TextEditingController(text: "dfwz-qg06-per2-qs6k-a6vh");
+  final TextEditingController _youtubeKeyController = TextEditingController(text: "");
   
   late TabController _tabController;
   
