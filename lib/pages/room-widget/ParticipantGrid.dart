@@ -41,25 +41,33 @@ class _ParticipantGridState extends State<ParticipantGrid> {
 
   Future<void> _onParticipantTap(BuildContext context, ParticipantTrack participantTrack) async {
     // Capture a frame from the video
+
+   
+    if (!participantTrack.participant.isCameraEnabled()) {
+      // Handle the case where there are no video tracks
+      _showErrorDialog(context, "No video track available for this participant.");
+      return;
+    }
     final track = participantTrack.participant.videoTrackPublications.first.track as Track;
     final byteBufferImage = await track.mediaStreamTrack.captureFrame();
+  
 
     // Convert ByteBuffer to Uint8List
     final uint8List = byteBufferImage.asUint8List();
 
-    // Show loading dialog
-    final loadingDialog = showDialog(
+    showDialog(
+      // ignore: use_build_context_synchronously
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
+        return const AlertDialog(
           backgroundColor: Colors.white,
           content: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 20),
-              const Text("Extracting text...", style: TextStyle(color: Colors.black)),
+               CircularProgressIndicator(),
+               SizedBox(width: 20),
+               Text("Extracting text...", style: TextStyle(color: Colors.black)),
             ],
           ),
         );

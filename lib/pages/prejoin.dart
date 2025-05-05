@@ -274,14 +274,25 @@ class _PreJoinPageState extends State<PreJoinPage> {
             args.token,
             connectOptions: const ConnectOptions(
              autoSubscribe: false,
+          
              
             ),
             roomOptions: RoomOptions(
+              
+              defaultAudioCaptureOptions: AudioCaptureOptions(
+                deviceId: _selectedAudioDevice?.deviceId,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                
+                 
+              ),
               adaptiveStream: args.adaptiveStream,
         
               dynacast: args.dynacast,
               defaultAudioPublishOptions: const AudioPublishOptions(
                 name: 'custom_audio_track_name',
+                
               ),
               defaultVideoPublishOptions: VideoPublishOptions(
                 simulcast: args.simulcast,

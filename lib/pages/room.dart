@@ -56,7 +56,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   String searchQuery = '';
   bool _isPiP = false;
   bool _isSideBarShouldVisible = false;
-  
+
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
       GetIt.instance<RoomDataManageService>();
@@ -234,6 +234,20 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     final localParticipant = widget.room.localParticipant;
     final bool isLocalHost = localParticipant != null &&
         localParticipantRole == Role.admin.toString();
+    final localParticipantStatus =
+        _getParticipantStatus(localParticipant!.identity) ??
+            ParticipantStatus(
+              identity: localParticipant.identity,
+              isAudioEnable: true,
+              isVideoEnable: true,
+              isTalkToHostEnable: false,
+              isHandRaised: false,
+              isPinned: false,
+              isSpotlight: false,
+              role: localParticipantRole!,
+            );
+
+    final bool isSpotlight = localParticipantStatus!.isSpotlight;
 
     // Clear synced list before re-building
     syncedParticipants.clear();
@@ -251,11 +265,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       final isAudio = participantStatus.isAudioEnable;
       final isTalkToHostEnable = participantStatus.isTalkToHostEnable;
 
-      final shouldAudioSubscribe =
-          (isTalkToHostEnable && (isLocalHost || isRemoteParticipantHost)) ||
-              (isAudio &&
-                  !((isLocalHost || isRemoteParticipantHost) &&
-                      !isTalkToHostEnable));
+      final shouldAudioSubscribe = (isTalkToHostEnable &&
+              (isLocalHost || isRemoteParticipantHost || isSpotlight)) ||
+          (isAudio &&
+              !((isLocalHost || isRemoteParticipantHost) &&
+                  !isTalkToHostEnable));
 
       for (var element in participant.audioTrackPublications) {
         if (shouldAudioSubscribe) {
@@ -274,7 +288,10 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
           ),
           status: participantStatus,
         );
-      } else if (isVideo || isLocalHost || isRemoteParticipantHost) {
+      } else if (isVideo ||
+          isLocalHost ||
+          isRemoteParticipantHost ||
+          isSpotlight) {
         syncedParticipants[identity] = SyncedParticipant(
           identity: identity,
           track: ParticipantTrack(participant: participant),
@@ -316,21 +333,17 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         return aTime.compareTo(bTime);
       }
 
-      final aSpokeAt =
-          a.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
-      final bSpokeAt =
-          b.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+      final aIsSpeaking = a.track?.participant.isSpeaking ?? false;
+      final bIsSpeaking = b.track?.participant.isSpeaking ?? false;
 
-      final aSpokeRecently = aSpokeAt > fiveSecondsAgo;
-      final bSpokeRecently = bSpokeAt > fiveSecondsAgo;
-
-      if (aSpokeRecently != bSpokeRecently) return aSpokeRecently ? -1 : 1;
+      if (aIsSpeaking != bIsSpeaking) return aIsSpeaking ? -1 : 1;
 
       // Fair exposure logic: participant not shown recently gets higher priority
       final aLastShown = a.lastShownAt ?? 0;
       final bLastShown = b.lastShownAt ?? 0;
       if (aLastShown != bLastShown) {
-        return aLastShown.compareTo(bLastShown); // Older lastShownAt comes first
+        return aLastShown
+            .compareTo(bLastShown); // Older lastShownAt comes first
       }
 
       // Prefer participants with video
@@ -910,6 +923,10 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     if (sidebarTracks.isNotEmpty) {
       setState(() {
         _isSideBarShouldVisible = true;
+      });
+    } else {
+      setState(() {
+        _isSideBarShouldVisible = false;
       });
     }
     // Optional: toggle sidebar visibility state

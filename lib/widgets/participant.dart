@@ -239,11 +239,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               : null,
         ),
        decoration: BoxDecoration(
-  color: widget.participantStatus.isSpotlight
-      ? const Color(0xFFFFD700) // Gold for spotlight
-      : isPinned
-          ? const Color(0xFF2196F3) // Blue for pinned
-          : const Color(0xFF747474), // Default gray
+  color  : const Color(0xFF747474), // Default gray
   border: Border.all(
     color: widget.participantStatus.isSpotlight
         ? Colors.orangeAccent
@@ -252,7 +248,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
             : Colors.transparent,
     width: 3.0,
   ),
-  borderRadius: BorderRadius.circular(8.0),
+ 
 ),
         child: Stack(
           children: [
@@ -429,9 +425,36 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 style: const TextStyle(color: Colors.white),
               ),
             ),
+            
           ];
         },
       ),
+        if (widget.participantStatus.isSpotlight)
+        Container(
+          margin: const EdgeInsets.only(left: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.orange.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            'Spotlighted',
+            style: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      if (isPinned)
+        Container(
+          margin: const EdgeInsets.only(left: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            'Pinned',
+            style: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
     ],
   ),
 ),

@@ -88,13 +88,22 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
       if (type == 'audio') {
         _selectAllAudio = value;
         final updatedList = widget.participantsStatusList.map((status) {
-          return status.copyWith(isAudioEnable: _selectAllAudio,isTalkToHostEnable: _selectAllAudio);
+          // Update only if the participant is not an admin
+          if (status.role != Role.admin.toString()) {
+             return status.copyWith(isAudioEnable: _selectAllAudio,isTalkToHostEnable: _selectAllAudio);
+          }
+          return status; // Leave admin participants unchanged
         }).toList();
         widget.onParticipantsStatusChanged(updatedList);
       } else if (type == 'video') {
         _selectAllVideo = value;
         final updatedList = widget.participantsStatusList.map((status) {
-          return status.copyWith(isVideoEnable: _selectAllVideo);
+          // Update only if the participant is not an admin
+          if (status.role != Role.admin.toString()) {
+        return status.copyWith(isVideoEnable: _selectAllVideo);
+          }
+          return status; // Leave admin participants unchanged
+        
         }).toList();
         widget.onParticipantsStatusChanged(updatedList);
       } else {
@@ -115,6 +124,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
 
   void updateAudioVideoStatus(
       ParticipantStatus participantStatus, bool isAudio, bool isVideo) {
+    
     final updatedStatus = participantStatus.copyWith(
       isAudioEnable: isAudio,
       isVideoEnable: isVideo,
@@ -124,7 +134,7 @@ class _ParticipantDrawerState extends State<ParticipantDrawer> {
   }
 
   void updateSpotLightStatus(ParticipantStatus participantStatus, bool isSpotlight) {
-
+   
 
     final updatedStatus = participantStatus.copyWith(
       isSpotlight: isSpotlight,
@@ -256,10 +266,10 @@ return Drawer(
                       length: 2,
                       child: Column(
                         children: [
-                          TabBar(
-                            labelColor: const Color(0xFF9FF5FF),
+                          const TabBar(
+                            labelColor:  Color(0xFF9FF5FF),
                             unselectedLabelColor: Colors.grey,
-                            indicatorColor: const Color(
+                            indicatorColor:  Color(
                                 0xFF9FF5FF), // Updated indicator color
                             tabs: [
                               Tab(text: 'Audio Manage'),
@@ -605,40 +615,29 @@ Widget _buildParticipantTile(
 Row _getAudioManageTrailingIcons(ParticipantStatus participantStatus,bool isFromHandRaised) {
   return Row(
     mainAxisSize: MainAxisSize.min,
+
     children: [
-      Tooltip(
-        message: (participantStatus.isTalkToHostEnable)
-            ? 'Disallow to talk'
-            : 'Allow to talk',
-        child: IconButton(
-          icon: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white, // White circle background
-            ),
-            padding: EdgeInsets.all(1), // Padding to make it a circle
-            child: Icon(
-              (participantStatus.isTalkToHostEnable)
-                  ? Icons.mic
-                  : Icons.mic_off,
-              color: (participantStatus.isTalkToHostEnable )
-                  ? Colors.black
-                  : Colors.red,
-            ),
-          ),
-          onPressed: () {
-            final newAllowToTalkStatus =
-                !(participantStatus.isTalkToHostEnable );
-            updateAllowToTalkStatus(participantStatus, newAllowToTalkStatus);
-          },
-        ),
+      ParticipantControlIcon(
+        isDisabled: participantStatus.role == Role.admin.toString(),
+        isActive: participantStatus.isTalkToHostEnable,
+        iconOn: Icons.mic,
+        iconOff: Icons.mic_off,
+        tooltipOn: 'Disallow to talk',
+        tooltipOff: 'Allow to talk',
+        colorActive: Colors.black,
+        colorInactive: Colors.red,
+        onTap: () {
+          final newAllowToTalkStatus = !(participantStatus.isTalkToHostEnable);
+          updateAllowToTalkStatus(
+              participantStatus, newAllowToTalkStatus);
+        },
       ),
       if (isFromHandRaised && participantStatus.isHandRaised )
         Tooltip(
           message: 'Raised hand',
           child: Container(
            
-            padding: EdgeInsets.all(1), // Padding to make it a circle
+            padding: const EdgeInsets.all(1), // Padding to make it a circle
             child: const Icon(
               Icons.pan_tool,
               color: Colors.orange,
@@ -653,11 +652,13 @@ Widget _getTogetherModeTrailingIcons(ParticipantStatus participantStatus) {
   final pinnedProvider =
       Provider.of<PinnedParticipantProvider>(context);
   final isPinned = pinnedProvider.isPinned(participantStatus.identity);
+  final isLocalHost = participantStatus.role == Role.admin.toString() ;
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-    
+      
       ParticipantControlIcon(
+        isDisabled: isLocalHost,
         isActive: participantStatus.isAudioEnable ,
         iconOn: Icons.volume_up,
         iconOff: Icons.volume_off,
@@ -674,6 +675,7 @@ Widget _getTogetherModeTrailingIcons(ParticipantStatus participantStatus) {
       const SizedBox(width: 6),
     
       ParticipantControlIcon(
+        isDisabled: isLocalHost,
         isActive: participantStatus.isVideoEnable ,
         iconOn: Icons.videocam,
         iconOff: Icons.videocam_off,

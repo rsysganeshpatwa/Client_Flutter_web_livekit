@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/pages/connect.dart';
 import 'package:video_meeting_room/utils.dart';
+import 'package:video_meeting_room/widgets/link_expried.dart';
 
 
 class LoginPage extends StatefulWidget {
@@ -37,10 +38,21 @@ class _LoginPageState extends State<LoginPage> {
 
       final role = decodedParams['role'];
       final room = decodedParams['room'];
+      print('Decoded Params: $decodedParams');
+      print('Role: $role');
+      print('Room: $room');
+      print('Encrypted Params: $encryptedParams');
+      print('Decoded Encrypted Params: $decodedEncryptedParams');
+      print('Decrypted Params: $decryptedParams');
+
       if (role != null && room != null) {
         _navigateToConnect();
       } else {
-        _checkLoginStatus();
+        Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(builder: (context) => const LinkExpiredScreen()),
+);
+
       }
     } else {
       _checkLoginStatus();

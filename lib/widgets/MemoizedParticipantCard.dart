@@ -9,9 +9,11 @@ class MemoizedParticipantCard extends StatelessWidget {
   final int index;
   final bool isLocalHost;
   final Function(ParticipantStatus)? onParticipantsStatusChanged;
+  // Function to handle participant status changes
   final VoidCallback? onTap;
   final double width;
   final double height;
+
 
   const MemoizedParticipantCard({
     Key? key,
@@ -28,7 +30,6 @@ class MemoizedParticipantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
       child: Card(
         elevation: 4.0,
         shape: const RoundedRectangleBorder(
@@ -50,6 +51,7 @@ class MemoizedParticipantCard extends StatelessWidget {
                 participantIndex: index,
                 isLocalHost: isLocalHost,
                 onParticipantsStatusChanged: onParticipantsStatusChanged!,
+                handleExtractText: isLocalHost ? onTap : null,
               ),
             ),
           ),

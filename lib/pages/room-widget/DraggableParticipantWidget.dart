@@ -37,6 +37,27 @@ class _DraggableParticipantWidgetState
   bool _isExpanded = false; // Track whether the widget is expanded or not
   bool _isDragging = false;
 
+    void _adjustPositionForBounds(double screenWidth, double screenHeight) {
+    // Adjust position if expanding would push the widget out of bounds
+    if (_isExpanded) {
+      // Check and adjust for right edge
+      if (screenWidth - _rightPosition - _width < 0) {
+        _rightPosition = screenWidth - _width;
+      }
+      
+      // Check and adjust for bottom edge
+      if (screenHeight - _bottomPosition - _height < 0) {
+        _bottomPosition = screenHeight - _height;
+      }
+
+      // Check and adjust for top edge
+      double topPosition = screenHeight - _bottomPosition - _height;
+      if (topPosition < 0) {
+        _bottomPosition = screenHeight - _height;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -55,7 +76,7 @@ class _DraggableParticipantWidgetState
         decoration: BoxDecoration(
           color: Colors.blueGrey,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
         ),
         child: Stack(
           children: [
@@ -101,10 +122,13 @@ class _DraggableParticipantWidgetState
                   cursor: _isDragging
                       ? SystemMouseCursors.grabbing
                       : SystemMouseCursors.grab,
-                  child: const Icon(
-                    Icons.drag_handle,
-                    color: Colors.white,
-                    size: 30,
+                  child:  Tooltip(
+                    message: !_isDragging ? 'Drag to move' : '',
+                    child: const Icon(
+                      Icons.drag_handle,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                 ),
               ),
@@ -121,14 +145,22 @@ class _DraggableParticipantWidgetState
                     _width = _isExpanded
                         ? _maxWidth
                         : _minWidth; // Toggle between max and min height
+                          _adjustPositionForBounds(screenWidth, screenHeight);
                   });
                 },
-                child: Icon(
-                  !_isExpanded ? Icons.open_in_full : Icons.close_fullscreen,
-                  color: Colors.white,
-                  size: 30,
-                ),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                child: Tooltip(
+                    message: _isExpanded ? 'Minimize View' : 'Expand View',
+                    child: const Icon(
+                      Icons. open_in_full,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    
               ),
+              ),
+            ),
             ),
           ],
         ),
