@@ -38,12 +38,12 @@ class _LoginPageState extends State<LoginPage> {
 
       final role = decodedParams['role'];
       final room = decodedParams['room'];
-      print('Decoded Params: $decodedParams');
-      print('Role: $role');
-      print('Room: $room');
-      print('Encrypted Params: $encryptedParams');
-      print('Decoded Encrypted Params: $decodedEncryptedParams');
-      print('Decrypted Params: $decryptedParams');
+      // print('Decoded Params: $decodedParams');
+      // print('Role: $role');
+      // print('Room: $room');
+      // print('Encrypted Params: $encryptedParams');
+      // print('Decoded Encrypted Params: $decodedEncryptedParams');
+      // print('Decrypted Params: $decryptedParams');
 
       if (role != null && room != null) {
         _navigateToConnect();

@@ -31,6 +31,12 @@ class _ParticipantListViewState extends State<ParticipantListView> {
 
   final List<ParticipantTrack> participantTracks = [];
   final List<ParticipantStatus> participantStatuses = [];
+  final int itemsPerPage = 4;
+  int bufferSize = 2; // 2 pages before and after
+  int? previousStartIndex;
+  int? previousEndIndex;
+  int? previousNumParticipants;
+  int _pag = 0;
 
 // update state
   @override
@@ -51,27 +57,21 @@ class _ParticipantListViewState extends State<ParticipantListView> {
   }
 
   void updateState(List<SyncedParticipant> syncedParticipants) {
-    final newTracks = <ParticipantTrack>[];
-    final newStatuses = <ParticipantStatus>[];
-    
-    for (var participant in syncedParticipants) {
-      newTracks.add(participant.track!);
-      newStatuses.add(participant.status!);
-    }
-    
     setState(() {
-      // Clear existing lists before adding new items
       participantTracks.clear();
       participantStatuses.clear();
-      participantTracks.addAll(newTracks);
-      participantStatuses.addAll(newStatuses);
+      for (var syncedParticipant in syncedParticipants) {
+        participantTracks.add(syncedParticipant.track!);
+        participantStatuses.add(syncedParticipant.status!);
+      }
+      int maxPage = (syncedParticipants.length / 4).ceil() - 1;
+      if (maxPage < 0) maxPage = 0;
+      _pag = _pag.clamp(0, maxPage);
+
+      _handlePageChange(_pag);
     });
   }
 
-  int? previousStartIndex;
-  int? previousEndIndex;
-  int? previousNumParticipants;
-  int _pag = 0;
   void subscribe(List<ParticipantTrack> pageParticipants) {
     for (var i = 0; i < pageParticipants.length; i++) {
       final participant = pageParticipants[i].participant;
@@ -101,7 +101,44 @@ class _ParticipantListViewState extends State<ParticipantListView> {
       }
     }
   }
-  
+
+  void _handlePageChange(int pageIndex) {
+    setState(() {
+      _pag = pageIndex;
+    });
+
+    final int numParticipants = participantTracks.length;
+
+    // Clamp the pageIndex to a valid range
+    int maxPage = (numParticipants / itemsPerPage).ceil() - 1;
+    if (maxPage < 0) maxPage = 0;
+    int safePageIndex = pageIndex.clamp(0, maxPage);
+
+    int bufferBefore = (bufferSize ~/ 2) * itemsPerPage;
+    int bufferAfter = (bufferSize - bufferSize ~/ 2) * itemsPerPage;
+
+    final int startIndex =
+        math.max(0, (safePageIndex * itemsPerPage) - bufferBefore);
+    final int endIndex = math.min(numParticipants,
+        (safePageIndex * itemsPerPage) + itemsPerPage + bufferAfter);
+
+    final List<ParticipantTrack> bufferParticipants =
+        participantTracks.sublist(startIndex, endIndex);
+
+    final List<ParticipantTrack> toUnsubscribe =
+        participantTracks.where((track) {
+      int index = participantTracks.indexOf(track);
+      return index < startIndex || index >= endIndex;
+    }).toList();
+
+    if (toUnsubscribe.isNotEmpty) {
+      unsubscribe(toUnsubscribe);
+    }
+
+    if (bufferParticipants.isNotEmpty) {
+      subscribe(bufferParticipants);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,76 +159,45 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                 if (numParticipants <= 4) {
                   subscribe(participantTracks);
                   return ListView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
                     scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
                     itemCount: numParticipants,
                     itemBuilder: (context, index) {
                       return MemoizedParticipantCard(
-                        key: ValueKey(participantTracks[index].participant.identity),
+                        key: ValueKey(
+                            participantTracks[index].participant.identity),
                         track: participantTracks[index],
                         status: participantStatuses.firstWhere(
-                          (status) => status.identity == participantTracks[index].participant.identity,
+                          (status) =>
+                              status.identity ==
+                              participantTracks[index].participant.identity,
                         ),
                         index: index,
                         isLocalHost: widget.isLocalHost,
-                        width: isMobile ? screenSize.width * 0.4 : screenSize.width * 0.9,
-                        height: isMobile ? screenSize.height * 0.15 : screenSize.height * 0.2,
-                        onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
+                        width: isMobile
+                            ? screenSize.width * 0.4
+                            : screenSize.width * 0.9,
+                        height: isMobile
+                            ? screenSize.height * 0.15
+                            : screenSize.height * 0.2,
+                        onParticipantsStatusChanged:
+                            widget.onParticipantsStatusChanged,
                       );
                     },
                   );
                 } else {
-                  final int itemsPerPage = 4;
                   final int pageCount = (numParticipants / itemsPerPage).ceil();
 
                   return Stack(
                     children: [
                       Positioned.fill(
                         child: PageView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
                           scrollDirection:
                               isMobile ? Axis.horizontal : Axis.vertical,
                           controller: _pageController,
                           itemCount: pageCount,
-                          onPageChanged: (pageIndex) {
-                            final startIndex = pageIndex * itemsPerPage;
-                            final endIndex = math.min(
-                                startIndex + itemsPerPage, numParticipants);
-                            setState(() {
-                              _pag = pageIndex;
-                            });
-
-                            // Define a buffer size for prefetching participants before and after the current page
-                            int bufferSize = 4; // Adjust as needed
-
-                            if (startIndex != previousStartIndex ||
-                                endIndex != previousEndIndex ||
-                                numParticipants != previousNumParticipants) {
-                              // Determine the buffer range
-                              int bufferStartIndex = (startIndex - bufferSize)
-                                  .clamp(0, participantTracks.length);
-                              int bufferEndIndex = (endIndex + bufferSize)
-                                  .clamp(0, participantTracks.length);
-
-                              final bufferParticipants = participantTracks
-                                  .sublist(bufferStartIndex, bufferEndIndex);
-
-                              // Subscribe to current page participants and buffer participants
-                              subscribe(bufferParticipants);
-
-                              // Unsubscribe participants not in the buffer range
-                              unsubscribe(participantTracks
-                                  .where((track) =>
-                                      participantTracks.indexOf(track) <
-                                          bufferStartIndex ||
-                                      participantTracks.indexOf(track) >=
-                                          bufferEndIndex)
-                                  .toList());
-
-                              // Update previous indices
-                              previousStartIndex = startIndex;
-                              previousEndIndex = endIndex;
-                              previousNumParticipants = numParticipants;
-                            }
-                          },
+                          onPageChanged: _handlePageChange,
                           itemBuilder: (context, pageIndex) {
                             final startIndex = pageIndex * itemsPerPage;
                             final endIndex = math.min(
@@ -200,21 +206,28 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                 participantTracks.sublist(startIndex, endIndex);
 
                             return ListView.builder(
+                              physics: const NeverScrollableScrollPhysics(),
                               scrollDirection:
                                   isMobile ? Axis.horizontal : Axis.vertical,
                               itemCount: pageParticipants.length,
                               itemBuilder: (context, index) {
                                 return MemoizedParticipantCard(
-                                  key: ValueKey(pageParticipants[index].participant.identity),
+                                  key: ValueKey(pageParticipants[index]
+                                      .participant
+                                      .identity),
                                   track: pageParticipants[index],
-                                  status: participantStatuses[
-                                      participantTracks.indexOf(
-                                          pageParticipants[index])],
+                                  status: participantStatuses[participantTracks
+                                      .indexOf(pageParticipants[index])],
                                   index: index,
                                   isLocalHost: widget.isLocalHost,
-                                  width: isMobile ? screenSize.width * 0.4 : screenSize.width * 0.9,
-                                  height: isMobile ? screenSize.height * 0.15 : screenSize.height * 0.2,
-                                  onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
+                                  width: isMobile
+                                      ? screenSize.width * 0.4
+                                      : screenSize.width * 0.9,
+                                  height: isMobile
+                                      ? screenSize.height * 0.15
+                                      : screenSize.height * 0.2,
+                                  onParticipantsStatusChanged:
+                                      widget.onParticipantsStatusChanged,
                                 );
                               },
                             );

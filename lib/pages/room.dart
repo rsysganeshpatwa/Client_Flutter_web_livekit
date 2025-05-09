@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -32,10 +31,16 @@ import '../widgets/participant_info.dart';
 class RoomPage extends StatefulWidget {
   final Room room;
   final EventsListener<RoomEvent> listener;
+  final bool muteByDefault;
+  final bool enableAudio;
+  final bool enableVideo;
 
   const RoomPage(
     this.room,
-    this.listener, {
+    this.listener,
+    this.muteByDefault,
+    this.enableAudio,
+    this.enableVideo, {
     super.key,
   });
 
@@ -47,6 +52,12 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   // ==================== Properties/Fields ====================
   Map<String, SyncedParticipant> syncedParticipants = {};
   final List<ParticipantStatus> participantsStatusList = [];
+
+  int recentSpeechWindowMs = 10000;
+  int promotionDelayMs = 1000;
+  double minAudioLevel = 0.05;
+  final Map<String, int> speakingCandidates =
+      {}; // Should live outside the function
 
   bool _muteAll = true;
   bool _isHandleRaiseHand = false;
@@ -75,6 +86,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
     _initializeLocalParticipantRole();
+
     _sortParticipants('initState');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!fastConnection) {
@@ -108,6 +120,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
       widget.room.removeListener(_onRoomDidUpdate);
       await _listener.dispose();
+      await widget.room.localParticipant?.unpublishAllTracks();
+      await widget.room.localParticipant?.setCameraEnabled(false);
+      await widget.room.localParticipant?.setMicrophoneEnabled(false);
+      await widget.room.localParticipant?.setScreenShareEnabled(false);
+
       await widget.room.dispose();
       await removeParticipantFromDB();
     })();
@@ -220,7 +237,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
           _checkForPendingRequests();
         }
       });
-      if (localParticipantRole == Role.participant.toString()) {
+      if (localParticipantRole == Role.participant.toString() &&
+          widget.muteByDefault) {
         Future.delayed(Duration.zero, () {
           if (mounted) {
             NewParticipantDialog.show(context, localParticipant.name);
@@ -234,6 +252,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     final localParticipant = widget.room.localParticipant;
     final bool isLocalHost = localParticipant != null &&
         localParticipantRole == Role.admin.toString();
+
     final localParticipantStatus =
         _getParticipantStatus(localParticipant!.identity) ??
             ParticipantStatus(
@@ -247,15 +266,15 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
               role: localParticipantRole!,
             );
 
-    final bool isSpotlight = localParticipantStatus!.isSpotlight;
+    final bool isSpotlight = localParticipantStatus.isSpotlight;
 
-    // Clear synced list before re-building
-    syncedParticipants.clear();
+    final previousSynced =
+        Map<String, SyncedParticipant>.from(syncedParticipants);
+    final Map<String, SyncedParticipant> tempSynced = {};
 
     for (var participant in widget.room.remoteParticipants.values) {
       final identity = participant.identity;
       final participantStatus = _getParticipantStatus(identity);
-
       if (participantStatus == null) continue;
 
       final isRemoteParticipantHost =
@@ -279,26 +298,58 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         }
       }
 
+      // Handle screen share track
       if (participant.isScreenShareEnabled()) {
-        syncedParticipants[identity] = SyncedParticipant(
-          identity: identity,
+        final key = '${identity}_screen';
+
+        tempSynced[key] = SyncedParticipant(
+          identity: key,
           track: ParticipantTrack(
             participant: participant,
             type: ParticipantTrackType.kScreenShare,
           ),
           status: participantStatus,
         );
-      } else if (isVideo ||
-          isLocalHost ||
-          isRemoteParticipantHost ||
-          isSpotlight) {
-        syncedParticipants[identity] = SyncedParticipant(
+      }
+
+      // Handle camera or visible track
+      if (isVideo || isLocalHost || isRemoteParticipantHost || isSpotlight) {
+        tempSynced[identity] = SyncedParticipant(
           identity: identity,
-          track: ParticipantTrack(participant: participant),
+          track: ParticipantTrack(
+            participant: participant,
+            type: ParticipantTrackType.kUserMedia,
+          ),
           status: participantStatus,
         );
       }
     }
+
+    // Maintain previous order then append new participants
+    final sortedSynced = <String, SyncedParticipant>{};
+    for (final key in previousSynced.keys) {
+      if (tempSynced.containsKey(key)) {
+        sortedSynced[key] = tempSynced[key]!;
+      }
+    }
+
+    for (final entry in tempSynced.entries) {
+      if (!sortedSynced.containsKey(entry.key)) {
+        sortedSynced[entry.key] = entry.value;
+      }
+    }
+
+    print('----sortedSynced----');
+    for (final entry in sortedSynced.entries) {
+      print(
+          'Sorted participant: ${entry.key}, Track: ${entry.value.track?.participant.name}');
+    }
+    print('---------------------');
+
+    syncedParticipants
+      ..clear()
+      ..addAll(sortedSynced);
+
     _sortUserMediaTracks();
 
     setState(() {});
@@ -306,78 +357,172 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   void _sortUserMediaTracks() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final fiveSecondsAgo = now - 10000;
+    final recentSpeechCutoff = now - recentSpeechWindowMs;
 
     final pinnedSet = Set<String>.from(
       context.read<PinnedParticipantProvider>().pinnedIdentities,
     );
 
-    List<SyncedParticipant> userMediaParticipants = syncedParticipants.values
-        .where((participant) => participant.track != null)
+    final localIdentity = widget.room.localParticipant?.identity;
+
+    List<SyncedParticipant> allParticipants = syncedParticipants.values
+        .where((p) =>
+            p.track != null && p.identity != localIdentity) // exclude local
         .toList();
 
-    userMediaParticipants.sort((a, b) {
-      final aPinned = pinnedSet.contains(a.identity);
-      final bPinned = pinnedSet.contains(b.identity);
-      if (aPinned != bPinned) return aPinned ? -1 : 1;
+    List<SyncedParticipant> currentVisible = allParticipants.take(4).toList();
+    final currentVisibleIds = currentVisible.map((p) => p.identity).toSet();
 
-      final aStatus = a.status;
-      final bStatus = b.status;
-      final aHandRaised = aStatus?.isHandRaised ?? false;
-      final bHandRaised = bStatus?.isHandRaised ?? false;
+    bool isSpeaking(SyncedParticipant p) =>
+        (p.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0) >
+        recentSpeechCutoff;
 
-      if (aHandRaised != bHandRaised) return aHandRaised ? -1 : 1;
-      if (aHandRaised && bHandRaised) {
-        final aTime = aStatus?.handRaisedTimeStamp ?? 0;
-        final bTime = bStatus?.handRaisedTimeStamp ?? 0;
-        return aTime.compareTo(bTime);
-      }
+    bool isMuted(SyncedParticipant p) =>
+        (p.track?.participant.isSpeaking == false) &&
+        (p.track?.participant.audioLevel ?? 0.0) < 0.01;
 
-      final aIsSpeaking = a.track?.participant.isSpeaking ?? false;
-      final bIsSpeaking = b.track?.participant.isSpeaking ?? false;
+    bool isHandRaised(SyncedParticipant p) => p.status?.isHandRaised == true;
+    bool isPinned(SyncedParticipant p) => pinnedSet.contains(p.identity);
+    bool isSpotlight(SyncedParticipant p) => p.status?.isSpotlight == true;
+    bool isScreenShare(SyncedParticipant p) =>
+        p.track!.type == ParticipantTrackType.kScreenShare;
 
-      if (aIsSpeaking != bIsSpeaking) return aIsSpeaking ? -1 : 1;
-
-      // Fair exposure logic: participant not shown recently gets higher priority
-      final aLastShown = a.lastShownAt ?? 0;
-      final bLastShown = b.lastShownAt ?? 0;
-      if (aLastShown != bLastShown) {
-        return aLastShown
-            .compareTo(bLastShown); // Older lastShownAt comes first
-      }
-
-      // Prefer participants with video
-      if (a.track?.participant.hasVideo != b.track?.participant.hasVideo) {
-        return a.track?.participant.hasVideo == true ? -1 : 1;
-      }
-
-      // Fallback: earlier join time
-      return (a.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0)
-          .compareTo(b.track?.participant.joinedAt.millisecondsSinceEpoch ?? 0);
+    // Cleanup speakingCandidates for those no longer speaking
+    speakingCandidates.removeWhere((identity, _) {
+      final p = allParticipants.firstWhere((x) => x.identity == identity,
+          orElse: () => SyncedParticipant(
+                identity: identity,
+                track: null,
+                status: null,
+              ));
+      return !isSpeaking(p);
     });
 
-    final currentOrder = syncedParticipants.values
-        .where((participant) => participant.track != null)
-        .map((p) => p.identity)
+    final activeSpeakersInTop4 =
+        currentVisible.where((p) => isSpeaking(p)).length;
+
+    final newSpeakers = allParticipants
+        .where((p) => isSpeaking(p) && !currentVisibleIds.contains(p.identity))
         .toList();
 
-    final newOrder = userMediaParticipants.map((p) => p.identity).toList();
+    for (final p in newSpeakers) {
+      speakingCandidates.putIfAbsent(p.identity, () => now);
+    }
 
-    if (!listEquals(currentOrder, newOrder)) {
-      // Update lastShownAt for top 4 participants only
-      for (int i = 0; i < userMediaParticipants.length && i < 4; i++) {
-        userMediaParticipants[i].lastShownAt = now;
+    final eligibleNewSpeakers = newSpeakers.where((p) {
+      final startedAt = speakingCandidates[p.identity] ?? now;
+      final hasSpokenLongEnough = now - startedAt >= promotionDelayMs;
+      final isLoudEnough =
+          (p.track?.participant.audioLevel ?? 0.0) >= minAudioLevel;
+      return hasSpokenLongEnough && isLoudEnough;
+    }).toList();
+
+    if (eligibleNewSpeakers.isEmpty || activeSpeakersInTop4 >= 4) {
+      final updatedOrder = allParticipants.toList()
+        ..sort((a, b) {
+          int rank(SyncedParticipant p) {
+            //   if (isScreenShare(p)) return 0;
+            // Group camera right after screen share if same base identity
+            final screenShareIdentities = allParticipants
+                .where((x) => isScreenShare(x))
+                .map((x) => x.identity.split('_screen').first)
+                .toSet();
+
+            final baseId = p.identity.split('_screen').first;
+            if (screenShareIdentities.contains(baseId)) return 0;
+            if (isSpotlight(p)) return 1;
+            if (isPinned(p)) return 2;
+            if (isHandRaised(p)) return 3;
+            return 4;
+          }
+
+          int rA = rank(a);
+          int rB = rank(b);
+          if (rA != rB) return rA.compareTo(rB);
+
+          // Optional: fallback to lastShownAt descending
+          return (b.lastShownAt ?? 0).compareTo(a.lastShownAt ?? 0);
+        });
+
+      setState(() {
+        syncedParticipants = {
+          for (var p in updatedOrder) p.identity: p,
+        };
+      });
+
+      _addLocalParticipant();
+      return;
+    }
+
+    SyncedParticipant? replaceTarget;
+    for (var p in currentVisible) {
+      if (isScreenShare(p) || isSpotlight(p) || isPinned(p) || isHandRaised(p))
+        continue;
+
+      final lastSpoke =
+          p.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
+      final neverSpoke = lastSpoke == 0;
+      final notSpeaking = lastSpoke < recentSpeechCutoff;
+
+      if (isMuted(p) || neverSpoke || notSpeaking) {
+        if (replaceTarget == null ||
+            (p.lastShownAt ?? 0) < (replaceTarget.lastShownAt ?? 0)) {
+          replaceTarget = p;
+        }
+      }
+    }
+
+    if (replaceTarget != null) {
+      final indexToReplace = currentVisible.indexOf(replaceTarget);
+      final newSpeaker = eligibleNewSpeakers.first;
+      newSpeaker.lastShownAt = now;
+
+      currentVisible[indexToReplace] = newSpeaker;
+
+      final updatedOrder = allParticipants.toList()
+        ..sort((a, b) {
+          int rank(SyncedParticipant p) {
+            // Group camera right after screen share if same base identity
+            final screenShareIdentities = allParticipants
+                .where((x) => isScreenShare(x))
+                .map((x) => x.identity.split('_screen').first)
+                .toSet();
+
+            final baseId = p.identity.split('_screen').first;
+            if (screenShareIdentities.contains(baseId)) return 0;
+            if (isSpotlight(p)) return 1;
+            if (isPinned(p)) return 2;
+            if (isHandRaised(p)) return 3;
+            return 4;
+          }
+
+          int rA = rank(a);
+          int rB = rank(b);
+          if (rA != rB) return rA.compareTo(rB);
+
+          // Within same rank, preserve visual order
+          int aIndex =
+              currentVisible.indexWhere((p) => p.identity == a.identity);
+          int bIndex =
+              currentVisible.indexWhere((p) => p.identity == b.identity);
+          if (aIndex == -1) aIndex = 999;
+          if (bIndex == -1) bIndex = 999;
+          return aIndex.compareTo(bIndex);
+        });
+
+      for (var p in updatedOrder) {
+        print('Updated order: ${p.identity}');
       }
 
       setState(() {
         syncedParticipants = {
-          for (var p in userMediaParticipants) p.identity: p
+          for (var p in updatedOrder) p.identity: p,
         };
       });
     }
 
     _addLocalParticipant();
-    subscribeToFirstToFourthParticipants();
+    // subscribeToFirstToFourthParticipants();
   }
 
   void _addLocalParticipant() {
@@ -441,8 +586,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       return;
     }
 
-    List<SyncedParticipant> sortedParticipants =
-        syncedParticipants.values.where((p) => p.track != null).toList();
+    List<SyncedParticipant> sortedParticipants = syncedParticipants.values
+        .where((p) =>
+            p.track != null &&
+            p.identity != widget.room.localParticipant?.identity)
+        .toList();
 
     int limit = sortedParticipants.length < 4 ? sortedParticipants.length : 4;
 
@@ -455,6 +603,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   void _subscribeToParticipant(ParticipantTrack participantTrack) {
     if (participantTrack.participant is RemoteParticipant) {
       final participant = participantTrack.participant as RemoteParticipant;
+      print('Subscribing to participant: ${participant.identity}');
       for (var publication in participant.videoTrackPublications) {
         if (!publication.subscribed) {
           publication.subscribe();
@@ -504,9 +653,12 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       await _updateParticipantmanagerFromDB();
       final localStatus = ParticipantStatus(
         identity: localParticipant.identity,
-        isAudioEnable: localParticipantRole == Role.admin.toString(),
-        isVideoEnable: localParticipantRole == Role.admin.toString(),
-        isTalkToHostEnable: localParticipantRole == Role.admin.toString(),
+        isAudioEnable:
+            localParticipantRole == Role.admin.toString() || widget.enableAudio,
+        isVideoEnable:
+            localParticipantRole == Role.admin.toString() || widget.enableVideo,
+        isTalkToHostEnable: localParticipantRole == Role.admin.toString() ||
+            !widget.muteByDefault,
         role: localParticipantRole!,
       );
 
@@ -616,7 +768,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         ..clear()
         ..addAll(newList);
     });
-
     // Sync after state updated
     _updateRoomData(newList).then((_) {
       sendParticipantsStatus();
@@ -909,16 +1060,32 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     String localIdentity,
   ) {
     final shownIds = prioritizedTracks
-        .map((p) => p.track!.participant.identity)
+        .map((p) => p.identity)
         .toSet(); // IDs already shown in grid or PiP
 
-    final sidebarTracks = syncedParticipants.values
-        .where((p) =>
-            p.track != null &&
-            p.identity != localIdentity &&
-            !shownIds.contains(p.identity) &&
-            p.track?.type != ParticipantTrackType.kScreenShare)
-        .toList();
+    for (var p in prioritizedTracks) {
+      print('Prioritized track: ${p.track!.participant.identity}');
+    }
+
+    for (var p in syncedParticipants.values) {
+      print(
+          'Track identity: ${p.identity}, type: ${p.track?.type}, in shownIds: ${shownIds.contains(p.identity)}');
+    }
+    // Filter out local identity and already shown IDs
+    // Also filter for user media tracks only
+
+    final sidebarTracks = syncedParticipants.values.where((p) {
+      if (p.track == null || p.identity == localIdentity) return false;
+
+      final baseIdentity = p.identity.replaceFirst('_screen', '');
+      final alreadyShown = shownIds.contains(baseIdentity);
+
+      return !alreadyShown && p.track?.type == ParticipantTrackType.kUserMedia;
+    }).toList();
+
+    for (var p in sidebarTracks) {
+      print('Sidebar track: ${p.track!.participant.identity}');
+    }
 
     if (sidebarTracks.isNotEmpty) {
       setState(() {
@@ -929,7 +1096,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         _isSideBarShouldVisible = false;
       });
     }
-    // Optional: toggle sidebar visibility state
+    //Optional: toggle sidebar visibility state
 
     return sidebarTracks;
   }
@@ -961,6 +1128,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       (bool value) {
         if (_isSideBarShouldVisible != value) {
           setState(() {
+            print('Sidebar should be visible: $value');
+            isParticipantListVisible = value;
             _isSideBarShouldVisible = value;
           });
         }
@@ -1067,7 +1236,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-            if (!isMobile && _isPiP)
+            if (_isPiP)
               DraggableParticipantWidget(
                 localParticipantTrack: localParticipantTrack!,
                 localParticipantStatus: localParticipantStatus!,

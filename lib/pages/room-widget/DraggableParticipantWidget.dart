@@ -23,34 +23,58 @@ class DraggableParticipantWidget extends StatefulWidget {
       _DraggableParticipantWidgetState();
 }
 
-class _DraggableParticipantWidgetState
-    extends State<DraggableParticipantWidget> {
-  double _bottomPosition = 50.0; // Default vertical position
-  double _rightPosition = 0.0; // Default horizontal position
-  double _height = 150.0; // Fixed height of the widget
-  double _width = 200.0; // Width of the widget
+class _DraggableParticipantWidgetState extends State<DraggableParticipantWidget> with WidgetsBindingObserver {
+  double _bottomPosition = 50.0;
+  double _rightPosition = 0.0;
+  double _height = 150.0;
+  double _width = 200.0;
+
   final double _minWidth = 200;
   final double _maxWidth = 400;
-  final double _minHeight = 200.0; // Minimum height
-  final double _maxHeight = 400.0; // Maximum height
+  final double _minHeight = 200.0;
+  final double _maxHeight = 400.0;
 
-  bool _isExpanded = false; // Track whether the widget is expanded or not
+  bool _isExpanded = false;
   bool _isDragging = false;
 
-    void _adjustPositionForBounds(double screenWidth, double screenHeight) {
-    // Adjust position if expanding would push the widget out of bounds
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Called when screen size changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureWithinBounds();
+    });
+  }
+
+  void _ensureWithinBounds() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    setState(() {
+      _bottomPosition = _bottomPosition.clamp(0.0, screenHeight - _height);
+      _rightPosition = _rightPosition.clamp(0.0, screenWidth - _width);
+    });
+  }
+
+  void _adjustPositionForBounds(double screenWidth, double screenHeight) {
     if (_isExpanded) {
-      // Check and adjust for right edge
       if (screenWidth - _rightPosition - _width < 0) {
         _rightPosition = screenWidth - _width;
       }
-      
-      // Check and adjust for bottom edge
       if (screenHeight - _bottomPosition - _height < 0) {
         _bottomPosition = screenHeight - _height;
       }
-
-      // Check and adjust for top edge
       double topPosition = screenHeight - _bottomPosition - _height;
       if (topPosition < 0) {
         _bottomPosition = screenHeight - _height;
@@ -64,12 +88,8 @@ class _DraggableParticipantWidgetState
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Positioned(
-      top: screenHeight -
-          _bottomPosition -
-          _height, // Set the top position relative to bottom
-      left: screenWidth -
-          _rightPosition -
-          _width, // Set the left position relative to righ
+      top: screenHeight - _bottomPosition - _height,
+      left: screenWidth - _rightPosition - _width,
       child: Container(
         width: _width,
         height: _height,
@@ -80,7 +100,6 @@ class _DraggableParticipantWidgetState
         ),
         child: Stack(
           children: [
-            // Participant widget (Content of the participant)
             Positioned.fill(
               child: ParticipantWidget.widgetFor(
                 widget.localParticipantTrack,
@@ -88,22 +107,19 @@ class _DraggableParticipantWidgetState
                 showStatsLayer: false,
                 participantIndex: 0,
                 handleExtractText: null,
-                onParticipantsStatusChanged: (ParticipantStatus status) {
+               onParticipantsStatusChanged: (ParticipantStatus status) {
                   widget.updateParticipantsStatus(status);
                 },
                 isLocalHost:
                     widget.localParticipantRole == Role.admin.toString(),
               ),
             ),
-            // Draggable Icon (top right)
             Positioned(
               top: 0,
               left: 8,
               child: GestureDetector(
                 onPanStart: (_) {
-                  setState(() {
-                    _isDragging = true;
-                  });
+                  setState(() => _isDragging = true);
                 },
                 onPanUpdate: (details) {
                   setState(() {
@@ -114,21 +130,15 @@ class _DraggableParticipantWidgetState
                   });
                 },
                 onPanEnd: (_) {
-                  setState(() {
-                    _isDragging = false;
-                  });
+                  setState(() => _isDragging = false);
                 },
-                child:  MouseRegion(
+                child: MouseRegion(
                   cursor: _isDragging
                       ? SystemMouseCursors.grabbing
                       : SystemMouseCursors.grab,
-                  child:  Tooltip(
-                    message: !_isDragging ? 'Drag to move' : '',
-                    child: const Icon(
-                      Icons.drag_handle,
-                      color: Colors.white,
-                      size: 30,
-                    ),
+                  child: Tooltip(
+                     message: !_isDragging ? 'Drag to move' : '',
+                    child: const Icon(Icons.drag_handle, color: Colors.white),
                   ),
                 ),
               ),
@@ -138,29 +148,21 @@ class _DraggableParticipantWidgetState
               right: 0,
               child: GestureDetector(
                 onTap: () {
-                  // Toggle height when clicked
                   setState(() {
                     _isExpanded = !_isExpanded;
                     _height = _isExpanded ? _maxHeight : _minHeight;
-                    _width = _isExpanded
-                        ? _maxWidth
-                        : _minWidth; // Toggle between max and min height
-                          _adjustPositionForBounds(screenWidth, screenHeight);
+                    _width = _isExpanded ? _maxWidth : _minWidth;
+                    _adjustPositionForBounds(screenWidth, screenHeight);
                   });
                 },
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
-                child: Tooltip(
+                  child: Tooltip(
                     message: _isExpanded ? 'Minimize View' : 'Expand View',
-                    child: const Icon(
-                      Icons. open_in_full,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    
+                    child: const Icon(Icons.open_in_full, color: Colors.white),
+                  ),
+                ),
               ),
-              ),
-            ),
             ),
           ],
         ),

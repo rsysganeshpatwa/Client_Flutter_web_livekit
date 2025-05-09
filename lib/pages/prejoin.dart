@@ -31,7 +31,11 @@ class JoinArgs {
     this.role = Role.participant,
     this.roomName = '',
     this.identity = '',
-    this.roomId = ''
+    this.roomId = '',
+    this.muteByDefault = false,
+    this.joinRequiresApproval = false,
+    this.enableAudio = true,
+    this.enableVideo = true,
   });
   final String url;
   final String token;
@@ -46,6 +50,11 @@ class JoinArgs {
   final String roomName;
   final String identity;
   final String roomId;
+  // Add other parameters as needed
+  final bool muteByDefault;
+  final bool joinRequiresApproval;
+  final bool enableAudio;
+  final bool enableVideo;
 }
 
 class PreJoinPage extends StatefulWidget {
@@ -243,7 +252,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
     try {
       // Wait for approval before proceeding
       // final isLoggedIn = prefs.getBool('isLoggedIn');
-      if (args.role == Role.participant) {
+      if (args.role == Role.participant && args.joinRequiresApproval) {
         bool isApproved = await _waitForApproval(args.identity, args.roomName, args.roomId);
         if (!isApproved) {
           return;
@@ -312,6 +321,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
               defaultCameraCaptureOptions: CameraCaptureOptions(
                   maxFrameRate: 30, params: _selectedVideoParameters),
               e2eeOptions: e2eeOptions,
+              
             ),
              fastConnectOptions: FastConnectOptions(
               microphone: TrackOption(track: _audioTrack),
@@ -327,7 +337,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
       await Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => RoomPage(room, listener)),
+        MaterialPageRoute(builder: (_) => RoomPage(room, listener,widget.args.muteByDefault,
+             widget.args.enableAudio, widget.args.enableVideo)),
         (route) => false,
       );
     } catch (error) {
@@ -531,7 +542,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Micriphone:',
+                            'Microphone:',
                             style: TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold),

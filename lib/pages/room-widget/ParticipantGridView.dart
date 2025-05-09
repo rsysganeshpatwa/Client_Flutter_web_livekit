@@ -8,12 +8,10 @@ import 'package:video_meeting_room/widgets/participant_info.dart';
 import 'dart:math' as math;
 
 class ParticipantGridView extends StatefulWidget {
-
   final bool isLocalHost;
   //onParticipantsStatusChanged
-   final Function(ParticipantStatus) onParticipantsStatusChanged;
+  final Function(ParticipantStatus) onParticipantsStatusChanged;
   final List<SyncedParticipant>? syncedParticipant;
-
 
   const ParticipantGridView({
     super.key,
@@ -33,10 +31,8 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
   int? previousNumParticipants;
   int _pag = 0;
   final int bufferSize = 4;
-  final List<ParticipantTrack> participantTracks =[];
-  final List<ParticipantStatus> participantStatuses =[];
-
-
+  final List<ParticipantTrack> participantTracks = [];
+  final List<ParticipantStatus> participantStatuses = [];
 
 // update state
   @override
@@ -46,6 +42,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
       updateState(widget.syncedParticipant!);
     }
   }
+
   @override
   void didUpdateWidget(ParticipantGridView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -55,7 +52,6 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
     }
   }
 
-
   void updateState(List<SyncedParticipant> syncedParticipants) {
     setState(() {
       participantTracks.clear();
@@ -64,9 +60,14 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
         participantTracks.add(syncedParticipant.track!);
         participantStatuses.add(syncedParticipant.status!);
       }
+      int maxPage = (syncedParticipants.length / 4).ceil() - 1;
+      _pag = _pag.clamp(0, maxPage);
+
+      _handlePageChange(_pag);
     });
   }
 
+  // Subscribe to video tracks of participants
 
   void subscribe(List<ParticipantTrack> pageParticipants) {
     for (var i = 0; i < pageParticipants.length; i++) {
@@ -90,11 +91,52 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
       if (participant is RemoteParticipant) {
         participant.videoTrackPublications.forEach((publication) {
           if (publication.subscribed) {
+            //  print('GridView unsubscribing from participant: ${participant.name}');
+
             publication.unsubscribe();
             publication.disable();
-                   }
+          }
         });
       }
+    }
+  }
+
+  void _handlePageChange(int pageIndex) {
+    setState(() {
+      _pag = pageIndex;
+    });
+
+    const int itemsPerPage = 4;
+    const int bufferSize = 2; // 2 pages before and after
+    final int numParticipants = participantTracks.length;
+
+    // Clamp the pageIndex to a valid range
+    int maxPage = (numParticipants / itemsPerPage).ceil() - 1;
+    int safePageIndex = pageIndex.clamp(0, maxPage);
+
+    const int bufferBefore = (bufferSize ~/ 2) * itemsPerPage;
+    const int bufferAfter = (bufferSize - bufferSize ~/ 2) * itemsPerPage;
+
+    final int startIndex =
+        math.max(0, (safePageIndex * itemsPerPage) - bufferBefore);
+    final int endIndex = math.min(numParticipants,
+        (safePageIndex * itemsPerPage) + itemsPerPage + bufferAfter);
+
+    final List<ParticipantTrack> bufferParticipants =
+        participantTracks.sublist(startIndex, endIndex);
+
+    final List<ParticipantTrack> toUnsubscribe =
+        participantTracks.where((track) {
+      int index = participantTracks.indexOf(track);
+      return index < startIndex || index >= endIndex;
+    }).toList();
+
+    if (toUnsubscribe.isNotEmpty) {
+      unsubscribe(toUnsubscribe);
+    }
+
+    if (bufferParticipants.isNotEmpty) {
+      subscribe(bufferParticipants);
     }
   }
 
@@ -117,7 +159,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
               gridWidth - 2 * paginationWidth - 16.0; // 16.0 for padding
           final double adjustedGridHeight =
               gridHeight - paginationHeight - 16.0; // 16.0 for padding
-     
+
           if (numParticipants <= 4) {
             subscribe(participantTracks);
             return ParticipantGrid(
@@ -136,39 +178,19 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
               children: [
                 Positioned.fill(
                   child: PageView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
                     controller: _pageController,
                     itemCount: pageCount,
                     onPageChanged: (pageIndex) {
-                      setState(() {
-                        _pag = pageIndex;
-                      });
-
-                      int startIndex =
-                          math.max(0, (pageIndex - bufferSize) * itemsPerPage);
-                      int endIndex = math.min(numParticipants,
-                          (pageIndex + 1 + bufferSize) * itemsPerPage);
-
-                      // Get participants to subscribe (current page + buffer)
-                      final bufferParticipants = participantTracks
-                          .sublist(startIndex, endIndex);
-                    
-                      subscribe(bufferParticipants);
-
-                      // Get participants to unsubscribe (outside the buffer range)
-                      final toUnsubscribe =
-                          participantTracks.where((track) {
-                        int index = participantTracks.indexOf(track);
-                        return index < startIndex || index >= endIndex;
-                      }).toList();
-                      unsubscribe(toUnsubscribe);
+                      _handlePageChange(pageIndex);
                     },
                     itemBuilder: (context, pageIndex) {
                       final startIndex = pageIndex * itemsPerPage;
                       final endIndex =
                           math.min(startIndex + itemsPerPage, numParticipants);
 
-                      final pageParticipants = participantTracks
-                          .sublist(startIndex, endIndex);
+                      final pageParticipants =
+                          participantTracks.sublist(startIndex, endIndex);
                       return LayoutBuilder(
                         builder: (context, constraints) {
                           final double availableWidth = constraints.maxWidth;
@@ -256,5 +278,6 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+    // Unsubscribe from all participants when the widget is disposed
   }
 }

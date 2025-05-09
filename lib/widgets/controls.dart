@@ -147,11 +147,37 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   }
 
   void _disableAudio() async {
-    await participant.setMicrophoneEnabled(false);
+    //catch error if microphone is not enabled
+    try {
+      await participant.setMicrophoneEnabled(false);
+    } catch (e) {
+      print('Error disabling microphone: $e');
+      return;
+    }
+    
+ 
+    participant.audioTrackPublications.forEach((publication) {
+      publication.track?.mute();
+      print('Audio track muted');
+    });
+ 
   }
 
   Future<void> _enableAudio() async {
-    await participant.setMicrophoneEnabled(true);
+
+    //catch error if microphone is not enabled
+    try {
+      await participant.setMicrophoneEnabled(true);
+    } catch (e) {
+      print('Error enabling microphone: $e');
+      return;
+    }
+    
+    participant.audioTrackPublications.forEach((publication) {
+      publication.track?.unmute();
+      print('Audio track unmuted');
+    });
+    
   }
 
   void _disableVideo() async {
@@ -591,6 +617,7 @@ Widget build(BuildContext context) {
           ],
         ] else ...[
           // Mobile-specific More Controls icon
+          if (widget.role == Role.admin.toString()) 
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {

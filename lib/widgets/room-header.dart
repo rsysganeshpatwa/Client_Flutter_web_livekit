@@ -207,8 +207,6 @@ _checkMicrophoneAndCameraStatus();
       statsType = StatsType.kLocalVideoSender;
       listener.on<VideoSenderStatsEvent>((event) {
       
-        print(
-            "vikas testing in video track ${event.currentBitrate.toInt()} kbps");
         setState(() {
           isListenerSet = true;
           StatsRepository().stats['video tx'] =
@@ -235,8 +233,6 @@ _checkMicrophoneAndCameraStatus();
       }
       statsType = StatsType.kLocalAudioSender;
       listener.on<AudioSenderStatsEvent>((event) {
-        print(
-            "vikas testing in audio track ${event.currentBitrate.toInt()} kbps");
         setState(() {
            isListenerSet = true;
           StatsRepository().stats['audio tx'] =

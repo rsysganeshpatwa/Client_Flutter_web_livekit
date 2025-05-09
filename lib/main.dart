@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -10,44 +13,46 @@ import 'package:video_meeting_room/theme.dart';
 // Adjust import as necessary
 import 'utils.dart';
 
-void main() async {
-  // configure logs for debugging
-  Logger.root.level = Level.FINE;
-  Logger.root.onRecord.listen((record) {
-    //  print('${format.format(record.time)}: ${record.message}');
-  });
+void main() {
+  runZonedGuarded(() async {
+    // Ensure binding is initialized in the same zone
+    WidgetsFlutterBinding.ensureInitialized();
 
-  WidgetsFlutterBinding.ensureInitialized();
+    // Optional: Make zone mismatch fatal in dev
+    BindingBase.debugZoneErrorsAreFatal = true;
 
-  if (lkPlatformIsDesktop()) {
-    await FlutterWindowClose.setWindowShouldCloseHandler(() async {
-      await onWindowShouldClose?.call();
-      return true;
+    // Set up logging
+    Logger.root.level = Level.FINE;
+    Logger.root.onRecord.listen((record) {
+      // print('${format.format(record.time)}: ${record.message}');
     });
-  }
-  setup();
 
-  // ErrorWidget.builder = (FlutterErrorDetails details) {
-  //   print('ganesh Error: ${details.exception} ${details.stack} ${details.library}');
-  //   return Container(
-  //     color: Colors.white,
-  //     child: const Center(
-  //       child: Text(
-  //         'An error occurred. Please restart the app.',
-  //         style: TextStyle(color: Colors.red),
-  //       ),
-  //     ),
-  //   );
-  // };
+    if (lkPlatformIsDesktop()) {
+      await FlutterWindowClose.setWindowShouldCloseHandler(() async {
+        await onWindowShouldClose?.call();
+        return true;
+      });
+    }
 
-  runApp(
-    ChangeNotifierProvider(create: (_) => PinnedParticipantProvider(),
-     child: const LiveKitExampleApp(),
+    setup();
+
+    // Flutter error handler
+    FlutterError.onError = (FlutterErrorDetails details) {
+      print('Flutter error: ${details.exceptionAsString()}');
+      print('Stack trace: ${details.stack}');
+    };
+
+    runApp(
+      ChangeNotifierProvider(
+        create: (_) => PinnedParticipantProvider(),
+        child: const LiveKitExampleApp(),
       ),
-  );
-  
+    );
+  }, (error, stackTrace) {
+    print('Uncaught error: $error');
+    print('Stack: $stackTrace');
+  });
 }
-
 class LiveKitExampleApp extends StatelessWidget {
   const LiveKitExampleApp({
     super.key,

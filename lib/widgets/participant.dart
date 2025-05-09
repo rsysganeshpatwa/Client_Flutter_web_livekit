@@ -215,6 +215,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
    final pinnedProvider = Provider.of<PinnedParticipantProvider>(ctx);
    final bool isPinned = pinnedProvider.isPinned(widget.participantStatus.identity);
+  
      
     String formatName(String name) {
       if (name.isEmpty) return name;

@@ -10,6 +10,8 @@ import '../services/api_service.dart';
 import '../services/permission_service.dart';
 import '../models/role.dart';
 import 'streamer.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
 
 class ConnectPage extends StatefulWidget {
   const ConnectPage({super.key});
@@ -19,6 +21,8 @@ class ConnectPage extends StatefulWidget {
 }
 
 class _ConnectPageState extends State<ConnectPage> {
+   String _version = '12.4.45';
+  String _buildNumber = '';
   static const _storeKeyIdentity = 'identity';
   Role _selectedRole = Role.admin;
 
@@ -27,13 +31,17 @@ class _ConnectPageState extends State<ConnectPage> {
 
   final _identityCtrl = TextEditingController();
   final _roomCtrl = TextEditingController();
-  final _welcomeMessageCtrl = TextEditingController(text: 'Weekly Roundtable Leadership Call');
 
+  final _welcomeMessageCtrl = TextEditingController(text: 'Weekly Roundtable Leadership Call');
   bool _busy = false;
   String? roomNameFromUrl;
   String? roomRoleFromUrl;
   String? welcomeMessage = "Weekly Roundtable Leadership Call";
   bool _isRoomNameInUrl = false;
+  bool muteByDefault = false;
+  bool joinRequiresApproval = false;
+  bool enableAudio = true;
+  bool enableVideo = true;
 
   String? selectedRoom;
 
@@ -41,6 +49,7 @@ class _ConnectPageState extends State<ConnectPage> {
   void initState() {
     super.initState();
     _readPrefs();
+    _initPackageInfo();
 
     if (livekit.lkPlatformIs(livekit.PlatformType.android)) {
       _checkPermissions();
@@ -57,7 +66,14 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _checkPermissions() async {
     await _permissionService.checkPermissions();
   }
-
+Future<void> _initPackageInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = info.version;
+    
+      _buildNumber = info.buildNumber;
+    });
+  }
   Future<void> _readPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
@@ -73,6 +89,7 @@ class _ConnectPageState extends State<ConnectPage> {
       final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
   
       room = decodedParams['room'] ?? '';
+
     }
     //String metadata = await _apiService.getWelcomeMessage(room);
     welcomeMessage = 'Weekly Roundtable Leadership Call';
@@ -92,6 +109,10 @@ class _ConnectPageState extends State<ConnectPage> {
       setState(() {
         roomNameFromUrl = decodedParams['room'] ?? '';
         roomRoleFromUrl = decodedParams['role'] ?? '';
+        muteByDefault = decodedParams['muteByDefault'] == 'true';
+        joinRequiresApproval = decodedParams['joinRequiresApproval'] == 'true';
+        enableAudio = decodedParams['enableAudio'] == 'true';
+        enableVideo = decodedParams['enableVideo'] == 'true';
     
         if (roomNameFromUrl != null) {
           _roomCtrl.text = roomNameFromUrl!;
@@ -166,6 +187,11 @@ class _ConnectPageState extends State<ConnectPage> {
               role: role,
               roomName: roomName,
               identity: identity,
+             
+              muteByDefault: muteByDefault,
+              joinRequiresApproval: joinRequiresApproval,
+              enableAudio: enableAudio,
+              enableVideo: enableVideo,
             ),
           ),
         ),
@@ -261,6 +287,7 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
+    final double screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       /*appBar: AppBar(
@@ -269,9 +296,29 @@ class _ConnectPageState extends State<ConnectPage> {
       ),*/
       body: Stack(
         children: [
+
           buildMainContent(),
           //if (!isMobile) buildSidebar(),
           // if (isMobile) buildFloatingActionButton(),
+           Positioned( // Draws on top
+      top: 16,
+      left: 16,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Version: $_version $_buildNumber',
+          style: TextStyle(
+            fontSize: screenHeight * 0.02,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ),
+    ),
           Positioned(
             top: 16,
             right: 16,
@@ -311,6 +358,23 @@ Widget buildMainContent() {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Existing vertical box (left panel for mobile)
+                
+  Align(
+    alignment: Alignment.topLeft,
+    child: Padding(
+      padding: EdgeInsets.only(left: screenWidth * 0.05, bottom: 8),
+      child: Text(
+        _version,
+        style: TextStyle(
+          fontSize: screenHeight * 0.015,
+          fontWeight: FontWeight.w500,
+          color: Colors.black54,
+        ),
+
+      ),
+    ),
+  ),
+                
                 Container(
                   width: screenWidth * 0.9, // Make the container take up 90% of the width for mobile
                   height: screenHeight * 0.3, // Adjust height based on screen height
@@ -389,6 +453,7 @@ Widget buildMainContent() {
           : Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+    
                 // Existing vertical box (left panel for larger screens)
                 Container(
                   width: screenWidth * 0.2, // Adjust width for desktop
@@ -461,93 +526,12 @@ Widget buildMainContent() {
                 ),
               ],
             ),
+            
     ),
+    
   );
 }
 
-  // Widget buildSidebar() {
-  //   if (!_isRoomNameInUrl) {
-  //     final double screenWidth = MediaQuery.of(context).size.width;
-  //     return Positioned(
-  //       right: 0,
-  //       top: 0,
-  //       bottom: 0,
-  //       child: Container(
-  //         width: screenWidth * 0.15,
-  //         color: Colors.white,
-  //         child: Column(
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: [
-  //             const Padding(
-  //               padding: EdgeInsets.all(16.0),
-  //               child: Text(
-  //                 'Active Rooms',
-  //                 style: TextStyle(
-  //                   color: const Color.fromARGB(255, 39, 38, 104),
-  //                   fontSize: 16,
-  //                   fontWeight: FontWeight.bold,
-  //                 ),
-  //               ),
-  //             ),
-  //             //  Expanded(
-  //             //   child: StreamBuilder<List<String>>(
-  //             //     stream: _apiService.getRoomList(),
-  //             //     builder: (context, snapshot) {
-  //             //       if (snapshot.hasError) {
-  //             //         return const Center(
-  //             //           child: Text(
-  //             //             'Error loading rooms',
-  //             //             style: TextStyle(color: Colors.black),
-  //             //           ),
-  //             //         );
-  //             //       } else if (snapshot.connectionState == ConnectionState.waiting) {
-  //             //         return const Center(child: CircularProgressIndicator());
-  //             //       } else {
-  //             //         final roomList = snapshot.data;                      
-  //             //         return ListView.builder(
-  //             //           itemCount: roomList?.length,
-  //             //           itemBuilder: (context, index) {
-  //             //             return GestureDetector(
-  //             //               onTap: () {
-  //             //                 setState(() {
-  //             //                   selectedRoom = roomList[index];
-  //             //                   _roomCtrl.text = roomList[index];
-  //             //                   _isRoomNameInUrl = false;
-  //             //                 });
-  //             //               },
-  //             //               child: Container(
-  //             //                 height: 30,
-  //             //                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-  //             //                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-  //             //                 decoration: BoxDecoration(
-  //             //                   //color: const Color.fromARGB(255, 217, 219, 221),
-  //             //                   color: selectedRoom == roomList![index]
-  //             //                   ? const Color.fromARGB(255, 39, 38, 104) // Change color to blue for the selected room
-  //             //                   : const Color.fromARGB(255, 217, 219, 221), // Default color
-  //             //                   borderRadius: BorderRadius.circular(10), // Curved corners
-  //             //                 ),
-  //             //                 child: Text(
-  //             //                   roomList[index],
-  //             //                   style: const TextStyle(
-  //             //                     color: Colors.black,
-  //             //                     fontWeight: FontWeight.bold,
-  //             //                   ),
-  //             //                 ),
-  //             //               ),
-  //             //             );
-  //             //           },
-  //             //         );
-  //             //       }
-  //             //     },
-  //             //   ),
-  //             // ),
-  //           ],
-  //         ),
-  //       ),
-  //     );
-  //   }
-  //   return Container();
-  // }
 
   Widget buildFloatingActionButton() {
     if (!_isRoomNameInUrl) {
