@@ -1,9 +1,10 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/pages/room-widget/PaginationControls.dart';
-import 'package:video_meeting_room/widgets/participant.dart';
 import 'package:video_meeting_room/widgets/MemoizedParticipantCard.dart';
 import 'dart:math' as math;
 
@@ -23,6 +24,7 @@ class ParticipantListView extends StatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _ParticipantListViewState createState() => _ParticipantListViewState();
 }
 
@@ -77,12 +79,12 @@ class _ParticipantListViewState extends State<ParticipantListView> {
       final participant = pageParticipants[i].participant;
 
       if (participant is RemoteParticipant) {
-        participant.videoTrackPublications.forEach((publication) {
+        for (var publication in participant.videoTrackPublications) {
           if (!publication.subscribed) {
             publication.subscribe();
             publication.enable();
           }
-        });
+        }
       }
     }
   }
@@ -92,12 +94,12 @@ class _ParticipantListViewState extends State<ParticipantListView> {
       final participant = pageParticipants[i].participant;
 
       if (participant is RemoteParticipant) {
-        participant.videoTrackPublications.forEach((publication) {
+        for (var publication in participant.videoTrackPublications) {
           if (publication.subscribed) {
             publication.unsubscribe();
             publication.disable();
           }
-        });
+        }
       }
     }
   }

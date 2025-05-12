@@ -1,9 +1,11 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 class HandRaiseNotification {
   static void show(BuildContext context, Participant participant, void Function(Participant) allowSpeak, void Function(Participant) denySpeak) {
-    final participantName = participant.name ?? 'Unknown';
+    final participantName = participant.name;
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     scaffoldMessenger.showSnackBar(

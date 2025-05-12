@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class LKTextField extends StatelessWidget {
   final String label;
   final TextEditingController? ctrl;
+  // ignore: prefer_typing_uninitialized_variables
   final isPasswordField;
   const LKTextField({
     required this.label,
@@ -34,6 +35,7 @@ class LKTextField extends StatelessWidget {
             decoration: BoxDecoration(
               border: Border.all(
                 width: 1,
+                // ignore: deprecated_member_use
                 color: Colors.white.withOpacity(.3),
               ),
               borderRadius: BorderRadius.circular(8),

@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -19,16 +21,17 @@ class ParticipantDrawer extends StatefulWidget {
 
 
   const ParticipantDrawer({
-    Key? key,
+    super.key,
     required this.searchQuery,
     required this.onSearchChanged,
     required this.filterParticipants,
     required this.localParticipant,
     required this.participantsStatusList,
     required this.onParticipantsStatusChanged,
-  }) : super(key: key);
+  });
 
   @override
+  // ignore: library_private_types_in_public_api
   _ParticipantDrawerState createState() => _ParticipantDrawerState();
 }
 
@@ -215,6 +218,7 @@ return Drawer(
       child: ScrollbarTheme(
         data: ScrollbarThemeData(
           thumbColor: WidgetStateProperty.all(Colors.white),
+          // ignore: deprecated_member_use
           trackColor: WidgetStateProperty.all(Colors.white.withOpacity(0.5)),
           thickness: WidgetStateProperty.all(6.0),
           radius: const Radius.circular(4.0),
@@ -223,6 +227,7 @@ return Drawer(
           child: Column(
             children: [
               Container(
+                // ignore: deprecated_member_use
                 color: Colors.black.withOpacity(0.8),
                 padding: const EdgeInsets.all(8),
                 child: Column(
@@ -246,12 +251,12 @@ return Drawer(
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     TextField(
-                      style: TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         hintText: 'Search participants',
-                        prefixIcon: Icon(Icons.search, color: Colors.white),
+                        prefixIcon: const Icon(Icons.search, color: Colors.white),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
@@ -261,7 +266,7 @@ return Drawer(
                       ),
                       onChanged: widget.onSearchChanged,
                     ),
-                    SizedBox(height: 16),
+                   const SizedBox(height: 16),
                     DefaultTabController(
                       length: 2,
                       child: Column(
@@ -276,7 +281,7 @@ return Drawer(
                               Tab(text: 'Together Mode'),
                             ],
                           ),
-                          Container(
+                          SizedBox(
                             // as per drawer height:   // Set the height or use MediaQuery for dynamic sizing
                             height: MediaQuery.of(context).size.height,
                             child: TabBarView(
@@ -402,7 +407,7 @@ Column _selectAllTalkToHostModeParticipants() {
   return Column(
     children: [
       ListTile(
-        title: Text(
+        title: const Text(
           'Select all',
           style: TextStyle(color: Colors.white),
         ),
@@ -415,11 +420,11 @@ Column _selectAllTalkToHostModeParticipants() {
                   : 'Disallow all to talk to host',
               child: IconButton(
                 icon: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white, // White circle background
                   ),
-                  padding: EdgeInsets.all(1), // Padding to make it a circle
+                  padding: const EdgeInsets.all(1), // Padding to make it a circle
                   child: Icon(
                     _selectMuteAll ? Icons.mic_off : Icons.mic,
                     color: _selectMuteAll ? Colors.red : Colors.black,
@@ -435,7 +440,7 @@ Column _selectAllTalkToHostModeParticipants() {
         ),
         onTap: null,
       ),
-      Divider(
+      const Divider(
         thickness: 0.2,
         color: Colors.white, // Optional, to make the divider visible
       ),
@@ -447,7 +452,7 @@ Column _selectAllTalkToHostModeParticipants() {
   return Column(
     children: [
       ListTile(
-        title: Text(
+        title: const Text(
           'Select all',
           style: TextStyle(color: Colors.white),
         ),
@@ -458,11 +463,11 @@ Column _selectAllTalkToHostModeParticipants() {
               message: _selectAllAudio ? 'Mute All' : 'Unmute All',
               child: IconButton(
                 icon: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white, // White circle background
                   ),
-                  padding: EdgeInsets.all(1), // Padding for circle size
+                  padding: const EdgeInsets.all(1), // Padding for circle size
                   child: Icon(
                     _selectAllAudio ? Icons.volume_up : Icons.volume_off,
                     color: _selectAllAudio ? Colors.black : Colors.red,
@@ -479,11 +484,11 @@ Column _selectAllTalkToHostModeParticipants() {
                   : 'Turn on video for all',
               child: IconButton(
                 icon: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white, // White circle background
                   ),
-                  padding: EdgeInsets.all(1), // Padding for circle size
+                  padding: const EdgeInsets.all(1), // Padding for circle size
                   child: Icon(
                     _selectAllVideo ? Icons.videocam : Icons.videocam_off,
                     color: _selectAllVideo ? Colors.black : Colors.red,
@@ -498,7 +503,7 @@ Column _selectAllTalkToHostModeParticipants() {
         ),
         onTap: null,
       ),
-      Divider(
+      const Divider(
         thickness: 0.2,
         color: Colors.white, // Optional for better visibility
       ),
@@ -565,16 +570,16 @@ Widget _buildParticipantTile(
               ));
             }
 
-            if (participantStatus?.role == Role.admin.toString() &&
-                participantStatus?.identity != widget.localParticipant?.identity) {
+            if (participantStatus.role == Role.admin.toString() &&
+                participantStatus.identity != widget.localParticipant?.identity) {
               labels.add(const Text(
                 'Host',
                 style: TextStyle(color: Colors.green, fontSize: 12),
               ));
             }
 
-            if (participantStatus?.identity == widget.localParticipant?.identity &&
-                participantStatus?.role == Role.admin.toString()) {
+            if (participantStatus.identity == widget.localParticipant?.identity &&
+                participantStatus.role == Role.admin.toString()) {
               labels.add(const Text(
                 'You (Host)',
                 style: TextStyle(color: Colors.tealAccent, fontSize: 12),

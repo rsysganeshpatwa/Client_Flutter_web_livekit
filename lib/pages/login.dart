@@ -1,15 +1,16 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_meeting_room/pages/connect.dart';
 import 'package:video_meeting_room/utils.dart';
 import 'package:video_meeting_room/widgets/link_expried.dart';
 
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
   @override
-  _LoginPageState createState() => _LoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -28,12 +29,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _initializePreferences() async {
+    if(!mounted) return;
     prefs = await SharedPreferences.getInstance();
     var uri = Uri.base;
     final encryptedParams = uri.queryParameters['data'];
     if (encryptedParams != null) {
       final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
-      final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
+      final decryptedParams =
+          UrlEncryptionHelper.decrypt(decodedEncryptedParams);
       final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
 
       final role = decodedParams['role'];
@@ -48,11 +51,11 @@ class _LoginPageState extends State<LoginPage> {
       if (role != null && room != null) {
         _navigateToConnect();
       } else {
+        if(!mounted) return;
         Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(builder: (context) => const LinkExpiredScreen()),
-);
-
+          context,
+          MaterialPageRoute(builder: (context) => const LinkExpiredScreen()),
+        );
       }
     } else {
       _checkLoginStatus();
@@ -138,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
                                 semanticLabel: 'Rsilogo',
                                 height: screenHeight * 0.07,
                               ),
-                             SizedBox(height: screenHeight * 0.16),
+                              SizedBox(height: screenHeight * 0.16),
                               Align(
                                 alignment: Alignment.center,
                                 child: RichText(
@@ -156,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ),
                               ),
-                             SizedBox(height: screenHeight * 0.10),
+                              SizedBox(height: screenHeight * 0.10),
                               Align(
                                 alignment: Alignment.bottomCenter,
                                 child: Text(
@@ -171,7 +174,7 @@ class _LoginPageState extends State<LoginPage> {
                             ],
                           ),
                         ),
-                       // SizedBox(width: screenWidth * 0.05),
+                        // SizedBox(width: screenWidth * 0.05),
                         Container(
                           width: screenWidth * 0.3,
                           decoration: BoxDecoration(
@@ -194,13 +197,15 @@ class _LoginPageState extends State<LoginPage> {
                                   style: TextStyle(
                                     fontSize: screenHeight * 0.025,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color.fromARGB(255, 39, 38, 104),
+                                    color:
+                                        const Color.fromARGB(255, 39, 38, 104),
                                   ),
                                 ),
                               ),
                               SizedBox(height: screenHeight * 0.03),
                               Padding(
-                                padding: EdgeInsets.only(bottom: screenHeight * 0.02),
+                                padding: EdgeInsets.only(
+                                    bottom: screenHeight * 0.02),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -217,7 +222,8 @@ class _LoginPageState extends State<LoginPage> {
                                       controller: _usernameController,
                                       style: TextStyle(color: Colors.black),
                                       decoration: InputDecoration(
-                                        hintStyle: TextStyle(color: Colors.black),
+                                        hintStyle:
+                                            TextStyle(color: Colors.black),
                                         enabledBorder: OutlineInputBorder(
                                           borderSide: BorderSide(
                                             color: Colors.black,
@@ -226,18 +232,21 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderSide: BorderSide(
-                                            color: const Color.fromARGB(255, 39, 38, 104),
+                                            color: const Color.fromARGB(
+                                                255, 39, 38, 104),
                                             width: 2.0,
                                           ),
                                         ),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: screenHeight * 0.01),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: screenHeight * 0.01),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               Padding(
-                                padding: EdgeInsets.only(bottom: screenHeight * 0.03),
+                                padding: EdgeInsets.only(
+                                    bottom: screenHeight * 0.03),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -263,11 +272,13 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderSide: BorderSide(
-                                            color: const Color.fromARGB(255, 39, 38, 104),
+                                            color: const Color.fromARGB(
+                                                255, 39, 38, 104),
                                             width: 2.0,
                                           ),
                                         ),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: screenHeight * 0.01),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: screenHeight * 0.01),
                                       ),
                                     ),
                                   ],
@@ -280,7 +291,8 @@ class _LoginPageState extends State<LoginPage> {
                                     _login(context);
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 39, 38, 104),
+                                    backgroundColor:
+                                        const Color.fromARGB(255, 39, 38, 104),
                                     padding: EdgeInsets.symmetric(
                                         vertical: screenHeight * 0.015,
                                         horizontal: screenHeight * 0.03),
@@ -352,7 +364,7 @@ class _LoginPageState extends State<LoginPage> {
                               Align(
                                 alignment: Alignment.center,
                                 child: Text(
-                                 headLine,
+                                  headLine,
                                   style: TextStyle(
                                     fontSize: screenHeight * 0.03,
                                     fontWeight: FontWeight.bold,
@@ -383,13 +395,15 @@ class _LoginPageState extends State<LoginPage> {
                                   style: TextStyle(
                                     fontSize: screenHeight * 0.025,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color.fromARGB(255, 39, 38, 104),
+                                    color:
+                                        const Color.fromARGB(255, 39, 38, 104),
                                   ),
                                 ),
                               ),
                               SizedBox(height: screenHeight * 0.03),
                               Padding(
-                                padding: EdgeInsets.only(bottom: screenHeight * 0.02),
+                                padding: EdgeInsets.only(
+                                    bottom: screenHeight * 0.02),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -406,7 +420,8 @@ class _LoginPageState extends State<LoginPage> {
                                       controller: _usernameController,
                                       style: TextStyle(color: Colors.black),
                                       decoration: InputDecoration(
-                                        hintStyle: TextStyle(color: Colors.black),
+                                        hintStyle:
+                                            TextStyle(color: Colors.black),
                                         enabledBorder: OutlineInputBorder(
                                           borderSide: BorderSide(
                                             color: Colors.black,
@@ -415,18 +430,21 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderSide: BorderSide(
-                                            color: const Color.fromARGB(255, 39, 38, 104),
+                                            color: const Color.fromARGB(
+                                                255, 39, 38, 104),
                                             width: 2.0,
                                           ),
                                         ),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: screenHeight * 0.01),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: screenHeight * 0.01),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               Padding(
-                                padding: EdgeInsets.only(bottom: screenHeight * 0.03),
+                                padding: EdgeInsets.only(
+                                    bottom: screenHeight * 0.03),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -452,11 +470,13 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderSide: BorderSide(
-                                            color: const Color.fromARGB(255, 39, 38, 104),
+                                            color: const Color.fromARGB(
+                                                255, 39, 38, 104),
                                             width: 2.0,
                                           ),
                                         ),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: screenHeight * 0.01),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: screenHeight * 0.01),
                                       ),
                                     ),
                                   ],
@@ -469,7 +489,8 @@ class _LoginPageState extends State<LoginPage> {
                                     _login(context);
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 39, 38, 104),
+                                    backgroundColor:
+                                        const Color.fromARGB(255, 39, 38, 104),
                                     padding: EdgeInsets.symmetric(
                                         vertical: screenHeight * 0.015,
                                         horizontal: screenHeight * 0.03),

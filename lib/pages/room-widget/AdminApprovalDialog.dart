@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 
 class AdminApprovalDialog extends StatelessWidget {
@@ -21,7 +23,7 @@ class AdminApprovalDialog extends StatelessWidget {
       elevation: 16,
       child: Container(
         padding: const EdgeInsets.all(24),
-        constraints: BoxConstraints(
+        constraints: const BoxConstraints(
           minWidth: 200, // Minimum width
           maxWidth: 400, // Maximum width to control content stretching
           // Limit height based on content
@@ -31,6 +33,7 @@ class AdminApprovalDialog extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.2),
               spreadRadius: 3,
               blurRadius: 8,
@@ -44,7 +47,7 @@ class AdminApprovalDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Title with a modern touch
-              Text(
+              const Text(
                 'Approval Request',
                 style: TextStyle(
                   fontSize: 24,
@@ -56,7 +59,7 @@ class AdminApprovalDialog extends StatelessWidget {
               // Content
               Text(
                 'Participant $participantName has requested to join room $roomName.',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black,
                 ),

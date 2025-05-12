@@ -18,6 +18,7 @@ class ThankYouWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(10), // Border radius for rectangle shape
             boxShadow: [
               BoxShadow(
+                // ignore: deprecated_member_use
                 color: Colors.black.withOpacity(0.2),
                 spreadRadius: 3,
                 blurRadius: 6,
@@ -33,7 +34,7 @@ class ThankYouWidget extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.green, // Green background
                   shape: BoxShape.circle, // Circle shape for the icon
                 ),

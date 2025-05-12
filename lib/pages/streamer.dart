@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,8 +10,10 @@ import 'package:video_meeting_room/app_config.dart';
 const String apiServiceUrl = AppConfig.apiLocalNodeUrl;
  
 class LiveKitIngressPage extends StatefulWidget {
+  const LiveKitIngressPage({super.key});
+
   @override
-  _LiveKitIngressPageState createState() => _LiveKitIngressPageState();
+   State<LiveKitIngressPage>  createState() => _LiveKitIngressPageState();
 }
  
 class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTickerProviderStateMixin {
@@ -68,6 +72,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
         });
       }
     } catch (e) {
+      // ignore: avoid_print
       print('Error fetching egress list: $e');
     }
   }
@@ -95,7 +100,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
   Future<void> createYouTubeStream() async {
     if (_roomNameController.text.isEmpty || _youtubeKeyController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Room name and YouTube stream key are required"))
+        const SnackBar(content: Text("Room name and YouTube stream key are required"))
       );
       return;
     }
@@ -117,7 +122,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("YouTube stream started successfully"),
             backgroundColor: Colors.green,
           )
@@ -149,16 +154,16 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("Delete Stream"),
+          title: const Text("Delete Stream"),
           content: Text("Are you sure you want to delete the stream for room '$roomName'?"),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text("Cancel"),
+              child: const Text("Cancel"),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text("Delete", style: TextStyle(color: Colors.red)),
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -175,7 +180,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("Stream deleted successfully"),
             backgroundColor: Colors.green,
           ),
@@ -205,16 +210,16 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("Stop YouTube Stream"),
-          content: Text("Are you sure you want to stop this YouTube stream?"),
+          title: const Text("Stop YouTube Stream"),
+          content: const Text("Are you sure you want to stop this YouTube stream?"),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text("Cancel"),
+              child: const Text("Cancel"),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text("Stop", style: TextStyle(color: Colors.red)),
+              child: const Text("Stop", style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -232,7 +237,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("YouTube stream stopped successfully"),
             backgroundColor: Colors.green,
           ),
@@ -260,7 +265,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
   void copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Copied to clipboard")),
+      const SnackBar(content: Text("Copied to clipboard")),
     );
   }
  
@@ -337,12 +342,12 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
               controller: _tabController,
               labelColor: const Color.fromARGB(255, 39, 38, 104),
               unselectedLabelColor: Colors.grey,
-              tabs: [
+              tabs: const [
                 Tab(text: "RTMP Ingress", icon: Icon(Icons.upload)),
                 Tab(text: "YouTube Streaming", icon: Icon(Icons.live_tv)),
               ],
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             
             // Tab Bar View
             Expanded(
@@ -369,30 +374,30 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       children: [
         TextField(
           controller: _roomNameController,
-          decoration: InputDecoration(labelText: "Room Name"),
-          style: TextStyle(color: Colors.black),
+          decoration: const InputDecoration(labelText: "Room Name"),
+          style: const TextStyle(color: Colors.black),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         TextField(
           controller: _streamerNameController,
-          decoration: InputDecoration(labelText: "Streamer Name"),
-          style: TextStyle(color: Colors.black),
+          decoration: const InputDecoration(labelText: "Streamer Name"),
+          style: const TextStyle(color: Colors.black),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         ElevatedButton(
           onPressed: createIngress,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color.fromARGB(255, 39, 38, 104),
           ),
-          child: Text(
+          child: const Text(
             "Create Ingress",
             style: TextStyle(color: Colors.white),
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         Expanded(
           child: ingressList.isEmpty 
-              ? Center(child: Text("No ingress streams available"))
+              ? const Center(child: Text("No ingress streams available"))
               : ListView.builder(
                   itemCount: ingressList.length,
                   itemBuilder: (context, index) {
@@ -402,8 +407,8 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                     final String streamUrl = ingress['stream_url'] ?? 'N/A';
                     final String streamKey = ingress['stream_key'] ?? 'N/A';
                     final String combinedStreamUrl = streamUrl.endsWith('/')
-                        ? "${streamUrl}${streamKey}"
-                        : "${streamUrl}/${streamKey}";
+                        ? "$streamUrl$streamKey"
+                        : "$streamUrl/$streamKey";
                         
                     // Create host and participant links (modify as needed)
                     String encodedRoomName = ingress['roomName'] ?? 'unknown';
@@ -436,7 +441,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                     final String participantLink = '$baseUrl?data=$encodedEncryptedParticipantParams';
                     
                     return Card(
-                      margin: EdgeInsets.symmetric(vertical: 10),
+                      margin: const EdgeInsets.symmetric(vertical: 10),
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(
@@ -447,24 +452,24 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  "Room Name : ${encodedRoomName}",
-                                  style: TextStyle(
+                                  "Room Name : $encodedRoomName",
+                                  style: const TextStyle(
                                     color: Colors.black,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
                                   ),
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(Icons.delete, color: Colors.red),
                                   onPressed: () => deleteIngress(encodedRoomName),
                                   tooltip: "Delete stream",
                                 ),
                               ],
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             // Combined Stream URL with Copy Button
                             Container(
-                              padding: EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: Colors.blue[50],
                                 borderRadius: BorderRadius.circular(4),
@@ -472,20 +477,20 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     "Stream URL :",
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: Text(
                                           combinedStreamUrl,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             color: Colors.black,
                                             fontFamily: 'monospace',
                                           ),
@@ -493,7 +498,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                                         ),
                                       ),
                                       IconButton(
-                                        icon: Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
+                                        icon: const Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
                                         onPressed: () => copyToClipboard(combinedStreamUrl),
                                         tooltip: "Copy combined URL",
                                       ),
@@ -502,11 +507,11 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                                 ],
                               ),
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             
                             // Host and Participant Links
                             Container(
-                              padding: EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: Colors.blue[50],
                                 borderRadius: BorderRadius.circular(4),
@@ -514,50 +519,50 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     "Host Link :",
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: Text(
                                           hostLink,
-                                          style: TextStyle(color: Colors.black),
+                                          style: const TextStyle(color: Colors.black),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       IconButton(
-                                        icon: Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
+                                        icon: const Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
                                         onPressed: () => copyToClipboard(hostLink),
                                         tooltip: "Copy host link",
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 8),
-                                  Text(
+                                  const SizedBox(height: 8),
+                                  const Text(
                                     "Participant Link :",
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: Text(
                                           participantLink,
-                                          style: TextStyle(color: Colors.black),
+                                          style: const TextStyle(color: Colors.black),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       IconButton(
-                                        icon: Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
+                                        icon: const Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
                                         onPressed: () => copyToClipboard(participantLink),
                                         tooltip: "Copy participant link",
                                       ),
@@ -583,30 +588,30 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
       children: [
         TextField(
           controller: _roomNameController,
-          decoration: InputDecoration(labelText: "Room Name"),
-          style: TextStyle(color: Colors.black),
+          decoration: const InputDecoration(labelText: "Room Name"),
+          style: const TextStyle(color: Colors.black),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         TextField(
           controller: _youtubeKeyController,
-          decoration: InputDecoration(labelText: "YouTube Stream Key"),
-          style: TextStyle(color: Colors.black),
+          decoration: const InputDecoration(labelText: "YouTube Stream Key"),
+          style: const TextStyle(color: Colors.black),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         ElevatedButton(
           onPressed: createYouTubeStream,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color.fromARGB(255, 39, 38, 104),
           ),
-          child: Text(
+          child: const Text(
             "Start YouTube Stream",
             style: TextStyle(color: Colors.white),
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         Expanded(
           child: egressList.isEmpty
-              ? Center(child: Text("No active YouTube streams"))
+              ? const Center(child: Text("No active YouTube streams"))
               : ListView.builder(
                   itemCount: egressList.length,
                   itemBuilder: (context, index) {
@@ -619,7 +624,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                         : DateTime.now();
                     
                     return Card(
-                      margin: EdgeInsets.symmetric(vertical: 10),
+                      margin: const EdgeInsets.symmetric(vertical: 10),
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(
@@ -633,13 +638,13 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                                   children: [
                                     Text(
                                       "Room: $roomName",
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         color: Colors.black,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
                                       ),
                                     ),
-                                    SizedBox(height: 4),
+                                    const SizedBox(height: 4),
                                     Text(
                                       "Status: $status",
                                       style: TextStyle(
@@ -647,10 +652,10 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    SizedBox(height: 4),
+                                    const SizedBox(height: 4),
                                     Text(
                                       "Started: ${startedAt.toString().substring(0, 19)}",
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         color: Colors.black,
                                         fontSize: 12,
                                       ),
@@ -658,15 +663,15 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                                   ],
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.stop_circle, color: Colors.red),
+                                  icon: const Icon(Icons.stop_circle, color: Colors.red),
                                   onPressed: () => stopEgress(egressId),
                                   tooltip: "Stop stream",
                                 ),
                               ],
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             Container(
-                              padding: EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: Colors.blue[50],
                                 borderRadius: BorderRadius.circular(4),
@@ -674,20 +679,20 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     "Egress ID:",
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: Text(
                                           egressId,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             color: Colors.black,
                                             fontFamily: 'monospace',
                                           ),
@@ -695,7 +700,7 @@ class _LiveKitIngressPageState extends State<LiveKitIngressPage> with SingleTick
                                         ),
                                       ),
                                       IconButton(
-                                        icon: Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
+                                        icon: const Icon(Icons.copy, color: Color.fromARGB(255, 39, 38, 104)),
                                         onPressed: () => copyToClipboard(egressId),
                                         tooltip: "Copy Egress ID",
                                       ),

@@ -1,4 +1,5 @@
-// lib/widgets/participant_selection_dialog.dart
+
+// ignore_for_file: file_names
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -20,6 +21,7 @@ class ParticipantSelectionDialog extends StatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _ParticipantSelectionDialogState createState() =>
       _ParticipantSelectionDialogState();
 }
@@ -48,7 +50,7 @@ class _ParticipantSelectionDialogState
           children: [
             // Displaying admins first (without checkbox and with (host))
             ...adminTracks.map((track) {
-              final participantName = track.participant.name ?? 'Unknown';
+              final participantName = track.participant.name;
               final isLocal = track.participant.identity == widget.localParticipantIdentity;
               final displayName = isLocal ? '$participantName (you) (host)' : '$participantName (host)';
 
@@ -61,7 +63,7 @@ class _ParticipantSelectionDialogState
 
             // Displaying non-admin participants
             ...nonAdminTracks.map((track) {
-              final participantName = track.participant.name ?? 'Unknown';
+              final participantName = track.participant.name;
               final isLocal = track.participant.identity == widget.localParticipantIdentity;
               final isHandRaised = track.participant.metadata != null
                   ? jsonDecode(track.participant.metadata ?? '{}')['handraise'] == true
@@ -77,7 +79,7 @@ class _ParticipantSelectionDialogState
                   children: [
                     if (isHandRaised) const Icon(Icons.pan_tool, color: Colors.orange), // Hand raised icon
                     if (!isLocal) Checkbox(
-                      value: widget.allowedToTalk.contains(track),
+                      value: widget.allowedToTalk.contains(track as Participant<TrackPublication<Track>>),
                       onChanged: (value) {
                         widget.onToggleParticipantForTalk(track as Participant<TrackPublication<Track>>);
                       },

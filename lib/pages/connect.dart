@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart' as livekit;
@@ -77,20 +79,6 @@ Future<void> _initPackageInfo() async {
   Future<void> _readPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _identityCtrl.text = prefs.getString(_storeKeyIdentity) ?? '';
-    String? room = "";
-    final uri = Uri.base;
-    final encryptedParams = uri.queryParameters['data'];
-  
-
-    if (encryptedParams != null && encryptedParams.isNotEmpty) {
-          final decodedEncryptedParams = Uri.decodeComponent(encryptedParams);
-       
-      final decryptedParams = UrlEncryptionHelper.decrypt(decodedEncryptedParams);
-      final decodedParams = UrlEncryptionHelper.decodeParams(decryptedParams);
-  
-      room = decodedParams['room'] ?? '';
-
-    }
     //String metadata = await _apiService.getWelcomeMessage(room);
     welcomeMessage = 'Weekly Roundtable Leadership Call';
     _initializeParams();
@@ -139,6 +127,8 @@ Future<void> _initPackageInfo() async {
   }
 
   Future<void> _connect(BuildContext ctx) async {
+      if (!mounted) return;
+  
     try {
       setState(() {
         _busy = true;
@@ -170,7 +160,8 @@ Future<void> _initPackageInfo() async {
       final role = _selectedRole == Role.admin ? Role.admin : Role.participant;
 
       final token = await _apiService.getToken(identity, roomName, role.toString(), adminWelcomeMessage);
-    
+        if (!mounted || !ctx.mounted) return;
+
       await Navigator.pushAndRemoveUntil<void>(
         ctx,
         MaterialPageRoute(
@@ -181,9 +172,9 @@ Future<void> _initPackageInfo() async {
               simulcast: true,
               adaptiveStream: true,
               dynacast: true,
-              preferredCodec: 'Preferred Codec',
+              preferredCodec: 'VP9',
               enableBackupVideoCodec:
-                  ['VP9', 'AV1'].contains('Preferred Codec'),
+                  ['VP8', 'AV1'].contains('VP8') ? true : false,
               role: role,
               roomName: roomName,
               identity: identity,
@@ -200,11 +191,15 @@ Future<void> _initPackageInfo() async {
       );
     } catch (error) {
       print('Could not connect $error');
+      if (!mounted || !ctx.mounted) return;
       await ctx.showErrorDialog(error);
     } finally {
+      if (mounted) {
       setState(() {
         _busy = false;
       });
+      }
+     
     }
   }
 
@@ -214,9 +209,9 @@ Future<void> _initPackageInfo() async {
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: const BorderRadius.only(
+            borderRadius:  BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
@@ -286,7 +281,6 @@ Future<void> _initPackageInfo() async {
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 600;
     final double screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
@@ -326,7 +320,7 @@ Future<void> _initPackageInfo() async {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => LiveKitIngressPage()),
+                  MaterialPageRoute(builder: (context) => const LiveKitIngressPage()),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -491,9 +485,9 @@ Widget buildMainContent() {
                   width: screenWidth * 0.20,
                   height:screenHeight * 0.65,
                      
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: const BorderRadius.only(
+                    borderRadius: BorderRadius.only(
                       topRight: Radius.circular(10),
                       bottomRight: Radius.circular(10),
                     ),
@@ -606,17 +600,17 @@ Widget buildMainContent() {
                           SizedBox(height: screenHeight * 0.01), // Dynamic spacing
                           TextField(
                             controller: _identityCtrl,
-                            style: TextStyle(color: Colors.black),
+                            style: const TextStyle(color: Colors.black),
                             decoration: InputDecoration(
-                              enabledBorder: OutlineInputBorder(
+                              enabledBorder: const OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.black, // Border color
                                   width: 1.0, // Border width
                                 ),
                               ),
-                              focusedBorder: OutlineInputBorder(
+                              focusedBorder: const OutlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color.fromARGB(255, 39, 38, 104), // Focused border color
+                                  color:  Color.fromARGB(255, 39, 38, 104), // Focused border color
                                   width: 2.0,
                                 ),
                               ),
@@ -718,17 +712,17 @@ Widget buildMainContent() {
             SizedBox(height: screenHeight * 0.01), // Dynamic spacing
             TextField(
               controller: _roomCtrl,
-              style: TextStyle(color: Colors.black),
+              style: const TextStyle(color: Colors.black),
               decoration: InputDecoration(
-                enabledBorder: OutlineInputBorder(
+                enabledBorder: const OutlineInputBorder(
                   borderSide: BorderSide(
                     color: Colors.black, // Border color
                     width: 1.0, // Border width
                   ),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: const Color.fromARGB(255, 39, 38, 104), // Focused border color
+                    color:  Color.fromARGB(255, 39, 38, 104), // Focused border color
                     width: 2.0,
                   ),
                 ),
@@ -755,17 +749,17 @@ Widget buildMainContent() {
             SizedBox(height: screenHeight * 0.01), // Dynamic spacing
             TextField(
               controller: _welcomeMessageCtrl,
-              style: TextStyle(color: Colors.black),
+              style: const TextStyle(color: Colors.black),
               decoration: InputDecoration(
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
+                enabledBorder: const OutlineInputBorder(
+                  borderSide:  BorderSide(
                     color: Colors.black, // Border color
                     width: 1.0, // Border width
                   ),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: const Color.fromARGB(255, 39, 38, 104), // Focused border color
+                    color:  Color.fromARGB(255, 39, 38, 104), // Focused border color
                     width: 2.0,
                   ),
                 ),

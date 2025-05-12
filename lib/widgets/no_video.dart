@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'package:video_meeting_room/theme.dart';
 
 class NoVideoWidget extends StatelessWidget {
   //

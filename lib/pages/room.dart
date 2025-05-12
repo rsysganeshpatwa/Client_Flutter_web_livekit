@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -125,30 +127,88 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       await widget.room.localParticipant?.setMicrophoneEnabled(false);
       await widget.room.localParticipant?.setScreenShareEnabled(false);
 
-      await widget.room.dispose();
       await removeParticipantFromDB();
+      await widget.room.dispose();
     })();
     onWindowShouldClose = null;
     _isRunning = false;
     WidgetsBinding.instance.removeObserver(this);
+    print('RoomPage disposed');
     super.dispose();
   }
 
   // ==================== Room Management Methods ====================
   void _onRoomDidUpdate() {
+    if (!mounted) return;
     setState(() {
       _sortUserMediaTracks();
     });
   }
 
+  Future<void> handleRoomDisconnected(BuildContext context) async {
+    if (!mounted) return;
+
+    try {
+      // First cleanup room resources
+      await widget.room.localParticipant?.unpublishAllTracks();
+      await widget.room.localParticipant?.setCameraEnabled(false);
+      await widget.room.localParticipant?.setMicrophoneEnabled(false);
+      await widget.room.localParticipant?.setScreenShareEnabled(false);
+      await removeParticipantFromDB();
+
+      // Then disconnect and dispose room
+      await widget.room.disconnect();
+
+      // Navigate based on role using pushReplacement
+      if (!mounted) return;
+      // Capture the context's mounted state
+      if (!context.mounted) return;
+
+      if (localParticipantRole == Role.admin.toString()) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ThankYouWidget()),
+        );
+      }
+    } catch (e) {
+      print('Error during room disconnection: $e');
+      // Still try to navigate even if cleanup fails
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => localParticipantRole == Role.admin.toString()
+              ? const LoginPage()
+              : const ThankYouWidget(),
+        ),
+      );
+    }
+  }
+
   void _setUpListeners() => _listener
     ..on<RoomDisconnectedEvent>((event) async {
-      if (event.reason != null) {}
-      WidgetsBinding.instance.addPostFrameCallback((timeStamp) =>
-          handleRoomDisconnected(context, widget.room.localParticipant!));
+      if (event.reason != null) {
+        print('Room disconnected reason: ${event.reason}');
+      }
+      if (mounted) {
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => handleRoomDisconnected(context));
+      }
     })
     ..on<ParticipantEvent>((event) {
       _sortParticipants('ParticipantEvent');
+    })
+    ..on<VideoSenderStatsEvent>((event) {
+    for (int i = 0; i < event.stats.length; i++) {
+        final sender = event.stats[i];
+        print('VideoSenderStatsEvent: ${sender!.rid} - ${sender.framesSent} frames sent');
+      
+      }
     })
     ..on<RoomRecordingStatusChanged>((event) {
       context.showRecordingStatusChangedDialog(event.activeRecording);
@@ -188,16 +248,22 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     });
 
   void _askPublish() async {
+       if (!mounted) return;
+
     final result = await context.showPublishDialog();
     if (result != true) return;
+      // Capture the context's mounted state
+
     try {
       await widget.room.localParticipant?.setCameraEnabled(true);
     } catch (error) {
+       if (!mounted || !context.mounted) return;
       await context.showErrorDialog(error);
     }
     try {
       await widget.room.localParticipant?.setMicrophoneEnabled(true);
     } catch (error) {
+         if (!mounted || !context.mounted) return;
       await context.showErrorDialog(error);
     }
   }
@@ -206,22 +272,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     final roomId = await widget.room.getSid();
     final localParticipant = widget.room.localParticipant;
     final identity = localParticipant?.identity;
-    final roomName = widget.room.name!;
+    final roomName = widget.room.name;
     await _roomDataManageService.removeParticipant(roomId, roomName, identity);
-  }
-
-  void handleRoomDisconnected(BuildContext context, Participant participant) {
-    if (localParticipantRole == Role.admin.toString()) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const ThankYouWidget()),
-      );
-    }
   }
 
   // ==================== Participant Management Methods ====================
@@ -249,6 +301,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _sortParticipants(String from) {
+    if (!mounted) return;
+
     final localParticipant = widget.room.localParticipant;
     final bool isLocalHost = localParticipant != null &&
         localParticipantRole == Role.admin.toString();
@@ -338,13 +392,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         sortedSynced[entry.key] = entry.value;
       }
     }
-
-    print('----sortedSynced----');
-    for (final entry in sortedSynced.entries) {
-      print(
-          'Sorted participant: ${entry.key}, Track: ${entry.value.track?.participant.name}');
-    }
-    print('---------------------');
 
     syncedParticipants
       ..clear()
@@ -441,7 +488,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
           if (rA != rB) return rA.compareTo(rB);
 
           // Optional: fallback to lastShownAt descending
-          return (b.lastShownAt ?? 0).compareTo(a.lastShownAt ?? 0);
+          return (b.lastShownAt).compareTo(a.lastShownAt);
         });
 
       setState(() {
@@ -456,8 +503,12 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
     SyncedParticipant? replaceTarget;
     for (var p in currentVisible) {
-      if (isScreenShare(p) || isSpotlight(p) || isPinned(p) || isHandRaised(p))
+      if (isScreenShare(p) ||
+          isSpotlight(p) ||
+          isPinned(p) ||
+          isHandRaised(p)) {
         continue;
+      }
 
       final lastSpoke =
           p.track?.participant.lastSpokeAt?.millisecondsSinceEpoch ?? 0;
@@ -466,7 +517,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
       if (isMuted(p) || neverSpoke || notSpeaking) {
         if (replaceTarget == null ||
-            (p.lastShownAt ?? 0) < (replaceTarget.lastShownAt ?? 0)) {
+            (p.lastShownAt) < (replaceTarget.lastShownAt)) {
           replaceTarget = p;
         }
       }
@@ -510,10 +561,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
           return aIndex.compareTo(bIndex);
         });
 
-      for (var p in updatedOrder) {
-        print('Updated order: ${p.identity}');
-      }
-
       setState(() {
         syncedParticipants = {
           for (var p in updatedOrder) p.identity: p,
@@ -522,7 +569,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     }
 
     _addLocalParticipant();
-    // subscribeToFirstToFourthParticipants();
   }
 
   void _addLocalParticipant() {
@@ -581,38 +627,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       ..addEntries(entries);
   }
 
-  void subscribeToFirstToFourthParticipants() {
-    if (syncedParticipants.isEmpty) {
-      return;
-    }
-
-    List<SyncedParticipant> sortedParticipants = syncedParticipants.values
-        .where((p) =>
-            p.track != null &&
-            p.identity != widget.room.localParticipant?.identity)
-        .toList();
-
-    int limit = sortedParticipants.length < 4 ? sortedParticipants.length : 4;
-
-    for (int i = 0; i < limit; i++) {
-      SyncedParticipant syncedParticipant = sortedParticipants[i];
-      _subscribeToParticipant(syncedParticipant.track!);
-    }
-  }
-
-  void _subscribeToParticipant(ParticipantTrack participantTrack) {
-    if (participantTrack.participant is RemoteParticipant) {
-      final participant = participantTrack.participant as RemoteParticipant;
-      print('Subscribing to participant: ${participant.identity}');
-      for (var publication in participant.videoTrackPublications) {
-        if (!publication.subscribed) {
-          publication.subscribe();
-          publication.enable();
-        }
-      }
-    }
-  }
-
   List<ParticipantTrack> _filterParticipants(String searchQuery) {
     final localParticipant = widget.room.localParticipant;
 
@@ -648,6 +662,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   // ==================== Participant Status Methods ====================
   Future<void> _initializeParticipantStatuses() async {
+    if (!mounted) return;
     final localParticipant = widget.room.localParticipant;
     if (localParticipant != null) {
       await _updateParticipantmanagerFromDB();
@@ -672,6 +687,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   Future<void> _updateParticipantmanagerFromDB() async {
+    if (!mounted) return;
     final roomId = await widget.room.getSid();
     final roomName = widget.room.name!;
 
@@ -699,6 +715,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void updateParticipantStatusFromMetadata(String metadata) {
+    if (!mounted) return;
     // Parse the received metadata
     final decodedMetadata = jsonDecode(metadata);
 
@@ -751,6 +768,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void updateParticipantsStatus(List<ParticipantStatus> updatedStatuses) {
+    if (!mounted) return;
     final updatedIdentities = updatedStatuses.map((p) => p.identity).toSet();
 
     // Compute new list outside of setState
@@ -818,6 +836,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _handleRaiseHandFromParticipant(String identity, bool isHandRaised) {
+    if (!mounted) return;
     setState(() {
       final participantStatus = _getParticipantStatus(identity);
 
@@ -919,6 +938,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _closeDialog(String requestId) {
+    if (!mounted) return;
     final dialogContext = _dialogContexts[requestId];
     if (dialogContext != null) {
       Navigator.of(dialogContext).pop();
@@ -929,6 +949,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _toggleMuteAll(bool muteAll) {
+    if (!mounted) return;
     setState(() {
       _muteAll = muteAll;
 
@@ -984,6 +1005,39 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     });
   }
 
+  Widget _buildSidebar(List<SyncedParticipant> sidebarTracks, bool isMobile) {
+    if (!_isSideBarShouldVisible ||
+        isMobile ||
+        widget.room.localParticipant == null) {
+      return const SizedBox.shrink();
+    }
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: ValueNotifier<bool>(isParticipantListVisible),
+      builder: (context, isVisible, child) {
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: isVisible
+              ? SizedBox(
+                  width: 300,
+                  child: Container(
+                    color: const Color(0xFF404040),
+                    child: ParticipantListView(
+                      key: const ValueKey('sidebar'),
+                      syncedParticipant: sidebarTracks,
+                      isLocalHost:
+                          localParticipantRole == Role.admin.toString(),
+                      onParticipantsStatusChanged:
+                          _handlePinAndSpotlightStatusChanged,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
   List<SyncedParticipant> getPrioritizedTracks(
     Map<String, SyncedParticipant> participants,
     List<String> pinnedIds,
@@ -999,7 +1053,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         .where((p) =>
             p.track?.type == ParticipantTrackType.kScreenShare &&
             p.identity != localIdentity)
-        .map((p) => p!)
+        .map((p) => p)
         .toList();
     if (screenShares.isNotEmpty) {
       onPiPChanged?.call(true);
@@ -1059,21 +1113,21 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     List<SyncedParticipant> prioritizedTracks,
     String localIdentity,
   ) {
-    final shownIds = prioritizedTracks
-        .map((p) => p.identity)
-        .toSet(); // IDs already shown in grid or PiP
-
-    for (var p in prioritizedTracks) {
-      print('Prioritized track: ${p.track!.participant.identity}');
+    if (!mounted) return [];
+    if (prioritizedTracks.isEmpty) {
+      setState(() {
+        _isSideBarShouldVisible = false;
+      });
+      return [];
     }
 
-    for (var p in syncedParticipants.values) {
-      print(
-          'Track identity: ${p.identity}, type: ${p.track?.type}, in shownIds: ${shownIds.contains(p.identity)}');
-    }
-    // Filter out local identity and already shown IDs
-    // Also filter for user media tracks only
+    // ignore: unnecessary_null_comparison
+    final shownIds = prioritizedTracks != null
+        ? prioritizedTracks
+            .map((p) => p.identity)
+            .toSet() // IDs already shown in grid or PiP
 
+        : <String>{};
     final sidebarTracks = syncedParticipants.values.where((p) {
       if (p.track == null || p.identity == localIdentity) return false;
 
@@ -1082,10 +1136,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
       return !alreadyShown && p.track?.type == ParticipantTrackType.kUserMedia;
     }).toList();
-
-    for (var p in sidebarTracks) {
-      print('Sidebar track: ${p.track!.participant.identity}');
-    }
 
     if (sidebarTracks.isNotEmpty) {
       setState(() {
@@ -1114,6 +1164,27 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
 
+    if (localIdentity == null) {
+      print("localIdentity is null");
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (localParticipantTrack == null) {
+      print("localParticipantTrack is null");
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (localParticipantStatus == null) {
+      print("localParticipantStatus is null");
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     final prioritizedTracks = getPrioritizedTracks(
       syncedParticipants,
       pinnedProvider.pinnedIdentities,
@@ -1128,7 +1199,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       (bool value) {
         if (_isSideBarShouldVisible != value) {
           setState(() {
-            print('Sidebar should be visible: $value');
             isParticipantListVisible = value;
             _isSideBarShouldVisible = value;
           });
@@ -1137,7 +1207,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     );
     final sidebarTracks = getSidebarParticipants(
       prioritizedTracks,
-      localIdentity!,
+      localIdentity,
     );
 
     return Scaffold(
@@ -1191,25 +1261,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: (!isMobile &&
-                          widget.room.localParticipant != null &&
-                          isParticipantListVisible &&
-                          _isSideBarShouldVisible)
-                      ? 300
-                      : 0,
-                  color: const Color(0xFF404040),
-                  child: _isSideBarShouldVisible
-                      ? ParticipantListView(
-                          syncedParticipant: sidebarTracks,
-                          isLocalHost:
-                              localParticipantRole == Role.admin.toString(),
-                          onParticipantsStatusChanged:
-                              _handlePinAndSpotlightStatusChanged,
-                        )
-                      : null,
-                ),
+                _buildSidebar(sidebarTracks, isMobile),
               ],
             ),
             if (!isMobile && _isSideBarShouldVisible)
@@ -1238,8 +1290,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
               ),
             if (_isPiP)
               DraggableParticipantWidget(
-                localParticipantTrack: localParticipantTrack!,
-                localParticipantStatus: localParticipantStatus!,
+                localParticipantTrack: localParticipantTrack,
+                localParticipantStatus: localParticipantStatus,
                 localParticipantRole: localParticipantRole!,
                 updateParticipantsStatus: _handlePinAndSpotlightStatusChanged,
               ),

@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_brace_in_string_interps, file_names
+
 import 'package:flutter/material.dart';
 
 class NewParticipantDialog {
@@ -14,7 +16,7 @@ class NewParticipantDialog {
           elevation: 16,
           child: Container(
             padding: const EdgeInsets.all(24),
-            constraints: BoxConstraints(
+            constraints: const BoxConstraints(
               minWidth: 200,
               maxWidth: 400,
             ),
@@ -23,6 +25,7 @@ class NewParticipantDialog {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
+                  // ignore: deprecated_member_use
                   color: Colors.black.withOpacity(0.2),
                   spreadRadius: 3,
                   blurRadius: 8,
@@ -36,7 +39,7 @@ class NewParticipantDialog {
               children: [
                 Text(
                   '${participantName}, You are currently muted. Please raise your hand if you would like to speak.',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Colors.black87,
                   ),

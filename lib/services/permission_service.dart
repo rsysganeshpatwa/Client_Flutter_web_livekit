@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:permission_handler/permission_handler.dart';
 
 class PermissionService {

@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'package:encrypt/encrypt.dart' as  erc;
 import 'package:flutter/services.dart';
@@ -62,7 +64,7 @@ static String encrypt(String text) {
   static bool _isExpired(String timestamp) {
     final dateTime = DateTime.parse(timestamp);
     final now = DateTime.now();
-    final expirationDuration = const Duration(hours: 24); // Example: 24 hours expiration
+    const expirationDuration =  Duration(hours: 24); // Example: 24 hours expiration
     return now.difference(dateTime) > expirationDuration;
   }
   // Encode a map of parameters to a query string
@@ -77,6 +79,8 @@ static String encrypt(String text) {
 
 
 }
+
+
 
 
 class ValidateTextField {
@@ -134,3 +138,15 @@ List<ParticipantStatus> updateSpotlightStatus({
 }
 
 
+
+class ParticipantUtils {
+ static String formatName(String name) {
+      if (name.isEmpty) return name;
+      return name
+          .split(' ')
+          .map((word) => word.isNotEmpty
+              ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+              : '')
+          .join(' ');
+}
+}

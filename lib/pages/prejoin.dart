@@ -1,10 +1,10 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -83,7 +83,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
   VideoParameters _selectedVideoParameters = VideoParametersPresets.h720_169;
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   late SharedPreferences prefs;
-  final RoomDataManageService _roomDataManageService = GetIt.instance<RoomDataManageService>();
+  final RoomDataManageService _roomDataManageService =
+      GetIt.instance<RoomDataManageService>();
 
   @override
   void initState() {
@@ -93,7 +94,6 @@ class _PreJoinPageState extends State<PreJoinPage> {
     Hardware.instance.enumerateDevices().then(_loadDevices);
   }
 
-
   @override
   void deactivate() {
     _subscription?.cancel();
@@ -101,19 +101,21 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   void _loadDevices(List<MediaDevice> devices) async {
+    // Request both camera and microphone permissions
+    PermissionStatus cameraStatus = await Permission.camera.request();
+    PermissionStatus microphoneStatus = await Permission.microphone.request();
+    if (cameraStatus.isGranted || microphoneStatus.isGranted) {
+      devices = await Hardware.instance.enumerateDevices();
+    }
+    _setEnableVideo(cameraStatus.isGranted);
+    _setEnableAudio(microphoneStatus.isGranted);
 
-     // Request both camera and microphone permissions
-  PermissionStatus cameraStatus = await Permission.camera.request();
-  PermissionStatus microphoneStatus = await Permission.microphone.request();
-  if(cameraStatus.isGranted || microphoneStatus.isGranted){
-    devices = await Hardware.instance.enumerateDevices();
-  }
-            _setEnableVideo(cameraStatus.isGranted);
-            _setEnableAudio(microphoneStatus.isGranted);
-
-
-    _audioInputs = microphoneStatus.isGranted ? devices.where((d) => d.kind == 'audioinput').toList() :[];
-    _videoInputs = cameraStatus.isGranted ?devices.where((d) => d.kind == 'videoinput').toList() :[];
+    _audioInputs = microphoneStatus.isGranted
+        ? devices.where((d) => d.kind == 'audioinput').toList()
+        : [];
+    _videoInputs = cameraStatus.isGranted
+        ? devices.where((d) => d.kind == 'videoinput').toList()
+        : [];
 
     if (_audioInputs.isNotEmpty) {
       if (_selectedAudioDevice == null) {
@@ -191,25 +193,27 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
   @override
   void dispose() {
+    print("pre join dispose");
     _subscription?.cancel();
     super.dispose();
   }
 
-  Future<bool> _waitForApproval(String participantName, String roomName, String roomId) async {
+  Future<bool> _waitForApproval(
+      String participantName, String roomName, String roomId) async {
     try {
       // Request approval before joining
+      if (!mounted) return false;
       final request = await _approvalService.createApprovalRequest(
           participantName, roomName);
       final requestId = request['id'];
-      
-      
+
       // Initialize timer for 30 seconds
       const int timeout = 30;
       int elapsedTime = 0;
       bool approved = false;
 
       while (elapsedTime < timeout) {
-        await Future.delayed(Duration(seconds: 5));
+        await Future.delayed(const Duration(seconds: 5));
         elapsedTime += 5;
         final statusResponse =
             await _approvalService.getRequestStatus(requestId);
@@ -217,10 +221,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
         if (status == 'approved') {
           approved = true;
+          if (!mounted) return false;
           context.showApprovalStatusDialog('approved');
           await _approvalService.removeRequest(requestId);
           return true; // Approval was granted
         } else if (status == 'rejected') {
+          if (!mounted) return false;
           context.showApprovalStatusDialog('rejected');
           await _approvalService.removeRequest(requestId);
           return false; // Approval was denied
@@ -229,6 +235,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
       // If 30 seconds have passed and no approval was granted
       if (!approved) {
+         if (!mounted) return false;
         context
             .showApprovalStatusDialog('No host available, please try again.');
         await _approvalService.removeRequest(requestId);
@@ -242,29 +249,23 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   _join(BuildContext context) async {
+    if (!mounted) return;
     _busy = true;
 
     setState(() {});
 
     var args = widget.args;
-    
 
     try {
       // Wait for approval before proceeding
       // final isLoggedIn = prefs.getBool('isLoggedIn');
       if (args.role == Role.participant && args.joinRequiresApproval) {
-        bool isApproved = await _waitForApproval(args.identity, args.roomName, args.roomId);
+        bool isApproved =
+            await _waitForApproval(args.identity, args.roomName, args.roomId);
         if (!isApproved) {
           return;
         }
       }
-
-      //create new room
-      final room = Room();
-
-      // Create a Listener before connecting
-      final listener = room.createListener();
-
       E2EEOptions? e2eeOptions;
       if (args.e2ee && args.e2eeKey != null) {
         final keyProvider = await BaseKeyProvider.create();
@@ -272,86 +273,91 @@ class _PreJoinPageState extends State<PreJoinPage> {
         await keyProvider.setKey(args.e2eeKey!);
       }
 
-    
+      //create new room
+      final room = Room(
+        roomOptions: RoomOptions(
+          defaultCameraCaptureOptions: CameraCaptureOptions(
+            maxFrameRate: 30,
+            params: _selectedVideoParameters,
+          ),
+          defaultAudioCaptureOptions: AudioCaptureOptions(
+            deviceId: _selectedAudioDevice?.deviceId,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          ),
+          defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
+            useiOSBroadcastExtension: true,
+            params: VideoParameters(
+              dimensions: VideoDimensionsPresets.h1080_169,
+              encoding: VideoEncoding(
+                maxBitrate: 3 * 1000 * 1000,
+                maxFramerate: 15,
+              ),
+            ),
+          ),
+          defaultVideoPublishOptions: VideoPublishOptions(
+            simulcast: args.simulcast,
+            videoCodec: args.preferredCodec,
+            backupVideoCodec: BackupVideoCodec(
+              codec: 'VP8',
+              enabled: args.enableBackupVideoCodec,
+            ),
+          ),
+          defaultAudioPublishOptions: const AudioPublishOptions(
+            name: 'custom_audio_track_name',
+          ),
+          adaptiveStream: args.adaptiveStream,
+          dynacast: args.dynacast,
+          e2eeOptions: e2eeOptions,
+        ),
+      );
 
-      
+      // Create a Listener before connecting
+      final listener = room.createListener();
+
       // Try to connect to the room
       // This will throw an Exception if it fails for any reason.
       await room
           .connect(
-            args.url,
-            args.token,
-            connectOptions: const ConnectOptions(
-             autoSubscribe: false,
-          
-             
-            ),
-            roomOptions: RoomOptions(
-              
-              defaultAudioCaptureOptions: AudioCaptureOptions(
-                deviceId: _selectedAudioDevice?.deviceId,
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                
-                 
-              ),
-              adaptiveStream: args.adaptiveStream,
-        
-              dynacast: args.dynacast,
-              defaultAudioPublishOptions: const AudioPublishOptions(
-                name: 'custom_audio_track_name',
-                
-              ),
-              defaultVideoPublishOptions: VideoPublishOptions(
-                simulcast: args.simulcast,
-                videoCodec: args.preferredCodec,
-                backupVideoCodec: BackupVideoCodec(
-                  enabled: args.enableBackupVideoCodec,
-                ),
-              ),
-              defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
-                  useiOSBroadcastExtension: true,
-                  params: VideoParameters(
-                      dimensions: VideoDimensionsPresets.h1080_169,
-                      encoding: VideoEncoding(
-                        maxBitrate: 3 * 1000 * 1000,
-                        maxFramerate: 15,
-                      ))),
-              defaultCameraCaptureOptions: CameraCaptureOptions(
-                  maxFrameRate: 30, params: _selectedVideoParameters),
-              e2eeOptions: e2eeOptions,
-              
-            ),
-             fastConnectOptions: FastConnectOptions(
-              microphone: TrackOption(track: _audioTrack),
-              camera: TrackOption(track: _videoTrack),
-            ),
-          ).catchError((error) async {
-            print('Could not connect $error');
-            _roomDataManageService.removeParticipant('',args.roomName,args.identity);
-            await room.disconnect();
-            context.showErrorDialog(error);
-          });
-          
+        args.url,
+        args.token,
+        connectOptions: const ConnectOptions(
+          autoSubscribe: false,
+        ),
+        fastConnectOptions: FastConnectOptions(
+          microphone: TrackOption(track: _audioTrack),
+          camera: TrackOption(track: _videoTrack),
+        ),
+      )
+          .catchError((error) async {
+        print('Could not connect $error');
+        _roomDataManageService.removeParticipant(
+            '', args.roomName, args.identity);
+        await room.disconnect();
+        if (!mounted || !context.mounted) return;
+        context.showErrorDialog(error);
+      });
 
-      await Navigator.pushAndRemoveUntil(
+      if (!mounted || !context.mounted) return;
+      await Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => RoomPage(room, listener,widget.args.muteByDefault,
-             widget.args.enableAudio, widget.args.enableVideo)),
-        (route) => false,
+        MaterialPageRoute(
+            builder: (_) => RoomPage(room, listener, widget.args.muteByDefault,
+                widget.args.enableAudio, widget.args.enableVideo)),
       );
     } catch (error) {
       print('Could not connect $error');
-    
+      if (!mounted || !context.mounted) return;
       await context.showErrorDialog(error);
     } finally {
-      setState(() {
-        _busy = false;
-      }); 
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -377,8 +383,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                        padding: const EdgeInsets.all(20.0),
+                    const Padding(
+                        padding: EdgeInsets.all(20.0),
                         child: Text(
                           '      Select Devices',
                           style: TextStyle(

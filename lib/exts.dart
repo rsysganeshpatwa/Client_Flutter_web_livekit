@@ -32,7 +32,7 @@ extension LKExampleExt on BuildContext {
                 if (status == 'rejected') {
                   // Optionally, handle rejection (e.g., navigate back or show a message)
                   Navigator.of(context).pop(); // Or navigate to another page
-                  Future.delayed(Duration(milliseconds: 300), () {
+                  Future.delayed(const Duration(milliseconds: 300), () {
                   if (mounted) {
                     Navigator.of(context).pop(); // ✅ Navigate back to the previous page
                   }

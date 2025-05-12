@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -14,7 +16,7 @@ enum StatsType {
   kLocalVideoSender,
 }
 
-Timer? _checkTracksTimer;
+
 
 class RoomHeader extends StatefulWidget {
   final Room room;
@@ -23,14 +25,15 @@ class RoomHeader extends StatefulWidget {
   final bool isHandRaisedStatusChanged;
   final bool isAdmin;
 
-  RoomHeader(
-      {required this.room,
+  const RoomHeader(
+      {super.key, required this.room,
       required this.participantsStatusList,
       required this.onToggleRaiseHand,
       required this.isHandRaisedStatusChanged,
       required this.isAdmin});
 
   @override
+  // ignore: library_private_types_in_public_api
   _RoomHeaderState createState() => _RoomHeaderState();
 }
 
@@ -116,7 +119,7 @@ class _RoomHeaderState extends State<RoomHeader> {
                         Navigator.pop(context);
                       },
                     );
-                  }).toList(),
+                  }),
               ],
             ),
           ),
@@ -160,7 +163,7 @@ class _RoomHeaderState extends State<RoomHeader> {
                         Navigator.pop(context);
                       },
                     );
-                  }).toList(),
+                  }),
               ],
             ),
           ),
@@ -177,7 +180,7 @@ class _RoomHeaderState extends State<RoomHeader> {
     listeners.clear();
 
     // Function to check the status of microphone and camera continuously
-    void _checkMicrophoneAndCameraStatus() {
+    void checkMicrophoneAndCameraStatus() {
       if (participant.isMicrophoneEnabled() || participant.isCameraEnabled()) {
         // If either microphone or camera is enabled, allow entry and set up listeners
         for (var track in [
@@ -192,7 +195,7 @@ class _RoomHeaderState extends State<RoomHeader> {
 
 
     }
-_checkMicrophoneAndCameraStatus();
+checkMicrophoneAndCameraStatus();
    
   }
 
@@ -255,10 +258,10 @@ _checkMicrophoneAndCameraStatus();
       },
     ).then((value) {
       // Code to execute after the dialog is closed
-      print("Dialog closed");
-      listeners.forEach((element) {
+     
+      for (var element in listeners) {
         element.dispose();
-      });
+      }
       listeners.clear();
       setState(() {
          StatsRepository().stats.clear();
@@ -296,14 +299,15 @@ _checkMicrophoneAndCameraStatus();
         !widget.isAdmin ? totalParticipantCount + 1 : totalParticipantCount;
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      color: Color(0xFF4A4A4A)
+      padding:const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      color: const Color(0xFF4A4A4A)
+          // ignore: deprecated_member_use
           .withOpacity(0.8), // Use the actual hex code for var(--gray_700)
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Heading
-          Expanded(
+          const Expanded(
             child: Text(
               'Leadership Conference',
               style: TextStyle(
@@ -316,38 +320,38 @@ _checkMicrophoneAndCameraStatus();
           ),
 
 
-          SizedBox(
+          const SizedBox(
               height:
                   16), // Add some spacing between the title and participant count
           if (widget.isAdmin)
             Text(
               'Total : ${widget.room.remoteParticipants.values.length +1}   ', // Display total participant count
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 color: Colors.white, // Text color for participant count
               ),
             ),
 
 
-          SizedBox(
+          const SizedBox(
               height:
                   16), // Add some spacing between the title and participant count
           if (widget.isAdmin)
             Text(
-              'Participants: ${totalParticipantCount}', // Display total participant count
-              style: TextStyle(
+              'Participants: $totalParticipantCount', // Display total participant count
+              style: const TextStyle(
                 fontSize: 16,
                 color: Colors.white, // Text color for participant count
               ),
             ),
 
-          SizedBox(
+          const SizedBox(
             width: 16,
           ), // Add some spacing between the participant count and host count
           if (widget.isAdmin)
             Text(
-              'Hosts: ${totalHostCount}', // Display total host count
-              style: TextStyle(
+              'Hosts: $totalHostCount', // Display total host count
+              style: const TextStyle(
                 fontSize: 16,
                 color: Colors.white, // Text color for host count
               ),
@@ -366,7 +370,7 @@ _checkMicrophoneAndCameraStatus();
             ),
           // Settings Popup Menu
           PopupMenuButton<String>(
-            icon: Icon(
+            icon: const Icon(
               Icons.settings,
               color: Colors.white, // Icon color
               size: 30, // Adjust icon size as needed
@@ -383,7 +387,7 @@ _checkMicrophoneAndCameraStatus();
             },
             itemBuilder: (BuildContext context) {
               return [
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   value: 'Microphone',
                   child: ListTile(
                     leading: Icon(Icons.mic, color: Colors.black),
@@ -396,7 +400,7 @@ _checkMicrophoneAndCameraStatus();
                     ),
                   ),
                 ),
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   value: 'Camera',
                   child: ListTile(
                     leading: Icon(Icons.videocam, color: Colors.black),
@@ -409,7 +413,7 @@ _checkMicrophoneAndCameraStatus();
                     ),
                   ),
                 ),
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   value: 'codec',
                   child: ListTile(
                     leading: Icon(Icons.info, color: Colors.black),

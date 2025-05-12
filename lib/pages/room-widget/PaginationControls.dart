@@ -1,5 +1,6 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 enum PaginationPosition { left, right, bottom }
 
@@ -16,6 +17,7 @@ class PaginationControls extends StatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _PaginationControlsState createState() => _PaginationControlsState();
 }
 
@@ -61,13 +63,14 @@ class _PaginationControlsState extends State<PaginationControls> {
                       color: Colors.white, // Background color
                       boxShadow: [
                         BoxShadow(
+                          // ignore: deprecated_member_use
                           color: Colors.black.withOpacity(0.2),
                           blurRadius: 4.0,
                           spreadRadius: 1.0,
                         ),
                       ],
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.arrow_back_rounded,
                       color: Colors.black, // Arrow color
                     ),
@@ -98,13 +101,14 @@ class _PaginationControlsState extends State<PaginationControls> {
                       color: Colors.white, // Background color
                       boxShadow: [
                         BoxShadow(
+                          // ignore: deprecated_member_use
                           color: Colors.black.withOpacity(0.2),
                           blurRadius: 4.0,
                           spreadRadius: 1.0,
                         ),
                       ],
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.arrow_forward_rounded,
                       color: Colors.black, // Arrow color
                     ),

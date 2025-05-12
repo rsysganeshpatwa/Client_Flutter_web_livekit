@@ -54,7 +54,7 @@ class ParticipantInfoWidget extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       if (isScreenShare)
-        Padding(
+        const Padding(
           padding: EdgeInsets.only(left: 5),
           child: Icon(
             Icons.monitor,
@@ -73,7 +73,7 @@ class ParticipantInfoWidget extends StatelessWidget {
       ),
 
       if (publicAudioDisabled)
-        Padding(
+        const Padding(
           padding: EdgeInsets.only(left: 5),
           child: Icon(
             Icons.volume_off,
@@ -82,21 +82,21 @@ class ParticipantInfoWidget extends StatelessWidget {
           ),
         ),
 
-      if (connectionQuality != ConnectionQuality.unknown)
-        Padding(
-          padding: const EdgeInsets.only(left: 5),
-          child: Icon(
-            connectionQuality == ConnectionQuality.poor
-                ? Icons.wifi_off_outlined
-                : Icons.wifi,
-            color: {
-              ConnectionQuality.excellent: Colors.green,
-              ConnectionQuality.good: Colors.orange,
-              ConnectionQuality.poor: Colors.red,
-            }[connectionQuality],
-            size: 25,
-          ),
-        ),
+      // if (connectionQuality != ConnectionQuality.unknown)
+      //   Padding(
+      //     padding: const EdgeInsets.only(left: 5),
+      //     child: Icon(
+      //       connectionQuality == ConnectionQuality.poor
+      //           ? Icons.wifi_off_outlined
+      //           : Icons.wifi,
+      //       color: {
+      //         ConnectionQuality.excellent: Colors.green,
+      //         ConnectionQuality.good: Colors.orange,
+      //         ConnectionQuality.poor: Colors.red,
+      //       }[connectionQuality],
+      //       size: 25,
+      //     ),
+      //   ),
 
       // if (enabledE2EE)
       //   Padding(

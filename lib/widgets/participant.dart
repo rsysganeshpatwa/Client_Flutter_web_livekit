@@ -1,13 +1,10 @@
-import 'dart:async';
-import 'dart:convert';
+// ignore_for_file: deprecated_member_use
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
-import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
 import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 
@@ -24,6 +21,7 @@ abstract class ParticipantWidget extends StatefulWidget {
       //onParticipantsStatusChanged
       required Function(ParticipantStatus) onParticipantsStatusChanged,
       bool isLocalHost =false,
+      
       }) {
     if (participantTrack.participant is LocalParticipant) {
       return LocalParticipantWidget(
@@ -35,6 +33,7 @@ abstract class ParticipantWidget extends StatefulWidget {
           handleExtractText,
           onParticipantsStatusChanged,
           isLocalHost,
+          key: ValueKey(participantTrack.participant.sid),
           );
     } else if (participantTrack.participant is RemoteParticipant) {
       return RemoteParticipantWidget(
@@ -45,7 +44,8 @@ abstract class ParticipantWidget extends StatefulWidget {
           participantIndex,
           handleExtractText,
           onParticipantsStatusChanged,
-          isLocalHost
+          isLocalHost,
+          key: ValueKey(participantTrack.participant.sid),
           );
     }
     throw UnimplementedError('Unknown participant type');
@@ -134,6 +134,7 @@ class RemoteParticipantWidget extends ParticipantWidget {
     this.handleExtractText, 
     this.onParticipantsStatusChanged,
     this.isLocalHost,
+    
     {
     super.key,
   });
@@ -144,7 +145,6 @@ class RemoteParticipantWidget extends ParticipantWidget {
 
 abstract class _ParticipantWidgetState<T extends ParticipantWidget>
     extends State<T> {
-  bool _visible = true;
   VideoTrack? get activeVideoTrack;
   AudioTrack? get activeAudioTrack;
   TrackPublication? get videoPublication;
@@ -206,9 +206,6 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
 
   }
 
-
-  List<Widget> extraWidgets(bool isScreenShare) => [];
-
   @override
   Widget build(BuildContext ctx) {
     
@@ -240,6 +237,8 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               : null,
         ),
        decoration: BoxDecoration(
+        // make gradiant color transparent
+ 
   color  : const Color(0xFF747474), // Default gray
   border: Border.all(
     color: widget.participantStatus.isSpotlight
@@ -284,15 +283,14 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                           transform: Matrix4.identity()
                             ..translate(_offset.dx, _offset.dy)
                             ..scale(_scaleFactor),
-                          child: VideoTrackRenderer(
+                          child: RepaintBoundary (
+                            child:VideoTrackRenderer(
                             activeVideoTrack!,
-                            fit: MediaQuery.of(ctx).size.width < 600
-                                ? RTCVideoViewObjectFit
-                                    .RTCVideoViewObjectFitCover
-                                : RTCVideoViewObjectFit
-                                    .RTCVideoViewObjectFitContain,
+                            autoDisposeRenderer: true,
+                           
                             mirrorMode: VideoViewMirrorMode.off,
                           ),
+                        ),
                         )
                       : const NoVideoWidget(),
                 ),
@@ -309,7 +307,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.camera_alt,
                         color: Colors.black,
                       ),
@@ -320,7 +318,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                       tooltip: 'Perform OCR',
                     ),
                     IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.zoom_in,
                         color: Colors.black,
                       ),
@@ -334,7 +332,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                       tooltip: 'Zoom In',
                     ),
                     IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.zoom_out,
                         color: Colors.black,
                       ),
@@ -349,7 +347,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                     ),
                     if(_scaleFactor > _zoomThreshold || _offset != Offset.zero)
                     IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.reset_tv,
                         color: Colors.black,
                       ),
@@ -409,7 +407,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
         itemBuilder: (BuildContext context) {
           final status = widget.participantStatus;
           final isPinned = pinnedProvider.isPinned(widget.participantStatus.identity);
-          final isSpotlight = status?.isSpotlight ?? false;
+          final isSpotlight = status.isSpotlight;
 
           return [
             PopupMenuItem<String>(
@@ -466,12 +464,12 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                 bottom: 8.0,
                 right: 8.0,
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                   decoration: BoxDecoration(
                     color: Colors.red,
                     borderRadius: BorderRadius.circular(4.0),
                   ),
-                  child: Text(
+                  child: const Text(
                     'LIVE',
                     style: TextStyle(
                       color: Colors.white,
@@ -483,7 +481,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
               ),
 
             // Hand Raised Indicator
-            if (!(widget.participant is LocalParticipant) &&
+            if (widget.participant is! LocalParticipant &&
                 widget.participantStatus.isHandRaised)
               Positioned(
                 top: 8.0,
@@ -499,7 +497,7 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
                       ),
                     ),
                     const SizedBox(width: 8.0),
-                    Icon(
+                    const Icon(
                       Icons.pan_tool,
                       color: Colors.orange,
                       size: 30,
@@ -571,141 +569,4 @@ class _RemoteParticipantWidgetState
   @override
   AudioTrack? get activeAudioTrack => audioPublication?.track;
 
-  @override
-  List<Widget> extraWidgets(bool isScreenShare) => [
-        Row(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Menu for RemoteTrackPublication<RemoteAudioTrack>
-            if (audioPublication != null)
-              RemoteTrackPublicationMenuWidget(
-                pub: audioPublication!,
-                icon: Icons.volume_up,
-              ),
-            // Menu for RemoteTrackPublication<RemoteVideoTrack>
-            if (videoPublication != null)
-              RemoteTrackPublicationMenuWidget(
-                pub: videoPublication!,
-                icon: isScreenShare ? Icons.monitor : Icons.videocam,
-              ),
-            if (videoPublication != null)
-              RemoteTrackFPSMenuWidget(
-                pub: videoPublication!,
-                icon: Icons.menu,
-              ),
-            if (videoPublication != null)
-              RemoteTrackQualityMenuWidget(
-                pub: videoPublication!,
-                icon: Icons.monitor_outlined,
-              ),
-          ],
-        ),
-      ];
-}
-
-class RemoteTrackPublicationMenuWidget extends StatelessWidget {
-  final IconData icon;
-  final RemoteTrackPublication pub;
-  const RemoteTrackPublicationMenuWidget({
-    required this.pub,
-    required this.icon,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.black.withOpacity(0.3),
-        child: PopupMenuButton<Function>(
-          tooltip: 'Subscribe menu',
-          icon: Icon(icon,
-              color: {
-                TrackSubscriptionState.notAllowed: Colors.red,
-                TrackSubscriptionState.unsubscribed: Colors.grey,
-                TrackSubscriptionState.subscribed: Colors.green,
-              }[pub.subscriptionState]),
-          onSelected: (value) => value(),
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<Function>>[
-            // Subscribe/Unsubscribe
-            if (pub.subscribed == false)
-              PopupMenuItem(
-                child: const Text('Subscribe'),
-                value: () => pub.subscribe(),
-              )
-            else if (pub.subscribed == true)
-              PopupMenuItem(
-                child: const Text('Un-subscribe'),
-                value: () => pub.unsubscribe(),
-              ),
-          ],
-        ),
-      );
-}
-
-class RemoteTrackFPSMenuWidget extends StatelessWidget {
-  final IconData icon;
-  final RemoteTrackPublication pub;
-  const RemoteTrackFPSMenuWidget({
-    required this.pub,
-    required this.icon,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.black.withOpacity(0.3),
-        child: PopupMenuButton<Function>(
-          tooltip: 'Preferred FPS',
-          icon: Icon(icon, color: Colors.white),
-          onSelected: (value) => value(),
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<Function>>[
-            PopupMenuItem(
-              child: const Text('30'),
-              value: () => pub.setVideoFPS(30),
-            ),
-            PopupMenuItem(
-              child: const Text('15'),
-              value: () => pub.setVideoFPS(15),
-            ),
-            PopupMenuItem(
-              child: const Text('8'),
-              value: () => pub.setVideoFPS(8),
-            ),
-          ],
-        ),
-      );
-}
-
-class RemoteTrackQualityMenuWidget extends StatelessWidget {
-  final IconData icon;
-  final RemoteTrackPublication pub;
-  const RemoteTrackQualityMenuWidget({
-    required this.pub,
-    required this.icon,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.black.withOpacity(0.3),
-        child: PopupMenuButton<Function>(
-          tooltip: 'Preferred Quality',
-          icon: Icon(icon, color: Colors.white),
-          onSelected: (value) => value(),
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<Function>>[
-            PopupMenuItem(
-              child: const Text('HIGH'),
-              value: () => pub.setVideoQuality(VideoQuality.HIGH),
-            ),
-            PopupMenuItem(
-              child: const Text('MEDIUM'),
-              value: () => pub.setVideoQuality(VideoQuality.MEDIUM),
-            ),
-            PopupMenuItem(
-              child: const Text('LOW'),
-              value: () => pub.setVideoQuality(VideoQuality.LOW),
-            ),
-          ],
-        ),
-      );
 }

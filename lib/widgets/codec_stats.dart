@@ -7,13 +7,13 @@ class CodecStatsDialog extends StatefulWidget {
   final bool isVideoOn; // New parameter for video status
 
   const CodecStatsDialog({
-    Key? key,
+    super.key,
     required this.stats,
     required this.isVideoOn, // Require this parameter
-  }) : super(key: key);
+  });
 
   @override
-  _CodecStatsDialogState createState() => _CodecStatsDialogState();
+  State<CodecStatsDialog>  createState() => _CodecStatsDialogState();
 }
 
 class _CodecStatsDialogState extends State<CodecStatsDialog> {
@@ -50,7 +50,7 @@ class _CodecStatsDialogState extends State<CodecStatsDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      insetPadding: EdgeInsets.all(10),
+      insetPadding: const EdgeInsets.all(10),
       child: SizedBox(
         width: 400, // Fixed width
         height: 350, // Fixed height
@@ -62,7 +62,7 @@ class _CodecStatsDialogState extends State<CodecStatsDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Center(
+                    const Center(
                       child: Text(
                         'Codec Stats',
                         style: TextStyle(
@@ -72,11 +72,11 @@ class _CodecStatsDialogState extends State<CodecStatsDialog> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     
                     // Check if video is on but no stats are available
                     if (widget.isVideoOn && stats.isEmpty)
-                      Center(
+                      const Center(
                         child: Text(
                           'Wait, fetching codec information...',
                           style: TextStyle(
@@ -90,7 +90,7 @@ class _CodecStatsDialogState extends State<CodecStatsDialog> {
                     else if(
                       // Check if video is off and no stats are available
                       !widget.isVideoOn && stats.isEmpty)
-                      Center(
+                      const Center(
                         child: Text(
                           'Video/Audio is off',
                           style: TextStyle(
@@ -108,22 +108,22 @@ class _CodecStatsDialogState extends State<CodecStatsDialog> {
                             padding: const EdgeInsets.symmetric(vertical: 4.0),
                             child: RichText(
                               text: TextSpan(
-                                style: TextStyle(color: Colors.black, fontSize: 16),
+                                style: const TextStyle(color: Colors.black, fontSize: 16),
                                 children: [
                                   TextSpan(
                                     text: '${entry.key} : ',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   TextSpan(
-                                    text: '${entry.value}',
-                                    style: TextStyle(fontWeight: FontWeight.normal),
+                                    text: entry.value,
+                                    style: const TextStyle(fontWeight: FontWeight.normal),
                                   ),
                                 ],
                               ),
                               textAlign: TextAlign.center,
                             ),
                           )),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                   ],
                 ),
               ),
@@ -132,7 +132,7 @@ class _CodecStatsDialogState extends State<CodecStatsDialog> {
               right: 0,
               top: 0,
               child: IconButton(
-                icon: Icon(Icons.close),
+                icon: const Icon(Icons.close),
                 color: Colors.black,
                 onPressed: () {
                   _isCodecStatsActive = false;

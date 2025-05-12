@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
@@ -15,11 +17,11 @@ class DraggableParticipantWidget extends StatefulWidget {
     required this.localParticipantStatus,
     required this.localParticipantRole,
     required this.updateParticipantsStatus,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
-  _DraggableParticipantWidgetState createState() =>
+  State<DraggableParticipantWidget> createState() =>
       _DraggableParticipantWidgetState();
 }
 
@@ -136,10 +138,12 @@ class _DraggableParticipantWidgetState extends State<DraggableParticipantWidget>
                   cursor: _isDragging
                       ? SystemMouseCursors.grabbing
                       : SystemMouseCursors.grab,
-                  child: Tooltip(
-                     message: !_isDragging ? 'Drag to move' : '',
-                    child: const Icon(Icons.drag_handle, color: Colors.white),
-                  ),
+                child: !_isDragging
+    ? const Tooltip(
+        message: 'Drag to move',
+        child:  Icon(Icons.drag_handle, color: Colors.white),
+      )
+    : const Icon(Icons.drag_handle, color: Colors.white),
                 ),
               ),
             ),

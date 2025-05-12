@@ -1,5 +1,6 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:video_meeting_room/models/role.dart';
 
 class FloatingActionButtonBar extends StatelessWidget {
@@ -41,7 +42,7 @@ class FloatingActionButtonBar extends StatelessWidget {
           FloatingActionButton(
             onPressed: () => copyInviteLinkToClipboard(context),
             tooltip: 'Copy invite link',
-            child: Icon(Icons.link),
+            child: const Icon(Icons.link),
           ),
         const SizedBox(height: 16),
         if (localParticipantRole == Role.admin.toString())
@@ -54,7 +55,7 @@ class FloatingActionButtonBar extends StatelessWidget {
               }
             },
             tooltip: 'Manage Participants',
-            child: Icon(Icons.people),
+            child: const Icon(Icons.people),
           ),
       ],
     );

@@ -1,9 +1,12 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_meeting_room/utils.dart'; // Ensure this import is correct
 
 class CopyInviteLinkDialog {
   static Future<void> show(BuildContext context, String roomName) async {
+   
     // Encode the room name for safe URL usage
     String encodedRoomName = roomName;
 
@@ -18,6 +21,8 @@ class CopyInviteLinkDialog {
     // Copy the selected link to the clipboard and show a snackbar
     if (selectedLink != null) {
       await Clipboard.setData(ClipboardData(text: selectedLink));
+       if ( !context.mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Invite link copied to clipboard'),
@@ -30,8 +35,7 @@ class CopyInviteLinkDialog {
 class _CopyInviteLinkDialogContent extends StatefulWidget {
   final String roomName;
 
-  const _CopyInviteLinkDialogContent({Key? key, required this.roomName})
-      : super(key: key);
+  const _CopyInviteLinkDialogContent({required this.roomName});
 
   @override
   _CopyInviteLinkDialogContentState createState() =>
@@ -50,7 +54,7 @@ class _CopyInviteLinkDialogContentState
     String encodedRoomName = widget.roomName;
 
     // Define the parameters for both host and participant
-    final baseUrl = 'https://${Uri.base.host}';
+ 
     final Map<String, String> hostParams = {
       'room': encodedRoomName,
       'role': 'admin',
@@ -90,7 +94,7 @@ class _CopyInviteLinkDialogContentState
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: ConstrainedBox(
-            constraints: BoxConstraints(
+            constraints: const BoxConstraints(
               minWidth: 200,
               maxWidth: 400,
             ),
@@ -101,7 +105,7 @@ class _CopyInviteLinkDialogContentState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Header with title and close button
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
@@ -226,7 +230,7 @@ Column(
                   right: 0,
                   top: 0,
                   child: IconButton(
-                    icon: Icon(Icons.close),
+                    icon: const Icon(Icons.close),
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
@@ -253,6 +257,7 @@ Column(
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.grey.withOpacity(0.5),
             spreadRadius: 2,
             blurRadius: 5,

@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 
 class ParticipantControlIcon extends StatelessWidget {
@@ -13,7 +15,7 @@ class ParticipantControlIcon extends StatelessWidget {
   final VoidCallback onTap;
 
   const ParticipantControlIcon({
-    Key? key,
+    super.key,
     required this.isActive,
     this.isDisabled = false, // Default to false
     required this.iconOn,
@@ -24,7 +26,7 @@ class ParticipantControlIcon extends StatelessWidget {
     required this.colorInactive,
     this.colorDisabled = Colors.grey, // Default disabled color
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
