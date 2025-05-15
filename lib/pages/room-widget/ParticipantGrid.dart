@@ -22,6 +22,8 @@ class ParticipantGrid extends StatefulWidget {
   final List<ParticipantStatus> participantStatuses;
   final bool isLocalHost;
   final Function(ParticipantStatus) onParticipantsStatusChanged;
+  final List<ParticipantStatus> handRaisedList;
+  final int gridSize; // Add this parameter
 
   const ParticipantGrid({
     super.key,
@@ -29,8 +31,10 @@ class ParticipantGrid extends StatefulWidget {
     required this.gridWidth,
     required this.gridHeight,
     required this.participantStatuses,
+    required this.handRaisedList,
     required this.isLocalHost,
     required this.onParticipantsStatusChanged,
+    required this.gridSize, // Add to constructor
   });
 
   @override
@@ -39,6 +43,8 @@ class ParticipantGrid extends StatefulWidget {
 }
 
 class _ParticipantGridState extends State<ParticipantGrid> {
+
+  // Initialize the TextractService
   final TextractService _textractService =
       getIt<TextractService>(); // Get the service instance
   String extractedText = '';
@@ -229,80 +235,279 @@ class _ParticipantGridState extends State<ParticipantGrid> {
     html.Url.revokeObjectUrl(url);
   }
 
+  int _getRaisehandIndexByStatusTimestamp(
+    String identity,
+  ) {
+    // Filter and sort by timestamp
+    final sorted = widget.handRaisedList
+        .where((p) => p.isHandRaised)
+        .toList()
+      ..sort((a, b) => a.handRaisedTimeStamp.compareTo(b.handRaisedTimeStamp));
+
+    // Get the index
+    final index = sorted.indexWhere((p) => p.identity == identity);
+    return index >= 0 ? index + 1 : -1; // return 1-based index, -1 if not found
+  }
+
+  Widget _buildParticipantWidget(int index, double width, double height) {
+    final track = widget.participantTracks[index];
+    final status = widget.participantStatuses.firstWhere(
+      (s) => s.identity == track.participant.identity,
+      orElse: () => ParticipantStatus(
+        identity: '',
+        isAudioEnable: false,
+        isVideoEnable: false,
+        isHandRaised: false,
+        isTalkToHostEnable: false,
+      ),
+    );
+    final handRaisedIndex = _getRaisehandIndexByStatusTimestamp(
+      track.participant.identity,
+    );
+    return MemoizedParticipantCard(
+      key: ValueKey(track.participant.sid),
+      track: track,
+      status: status,
+      index: handRaisedIndex,
+      isLocalHost: widget.isLocalHost,
+      width: width,
+      height: height,
+      onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
+      onTap: widget.isLocalHost
+          ? () => _onParticipantTap(context, track)
+          : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = widget.gridWidth < 600;
-    final int numParticipants = widget.participantTracks.length;
-    final bool isLocalHost = widget.isLocalHost;
+    final numParticipants = widget.participantTracks.length;
+   
+    return Container(
+      width: widget.gridWidth,
+      height: widget.gridHeight,
+      color: Colors.transparent,
+      child: widget.gridSize == 4
+          ? (numParticipants <= 1
+              ? _buildSingleParticipant()
+              : numParticipants <= 2
+                  ? _buildTwoParticipants()
+                  : _buildFourParticipants())
+          : (numParticipants <= 1
+              ? _buildSingleParticipant()
+              : numParticipants <= 2
+                  ? _buildTwoParticipants()
+                  : numParticipants <= 4
+                      ? _buildFourParticipants()
+                      : numParticipants <= 6
+                          ? _buildSixParticipants()
+                          : _buildEightParticipants()),
+    );
+  }
 
-    if (numParticipants == 0) {
-      return const Center(
-        child: Text(
-          "No participants",
-          style: TextStyle(color: Colors.white, fontSize: 16),
+  Widget _buildSingleParticipant() {
+    return _buildParticipantWidget(0, widget.gridWidth, widget.gridHeight);
+  }
+
+  Widget _buildTwoParticipants() {
+    return Row(
+      children: [
+        SizedBox(
+          width: widget.gridWidth / 2,
+          height: widget.gridHeight,
+          child: _buildParticipantWidget(0, widget.gridWidth / 2, widget.gridHeight),
         ),
-      );
-    }
+        SizedBox(
+          width: widget.gridWidth / 2,
+          height: widget.gridHeight,
+          child: _buildParticipantWidget(1, widget.gridWidth / 2, widget.gridHeight),
+        ),
+      ],
+    );
+  }
 
-    final int estimatedCrossAxis = (isMobile && numParticipants == 2)
-        ? 1
-        : (numParticipants > 1)
-            ? (widget.gridWidth /
-                    (widget.gridWidth / math.sqrt(numParticipants)))
-                .ceil()
-            : 1;
-
-    final int safeCrossAxisCount =
-        estimatedCrossAxis > 0 ? estimatedCrossAxis : 1;
-    final int rows = (numParticipants / safeCrossAxisCount).ceil();
-    final double safeGridHeight = widget.gridHeight > 0 ? widget.gridHeight : 1;
-    final double aspectRatio = (widget.gridWidth / safeCrossAxisCount) /
-        (safeGridHeight / (rows > 0 ? rows : 1));
-    final double safeAspectRatio = aspectRatio > 0 ? aspectRatio : 1.0;
-
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: safeCrossAxisCount,
-        childAspectRatio: safeAspectRatio,
-        crossAxisSpacing: 12.0,
-        mainAxisSpacing: 12.0,
-      ),
-      itemCount: numParticipants,
-      itemBuilder: (context, index) {
-        final track = widget.participantTracks[index];
-        final status = widget.participantStatuses.firstWhere(
-          (s) => s.identity == track.participant.identity,
-          orElse: () => ParticipantStatus(
-            identity: '',
-            isAudioEnable: false,
-            isVideoEnable: false,
-            isHandRaised: false,
-            isTalkToHostEnable: false,
+  Widget _buildFourParticipants() {
+    return Column(
+      children: [
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 2,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(0, widget.gridWidth / 2, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 2,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(1, widget.gridWidth / 2, widget.gridHeight / 2),
+              ),
+            ],
           ),
-        );
+        ),
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 2,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 2
+                    ? _buildParticipantWidget(2, widget.gridWidth / 2, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 2,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 3
+                    ? _buildParticipantWidget(3, widget.gridWidth / 2, widget.gridHeight / 2)
+                    : Container(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-        return MemoizedParticipantCard(
-          key: ValueKey(track.participant.sid),
-          track: track,
-          status: status,
-          index: index,
-          isLocalHost: isLocalHost,
-          width: isMobile ? widget.gridWidth * 0.4 : widget.gridWidth * 0.9,
-          height: isMobile ? widget.gridHeight * 0.15 : widget.gridHeight * 0.2,
-          onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
-          onTap: widget.isLocalHost
-              ? () => _onParticipantTap(context, track)
-              : null,
-        );
-      },
+  // Add support for 6 participants (3x2 grid)
+  Widget _buildSixParticipants() {
+    return Column(
+      children: [
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(0, widget.gridWidth / 3, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(1, widget.gridWidth / 3, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 2
+                    ? _buildParticipantWidget(2, widget.gridWidth / 3, widget.gridHeight / 2)
+                    : Container(),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 3
+                    ? _buildParticipantWidget(3, widget.gridWidth / 3, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 4
+                    ? _buildParticipantWidget(4, widget.gridWidth / 3, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 5
+                    ? _buildParticipantWidget(5, widget.gridWidth / 3, widget.gridHeight / 2)
+                    : Container(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Add support for 8 participants (4x2 grid)
+  Widget _buildEightParticipants() {
+    return Column(
+      children: [
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(0, widget.gridWidth / 4, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(1, widget.gridWidth / 4, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 2
+                    ? _buildParticipantWidget(2, widget.gridWidth / 4, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 3
+                    ? _buildParticipantWidget(3, widget.gridWidth / 4, widget.gridHeight / 2)
+                    : Container(),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 4
+                    ? _buildParticipantWidget(4, widget.gridWidth / 4, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 5
+                    ? _buildParticipantWidget(5, widget.gridWidth / 4, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 6
+                    ? _buildParticipantWidget(6, widget.gridWidth / 4, widget.gridHeight / 2)
+                    : Container(),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: widget.participantTracks.length > 7
+                    ? _buildParticipantWidget(7, widget.gridWidth / 4, widget.gridHeight / 2)
+                    : Container(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   @override
   void dispose() {
     // Dispose of any resources if needed
-    // For example, if you have a controller or any other resources
-    print("Disposing ParticipantGrid");
     super.dispose();
   }
 }

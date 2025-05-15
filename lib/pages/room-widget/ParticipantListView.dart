@@ -15,12 +15,14 @@ class ParticipantListView extends StatefulWidget {
   final List<SyncedParticipant>? syncedParticipant;
   final Function(ParticipantStatus)? onParticipantsStatusChanged;
   final bool isLocalHost;
+    final List<ParticipantStatus> handRaisedList;
 
   const ParticipantListView({
     super.key,
     this.syncedParticipant,
     required this.isLocalHost,
     this.onParticipantsStatusChanged,
+    required this.handRaisedList,
   });
 
   @override
@@ -55,6 +57,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
     if (widget.syncedParticipant != null &&
         widget.syncedParticipant != oldWidget.syncedParticipant) {
       updateState(widget.syncedParticipant!);
+      
     }
   }
 
@@ -65,6 +68,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
       for (var syncedParticipant in syncedParticipants) {
         participantTracks.add(syncedParticipant.track!);
         participantStatuses.add(syncedParticipant.status!);
+     
       }
       int maxPage = (syncedParticipants.length / 4).ceil() - 1;
       if (maxPage < 0) maxPage = 0;
@@ -141,6 +145,23 @@ class _ParticipantListViewState extends State<ParticipantListView> {
       subscribe(bufferParticipants);
     }
   }
+int _getRaisehandIndexByStatusTimestamp(
+  String identity,
+) {
+//  print('Getting hand raised index for $identity');
+  // Filter and sort by timestamp
+  final sorted = widget.handRaisedList
+      .where((p) => p.isHandRaised)
+      .toList()
+    ..sort((a, b) => a.handRaisedTimeStamp.compareTo(b.handRaisedTimeStamp));
+
+
+  // Get the index
+  final index = sorted.indexWhere((p) => p.identity == identity);
+ // print('Hand raised index for $identity: $index');
+  return index >= 0 ? index + 1 : -1; // return 1-based index, -1 if not found
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +186,9 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                     scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
                     itemCount: numParticipants,
                     itemBuilder: (context, index) {
+                       final handRaisedIdex = _getRaisehandIndexByStatusTimestamp(
+                        participantTracks[index].participant.identity,
+                      );
                       return MemoizedParticipantCard(
                         key: ValueKey(
                             participantTracks[index].participant.identity),
@@ -174,7 +198,7 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                               status.identity ==
                               participantTracks[index].participant.identity,
                         ),
-                        index: index,
+                        index: handRaisedIdex,
                         isLocalHost: widget.isLocalHost,
                         width: isMobile
                             ? screenSize.width * 0.4
@@ -213,14 +237,21 @@ class _ParticipantListViewState extends State<ParticipantListView> {
                                   isMobile ? Axis.horizontal : Axis.vertical,
                               itemCount: pageParticipants.length,
                               itemBuilder: (context, index) {
+                                final int participantIndex =
+                                    participantTracks
+                                      .indexOf(pageParticipants[index]);
+                                 final handRaisedIdex = _getRaisehandIndexByStatusTimestamp(
+                                  pageParticipants[index].participant.identity,
+                                );
                                 return MemoizedParticipantCard(
                                   key: ValueKey(pageParticipants[index]
                                       .participant
                                       .identity),
                                   track: pageParticipants[index],
-                                  status: participantStatuses[participantTracks
-                                      .indexOf(pageParticipants[index])],
-                                  index: index,
+                                  status: participantStatuses[
+                                    participantIndex
+                                  ],
+                                  index: handRaisedIdex,
                                   isLocalHost: widget.isLocalHost,
                                   width: isMobile
                                       ? screenSize.width * 0.4

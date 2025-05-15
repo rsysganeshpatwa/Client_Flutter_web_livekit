@@ -11,6 +11,7 @@ class ParticipantStatus {
 
    int handRaisedTimeStamp = 0;
     int lastShownAt = 0;
+    int handRasiedIndex = 0;
    String role = '';
 
   ParticipantStatus({
@@ -34,6 +35,7 @@ class ParticipantStatus {
         bool? isHandRaised,
         bool? isPinned,
         bool? isSpotlight,
+        int? handRaisedTimeStamp,
         String? role
       }) {
         // Implement the copyWith method
@@ -46,6 +48,7 @@ class ParticipantStatus {
           isHandRaised: isHandRaised ?? this.isHandRaised,
           isPinned: isPinned ?? this.isPinned,
           isSpotlight: isSpotlight ?? this.isSpotlight,
+          handRaisedTimeStamp: handRaisedTimeStamp ?? this.handRaisedTimeStamp,
           role: role ?? this.role,
         );
       }
@@ -95,6 +98,8 @@ class SyncedParticipant {
   ParticipantTrack? track;
   ParticipantStatus? status;
   int lastShownAt = 0;
+  int handRasiedIndex = 0;
+
 
   SyncedParticipant({
     required this.identity,
@@ -107,6 +112,7 @@ class SyncedParticipant {
   bool get isPinned => status?.isPinned ?? false;
   bool get isSpotlight => status?.isSpotlight ?? false;
   bool get isHandRaised => status?.isHandRaised ?? false;
+  
   String get role => status?.role ?? '';
 }
 

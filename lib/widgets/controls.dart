@@ -58,6 +58,8 @@ class _ControlsWidgetState extends State<ControlsWidget> {
   bool _isHandRaised = false; // Track the "Raise Hand" state
   final RoomDataManageService _roomDataManageService =
       GetIt.instance<RoomDataManageService>();
+  bool _isVideoOperationInProgress = false; // Track video operation state
+  Timer? _videoDebounceTimer; // Timer for debouncing video operations
 
   @override
   void initState() {
@@ -170,14 +172,62 @@ class _ControlsWidgetState extends State<ControlsWidget> {
       publication.track?.unmute();
     }
   }
-
+// Implement debounced video disable
   void _disableVideo() async {
-    await participant.setCameraEnabled(false);
+    // Prevent rapid toggling
+    if (_isVideoOperationInProgress) return;
+    
+    // Cancel any pending operations
+    _videoDebounceTimer?.cancel();
+    
+    setState(() => _isVideoOperationInProgress = true);
+    
+    try {
+      // First disable camera through participant API
+      await participant.setCameraEnabled(false);
+     
+      
+    } catch (e) {
+      print('Error disabling video: $e');
+    } finally {
+      // Add delay before allowing next operation
+      _videoDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() => _isVideoOperationInProgress = false);
+        }
+      });
+    }
   }
 
+
+ // Implement debounced video enable
   void _enableVideo() async {
-    await participant.setCameraEnabled(true);
+    // Prevent rapid toggling
+    if (_isVideoOperationInProgress) return;
+    
+    // Cancel any pending operations
+    _videoDebounceTimer?.cancel();
+    
+    setState(() => _isVideoOperationInProgress = true);
+    
+    try {
+      // First enable camera through participant API
+      await participant.setCameraEnabled(true);
+      
+
+      
+    } catch (e) {
+      print('Error enabling video: $e');
+    } finally {
+      // Add delay before allowing next operation
+      _videoDebounceTimer = Timer(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          setState(() => _isVideoOperationInProgress = false);
+        }
+      });
+    }
   }
+  
 
   void _selectAudioOutput(MediaDevice device) async {
     await widget.room.setAudioOutputDevice(device);

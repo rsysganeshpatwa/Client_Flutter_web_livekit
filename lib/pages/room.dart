@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
+import 'package:video_meeting_room/helper_widgets/TrianglePainter.dart';
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
@@ -54,6 +55,9 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   // ==================== Properties/Fields ====================
   Map<String, SyncedParticipant> syncedParticipants = {};
   final List<ParticipantStatus> participantsStatusList = [];
+  final List<StreamSubscription> _subscriptions = [];
+  Timer? _checkPendingRequestsTimer;
+  late PinnedParticipantProvider _pinnedProvider;
 
   int recentSpeechWindowMs = 10000;
   int promotionDelayMs = 1000;
@@ -69,6 +73,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   String searchQuery = '';
   bool _isPiP = false;
   bool _isSideBarShouldVisible = false;
+  int _gridSize = 4; // Add this property
 
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
@@ -88,13 +93,16 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
     _initializeLocalParticipantRole();
+    _pinnedProvider = Provider.of<PinnedParticipantProvider>(context, listen: false);
+    _pinnedProvider.addListener(_onPinnedChanged);
 
-    _sortParticipants('initState');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!fastConnection) {
         _askPublish();
       }
     });
+
+    _sortParticipants('initState');
 
     if (lkPlatformIs(PlatformType.android)) {
       Hardware.instance.setSpeakerphoneOn(true);
@@ -115,25 +123,55 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   @override
   Future<void> dispose() async {
-    (() async {
-      if (lkPlatformIs(PlatformType.iOS)) {
-        ReplayKitChannel.closeReplayKit();
-      }
+    print('Disposing RoomPage');
 
-      widget.room.removeListener(_onRoomDidUpdate);
+    // First cancel timers to prevent async callbacks after disposal
+    _isRunning = false;
+    _checkPendingRequestsTimer?.cancel();
+
+    // Cancel all tracked subscriptions
+    for (var subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+
+    //  Close any open dialogs
+    _closeAllDialogs();
+
+    // Clean up observers
+    WidgetsBinding.instance.removeObserver(this);
+
+    // Use synchronous cleanup where possible
+    if (lkPlatformIs(PlatformType.iOS)) {
+      ReplayKitChannel.closeReplayKit();
+    }
+
+    // Remove room listener
+    widget.room.removeListener(_onRoomDidUpdate);
+    _pinnedProvider.removeListener(_onPinnedChanged);
+
+    // Use a try-catch to ensure all resources are released even if some fail
+    try {
+      // Handle track cleanup
       await _listener.dispose();
+
+      // Clean up all tracks synchronously
       await widget.room.localParticipant?.unpublishAllTracks();
       await widget.room.localParticipant?.setCameraEnabled(false);
       await widget.room.localParticipant?.setMicrophoneEnabled(false);
       await widget.room.localParticipant?.setScreenShareEnabled(false);
 
+      // Remove room data
       await removeParticipantFromDB();
+
+      // Finally dispose the room instance
       await widget.room.dispose();
-    })();
+    } catch (e) {
+      print('Error during room cleanup: $e');
+    }
+
     onWindowShouldClose = null;
-    _isRunning = false;
-    WidgetsBinding.instance.removeObserver(this);
-    print('RoomPage disposed');
+    print('RoomPage fully disposed');
     super.dispose();
   }
 
@@ -190,80 +228,75 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     }
   }
 
-  void _setUpListeners() => _listener
-    ..on<RoomDisconnectedEvent>((event) async {
-      if (event.reason != null) {
-        print('Room disconnected reason: ${event.reason}');
-      }
-      if (mounted) {
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => handleRoomDisconnected(context));
-      }
-    })
-    ..on<ParticipantEvent>((event) {
-      _sortParticipants('ParticipantEvent');
-    })
-    ..on<VideoSenderStatsEvent>((event) {
-    for (int i = 0; i < event.stats.length; i++) {
-        final sender = event.stats[i];
-        print('VideoSenderStatsEvent: ${sender!.rid} - ${sender.framesSent} frames sent');
-      
-      }
-    })
-    ..on<RoomRecordingStatusChanged>((event) {
-      context.showRecordingStatusChangedDialog(event.activeRecording);
-    })
-    ..on<RoomAttemptReconnectEvent>((event) {})
-    ..on<LocalTrackPublishedEvent>(
-        (_) => _sortParticipants('LocalTrackPublishedEvent'))
-    ..on<LocalTrackUnpublishedEvent>(
-        (_) => _sortParticipants('LocalTrackUnpublishedEvent'))
-    ..on<TrackSubscribedEvent>((event) {
-      _sortParticipants('TrackSubscribedEvent');
-    })
-    ..on<TrackUnsubscribedEvent>((event) {
-      _sortParticipants('TrackUnsubscribedEvent');
-    })
-    ..on<DataReceivedEvent>((event) async {
-      try {
-        _receivedHandRaiseRequest(utf8.decode(event.data));
-        updateParticipantStatusFromMetadata(utf8.decode(event.data));
-      } catch (_) {}
-    })
-    ..on<ParticipantConnectedEvent>((event) async {
-      await _updateParticipantmanagerFromDB();
-      _sortParticipants('TrackSubscribedEvent');
-    })
-    ..on<ParticipantDisconnectedEvent>((event) async {
-      await _updateParticipantmanagerFromDB();
-      _sortParticipants('ParticipantDisconnectedEvent');
-    })
-    ..on<AudioPlaybackStatusChanged>((event) async {
-      if (!widget.room.canPlaybackAudio) {
-        bool? yesno = await context.showPlayAudioManuallyDialog();
-        if (yesno == true) {
-          await widget.room.startAudio();
+  void _setUpListeners() {
+    _listener
+      ..on<RoomDisconnectedEvent>((event) async {
+        if (event.reason != null) {
+          print('Room disconnected reason: ${event.reason}');
         }
-      }
-    });
+        if (mounted) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => handleRoomDisconnected(context));
+        }
+      })
+      ..on<ParticipantEvent>((event) {
+        _sortParticipants('ParticipantEvent');
+      })
+      ..on<RoomRecordingStatusChanged>((event) {
+        context.showRecordingStatusChangedDialog(event.activeRecording);
+      })
+      ..on<RoomAttemptReconnectEvent>((event) {})
+      ..on<LocalTrackPublishedEvent>(
+          (_) => _sortParticipants('LocalTrackPublishedEvent'))
+      ..on<LocalTrackUnpublishedEvent>(
+          (_) => _sortParticipants('LocalTrackUnpublishedEvent'))
+      ..on<TrackSubscribedEvent>((event) {
+        _sortParticipants('TrackSubscribedEvent');
+      })
+      ..on<TrackUnsubscribedEvent>((event) {
+        _sortParticipants('TrackUnsubscribedEvent');
+      })
+      ..on<DataReceivedEvent>((event) async {
+        try {
+          _receivedHandRaiseRequest(utf8.decode(event.data));
+          updateParticipantStatusFromMetadata(utf8.decode(event.data));
+        } catch (_) {}
+      })
+      ..on<ParticipantConnectedEvent>((event) async {
+        await _updateParticipantmanagerFromDB();
+        _sortParticipants('TrackSubscribedEvent');
+      })
+      ..on<ParticipantDisconnectedEvent>((event) async {
+        await _updateParticipantmanagerFromDB();
+        _sortParticipants('ParticipantDisconnectedEvent');
+      })
+      ..on<AudioPlaybackStatusChanged>((event) async {
+        if (!widget.room.canPlaybackAudio) {
+          bool? yesno = await context.showPlayAudioManuallyDialog();
+          if (yesno == true) {
+            await widget.room.startAudio();
+          }
+        }
+      });
+  }
 
   void _askPublish() async {
-       if (!mounted) return;
+    if (!mounted) return;
 
     final result = await context.showPublishDialog();
     if (result != true) return;
-      // Capture the context's mounted state
+    // Capture the context's mounted state
 
     try {
       await widget.room.localParticipant?.setCameraEnabled(true);
     } catch (error) {
-       if (!mounted || !context.mounted) return;
+      if (!mounted || !context.mounted) return;
       await context.showErrorDialog(error);
     }
     try {
       await widget.room.localParticipant?.setMicrophoneEnabled(true);
     } catch (error) {
-         if (!mounted || !context.mounted) return;
+      if (!mounted || !context.mounted) return;
       await context.showErrorDialog(error);
     }
   }
@@ -302,7 +335,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   void _sortParticipants(String from) {
     if (!mounted) return;
-
     final localParticipant = widget.room.localParticipant;
     final bool isLocalHost = localParticipant != null &&
         localParticipantRole == Role.admin.toString();
@@ -330,7 +362,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       final identity = participant.identity;
       final participantStatus = _getParticipantStatus(identity);
       if (participantStatus == null) continue;
-
+     
       final isRemoteParticipantHost =
           _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
 
@@ -397,6 +429,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       ..clear()
       ..addAll(sortedSynced);
 
+    
     _sortUserMediaTracks();
 
     setState(() {});
@@ -406,10 +439,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     final now = DateTime.now().millisecondsSinceEpoch;
     final recentSpeechCutoff = now - recentSpeechWindowMs;
 
-    final pinnedSet = Set<String>.from(
-      context.read<PinnedParticipantProvider>().pinnedIdentities,
-    );
-
+    final pinnedSet = _pinnedProvider.pinnedIdentities;
+  
     final localIdentity = widget.room.localParticipant?.identity;
 
     List<SyncedParticipant> allParticipants = syncedParticipants.values
@@ -417,7 +448,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
             p.track != null && p.identity != localIdentity) // exclude local
         .toList();
 
-    List<SyncedParticipant> currentVisible = allParticipants.take(4).toList();
+    List<SyncedParticipant> currentVisible = allParticipants.take(_gridSize).toList();
     final currentVisibleIds = currentVisible.map((p) => p.identity).toSet();
 
     bool isSpeaking(SyncedParticipant p) =>
@@ -452,7 +483,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         .where((p) => isSpeaking(p) && !currentVisibleIds.contains(p.identity))
         .toList();
 
-    for (final p in newSpeakers) {
+    for (var p in newSpeakers) {
       speakingCandidates.putIfAbsent(p.identity, () => now);
     }
 
@@ -464,7 +495,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       return hasSpokenLongEnough && isLoudEnough;
     }).toList();
 
-    if (eligibleNewSpeakers.isEmpty || activeSpeakersInTop4 >= 4) {
+    if (eligibleNewSpeakers.isEmpty || activeSpeakersInTop4 >= _gridSize) {
       final updatedOrder = allParticipants.toList()
         ..sort((a, b) {
           int rank(SyncedParticipant p) {
@@ -803,6 +834,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     updateParticipantsStatus(updatedStatuses);
   }
 
+  void _onPinnedChanged() {
+  
+    _sortUserMediaTracks();
+  }
+
   Future<void> _updateRoomData(List<ParticipantStatus> statuslist) async {
     final roomSID = await widget.room.getSid();
     final roomName = widget.room.name!;
@@ -837,37 +873,40 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   void _handleRaiseHandFromParticipant(String identity, bool isHandRaised) {
     if (!mounted) return;
-    setState(() {
-      final participantStatus = _getParticipantStatus(identity);
 
-      if (participantStatus == null) {
-        return;
-      }
+    final participantStatus = _getParticipantStatus(identity);
 
-      final participantTrack = syncedParticipants[identity]?.track;
+    if (participantStatus == null) {
+      return;
+    }
 
-      final participant = participantTrack!.participant;
+    final participantTrack = syncedParticipants[identity]?.track;
 
-      participantStatus.isHandRaised = isHandRaised;
+    final participant = participantTrack!.participant;
 
-      if (isHandRaised) {
-        participantStatus.handRaisedTimeStamp =
-            DateTime.now().millisecondsSinceEpoch;
-      }
-
-      if (widget.room.localParticipant?.identity == identity) {
-        _isHandleRaiseHand = isHandRaised;
-      }
-
-      if (isHandRaised && localParticipantRole == Role.admin.toString()) {
-        _showHandRaiseNotification(context, participant);
-      }
-
-      _sortParticipants('handleRaiseHandFromParticipant');
-    });
+    if (isHandRaised && localParticipantRole == Role.admin.toString()) {
+      _showHandRaiseNotification(context, participant);
+    }
   }
 
   void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
+    if (!mounted) return;
+    final localParticipant = participant;
+
+    final participantStatus = _getParticipantStatus(localParticipant.identity);
+    if (participantStatus == null) {
+      return;
+    }
+    participantStatus.isHandRaised = isHandRaised;
+    participantStatus.handRaisedTimeStamp =
+        (isHandRaised ? DateTime.now().millisecondsSinceEpoch : 0);
+
+    participantsStatusList
+      ..removeWhere((status) => status.identity == localParticipant.identity)
+      ..add(participantStatus);
+
+    updateParticipantsStatus(participantsStatusList);
+
     final handRaiseData = jsonEncode(
         {'identity': participant.identity, 'handraise': isHandRaised});
 
@@ -875,7 +914,9 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       utf8.encode(handRaiseData),
     );
 
-    _handleRaiseHandFromParticipant(participant.identity, isHandRaised);
+    setState(() {
+      _isHandleRaiseHand = isHandRaised;
+    });
   }
 
   void _handleToggleRaiseHand(bool isHandRaised) async {
@@ -884,35 +925,54 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   // ==================== Admin Control Methods ====================
   Future<void> _checkForPendingRequests() async {
-    while (_isRunning) {
-      try {
-        final requests =
-            await _approvalService.fetchPendingRequests(widget.room.name!);
-        final currentRequestIds =
-            requests.map((request) => request['id'].toString()).toSet();
+    // Cancel any existing timer
+    _checkPendingRequestsTimer?.cancel();
 
-        _dialogContexts.keys.toList().forEach((requestId) {
-          if (!currentRequestIds.contains(requestId)) {
-            _closeDialog(requestId);
-          }
-        });
+    // Use a recursive timer pattern instead of a while loop
+    void scheduleNextCheck() {
+      if (!_isRunning || !mounted) return;
 
-        if (requests.isEmpty && _dialogContexts.isNotEmpty) {
+      _checkPendingRequestsTimer = Timer(const Duration(seconds: 5), () async {
+        if (!_isRunning || !mounted) return;
+
+        try {
+          final requests =
+              await _approvalService.fetchPendingRequests(widget.room.name!);
+
+          if (!mounted) return;
+
+          final currentRequestIds =
+              requests.map((request) => request['id'].toString()).toSet();
+
+          // Handle dialog closures for completed requests
           _dialogContexts.keys.toList().forEach((requestId) {
-            _closeDialog(requestId);
+            if (!currentRequestIds.contains(requestId)) {
+              _closeDialog(requestId);
+            }
           });
+
+          if (requests.isEmpty && _dialogContexts.isNotEmpty) {
+            _closeAllDialogs();
+          }
+
+          // Show new dialogs if needed
+          for (var request in requests) {
+            final requestId = request['id'].toString();
+            if (!_dialogContexts.containsKey(requestId)) {
+              _showApprovalDialog(request);
+            }
+          }
+        } catch (error) {
+          print('Error checking pending requests: $error');
         }
 
-        for (var request in requests) {
-          final requestId = request['id'].toString();
-          if (!_dialogContexts.containsKey(requestId)) {
-            _showApprovalDialog(request);
-          }
-        }
-        // ignore: empty_catches
-      } catch (error) {}
-      await Future.delayed(const Duration(seconds: 5));
+        // Schedule next check if still running
+        scheduleNextCheck();
+      });
     }
+
+    // Start the first check
+    scheduleNextCheck();
   }
 
   void _showApprovalDialog(dynamic request) {
@@ -939,13 +999,26 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   void _closeDialog(String requestId) {
     if (!mounted) return;
+
     final dialogContext = _dialogContexts[requestId];
-    if (dialogContext != null) {
-      Navigator.of(dialogContext).pop();
+    if (dialogContext != null && dialogContext.mounted) {
+      Navigator.of(dialogContext, rootNavigator: true).pop();
       setState(() {
         _dialogContexts.remove(requestId);
       });
+    } else {
+      // Just remove from tracking if context is no longer valid
+      _dialogContexts.remove(requestId);
     }
+  }
+
+  void _closeAllDialogs() {
+    for (var context in _dialogContexts.values) {
+      if (context != null && context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+    _dialogContexts.clear();
   }
 
   void _toggleMuteAll(bool muteAll) {
@@ -1005,7 +1078,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     });
   }
 
-  Widget _buildSidebar(List<SyncedParticipant> sidebarTracks, bool isMobile) {
+  Widget _buildSidebar(List<SyncedParticipant> sidebarTracks,
+      List<ParticipantStatus> statusList, bool isMobile) {
     if (!_isSideBarShouldVisible ||
         isMobile ||
         widget.room.localParticipant == null) {
@@ -1025,6 +1099,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                     child: ParticipantListView(
                       key: const ValueKey('sidebar'),
                       syncedParticipant: sidebarTracks,
+                      handRaisedList: statusList,
                       isLocalHost:
                           localParticipantRole == Role.admin.toString(),
                       onParticipantsStatusChanged:
@@ -1151,9 +1226,14 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     return sidebarTracks;
   }
 
+  void _handleGridSizeChange(int size) {
+    setState(() {
+      _gridSize = size;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pinnedProvider = Provider.of<PinnedParticipantProvider>(context);
     final localIdentity = widget.room.localParticipant?.identity;
 
     final localParticipant = syncedParticipants[localIdentity];
@@ -1187,7 +1267,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
     final prioritizedTracks = getPrioritizedTracks(
       syncedParticipants,
-      pinnedProvider.pinnedIdentities,
+      _pinnedProvider.pinnedIdentities,
       localIdentity,
       (bool value) {
         if (_isPiP != value) {
@@ -1210,6 +1290,12 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       localIdentity,
     );
 
+   
+    final statusList = syncedParticipants.values
+        .map((e) => e.status)
+        .whereType<ParticipantStatus>()
+        .toList();
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF353535),
@@ -1223,24 +1309,21 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                     children: [
                       RoomHeader(
                         room: widget.room,
-                        participantsStatusList: syncedParticipants.values
-                            .map((e) => e.status)
-                            .whereType<ParticipantStatus>()
-                            .toList(),
+                        participantsStatusList: statusList,
                         onToggleRaiseHand: _handleToggleRaiseHand,
                         isHandRaisedStatusChanged: _isHandleRaiseHand,
                         isAdmin: localParticipantRole == Role.admin.toString(),
+                        onGridSizeChanged: _handleGridSizeChange, // Add this
                       ),
                       Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: ParticipantGridView(
-                            syncedParticipant: prioritizedTracks,
-                            isLocalHost:
-                                localParticipantRole == Role.admin.toString(),
-                            onParticipantsStatusChanged:
-                                _handlePinAndSpotlightStatusChanged,
-                          ),
+                        child: ParticipantGridView(
+                          syncedParticipant: prioritizedTracks,
+                          handRaisedList: statusList,
+                          isLocalHost:
+                              localParticipantRole == Role.admin.toString(),
+                          onParticipantsStatusChanged:
+                              _handlePinAndSpotlightStatusChanged,
+                          gridSize: _gridSize, // Use the state variable instead of screenWidth check
                         ),
                       ),
                       ControlsWidget(
@@ -1253,37 +1336,32 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                         localParticipantRole,
                         widget.room,
                         widget.room.localParticipant!,
-                        syncedParticipants.values
-                            .map((e) => e.status)
-                            .whereType<ParticipantStatus>()
-                            .toList(),
+                        statusList,
                       ),
                     ],
                   ),
                 ),
-                _buildSidebar(sidebarTracks, isMobile),
+                _buildSidebar(sidebarTracks, statusList, isMobile),
               ],
             ),
             if (!isMobile && _isSideBarShouldVisible)
               Positioned(
                 top: MediaQuery.of(context).size.height / 2 - 25,
-                right: isParticipantListVisible ? 280 : -20,
+                right: isParticipantListVisible ? 270 : -20,
                 child: GestureDetector(
                   onTap: _toggleParticipantList,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 49,
                     decoration: BoxDecoration(
-                      // ignore: deprecated_member_use
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isParticipantListVisible
-                          ? Icons.chevron_right
-                          : Icons.chevron_left,
-                      color: Colors.black,
+                        color: Colors.white.withOpacity(0.6),
+                        shape: BoxShape.circle),
+                    child: CustomPaint(
+                      painter: TrianglePainter(
+                        isRight: isParticipantListVisible,
+                      ),
+                      child: Container(),
                     ),
                   ),
                 ),
@@ -1308,10 +1386,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         filterParticipants: _filterParticipants,
         localParticipant: widget.room.localParticipant,
         onParticipantsStatusChanged: updateParticipantsStatus,
-        participantsStatusList: syncedParticipants.values
-            .map((e) => e.status)
-            .whereType<ParticipantStatus>()
-            .toList(),
+        participantsStatusList: statusList,
       ),
     );
   }

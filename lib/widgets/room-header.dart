@@ -16,20 +16,21 @@ enum StatsType {
   kLocalVideoSender,
 }
 
-
-
 class RoomHeader extends StatefulWidget {
   final Room room;
   final List<ParticipantStatus> participantsStatusList;
   final void Function(bool) onToggleRaiseHand;
   final bool isHandRaisedStatusChanged;
   final bool isAdmin;
+  final Function(int) onGridSizeChanged;
 
   const RoomHeader(
-      {super.key, required this.room,
+      {super.key,
+      required this.room,
       required this.participantsStatusList,
       required this.onToggleRaiseHand,
       required this.isHandRaisedStatusChanged,
+      required this.onGridSizeChanged,
       required this.isAdmin});
 
   @override
@@ -45,6 +46,7 @@ class _RoomHeaderState extends State<RoomHeader> {
   StatsType statsType = StatsType.kUnknown;
   LocalParticipant get participant => widget.room.localParticipant!;
   bool isListenerSet = false;
+  int _currentGridSize = 4; // Track current grid size
 
   @override
   void initState() {
@@ -192,24 +194,21 @@ class _RoomHeaderState extends State<RoomHeader> {
           }
         }
       }
-
-
     }
-checkMicrophoneAndCameraStatus();
-   
+
+    checkMicrophoneAndCameraStatus();
   }
 
   void _setUpListener(Track track) async {
     var listener = track.createListener();
     listeners.add(listener);
     if (track is LocalVideoTrack) {
-      if(isListenerSet  ==false){
-      await participant.setCameraEnabled(false);
-      await participant.setCameraEnabled(true);
+      if (isListenerSet == false) {
+        await participant.setCameraEnabled(false);
+        await participant.setCameraEnabled(true);
       }
       statsType = StatsType.kLocalVideoSender;
       listener.on<VideoSenderStatsEvent>((event) {
-      
         setState(() {
           isListenerSet = true;
           StatsRepository().stats['video tx'] =
@@ -229,15 +228,14 @@ checkMicrophoneAndCameraStatus();
         });
       });
     } else if (track is LocalAudioTrack) {
-      if(isListenerSet ==false){
-      await participant.setMicrophoneEnabled(false);
-      await participant.setMicrophoneEnabled(true);
-
+      if (isListenerSet == false) {
+        await participant.setMicrophoneEnabled(false);
+        await participant.setMicrophoneEnabled(true);
       }
       statsType = StatsType.kLocalAudioSender;
       listener.on<AudioSenderStatsEvent>((event) {
         setState(() {
-           isListenerSet = true;
+          isListenerSet = true;
           StatsRepository().stats['audio tx'] =
               '${event.currentBitrate.toInt()} kbps';
           StatsRepository().stats['audio codec'] =
@@ -254,21 +252,21 @@ checkMicrophoneAndCameraStatus();
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return CodecStatsDialog(stats: stats,isVideoOn: isCameraEnabled || isMicrophoneEnabled);
+        return CodecStatsDialog(
+            stats: stats, isVideoOn: isCameraEnabled || isMicrophoneEnabled);
       },
     ).then((value) {
       // Code to execute after the dialog is closed
-     
+
       for (var element in listeners) {
         element.dispose();
       }
       listeners.clear();
       setState(() {
-         StatsRepository().stats.clear();
+        StatsRepository().stats.clear();
       });
       // Do any other operation here
     });
-    
   }
 
   void _toggleHandRaise() {
@@ -277,6 +275,13 @@ checkMicrophoneAndCameraStatus();
 
       widget.onToggleRaiseHand(_isHandRaised);
     });
+  }
+
+  void _handleGridSizeChange(int size) {
+    setState(() {
+      _currentGridSize = size;
+    });
+    widget.onGridSizeChanged(size);
   }
 
   @override
@@ -292,142 +297,246 @@ checkMicrophoneAndCameraStatus();
             jsonDecode(p.metadata!)['role'] == Role.participant.toString())
         .length;
 
-
-
     totalHostCount = widget.isAdmin ? totalHostCount + 1 : totalHostCount;
     totalParticipantCount =
         !widget.isAdmin ? totalParticipantCount + 1 : totalParticipantCount;
 
+    // Check if we're on a mobile device
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+
+    // For mobile devices, ensure we're always using 4-tile grid
+    if (isMobile && _currentGridSize != 4) {
+      // Reset to 4 tiles for mobile
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleGridSizeChange(4);
+      });
+    }
+
     return Container(
-      padding:const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      color: const Color(0xFF4A4A4A)
-          // ignore: deprecated_member_use
-          .withOpacity(0.8), // Use the actual hex code for var(--gray_700)
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      color: const Color(0xFF4A4A4A).withOpacity(0.8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Heading
-          const Expanded(
+          // Heading - make smaller on mobile
+          Expanded(
             child: Text(
               'Leadership Conference',
               style: TextStyle(
-                fontSize: 24, // Adjust font size as needed
+                fontSize: isMobile ? 18 : 24, // Smaller on mobile
                 fontWeight: FontWeight.bold,
-                color: Colors.white, // Text color
+                color: Colors.white,
               ),
-              overflow: TextOverflow.ellipsis, // Handles overflow
+              overflow: TextOverflow.ellipsis,
             ),
           ),
 
-
-          const SizedBox(
-              height:
-                  16), // Add some spacing between the title and participant count
-          if (widget.isAdmin)
+          // Show fewer stats on mobile
+          if (!isMobile && widget.isAdmin)
             Text(
-              'Total : ${widget.room.remoteParticipants.values.length +1}   ', // Display total participant count
+              'Total : ${widget.room.remoteParticipants.values.length + 1}   ',
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.white, // Text color for participant count
+                color: Colors.white,
               ),
             ),
 
-
-          const SizedBox(
-              height:
-                  16), // Add some spacing between the title and participant count
-          if (widget.isAdmin)
+          if (!isMobile && widget.isAdmin)
             Text(
-              'Participants: $totalParticipantCount', // Display total participant count
+              'Participants: $totalParticipantCount',
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.white, // Text color for participant count
+                color: Colors.white,
               ),
             ),
 
-          const SizedBox(
-            width: 16,
-          ), // Add some spacing between the participant count and host count
-          if (widget.isAdmin)
+          if (!isMobile && widget.isAdmin)
+            const SizedBox(width: 16),
+
+          if (!isMobile && widget.isAdmin)
             Text(
-              'Hosts: $totalHostCount', // Display total host count
+              'Hosts: $totalHostCount',
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.white, // Text color for host count
+                color: Colors.white,
               ),
             ),
+
           // Hand Raise Icon
           if (!widget.isAdmin)
             IconButton(
               icon: Icon(
                 Icons.pan_tool,
-                color: _isHandRaised
-                    ? Colors.orange
-                    : Colors.white, // Change color based on state
-                size: 30,
+                color: _isHandRaised ? Colors.orange : Colors.white,
+                size: isMobile ? 24 : 30, // Smaller on mobile
               ),
               onPressed: _toggleHandRaise,
             ),
-          // Settings Popup Menu
-          PopupMenuButton<String>(
-            icon: const Icon(
-              Icons.settings,
-              color: Colors.white, // Icon color
-              size: 30, // Adjust icon size as needed
-            ),
-            tooltip: 'Settings',
-            onSelected: (String value) {
-              if (value == 'Microphone') {
-                _showMicrophoneOptions(context);
-              } else if (value == 'Camera') {
-                _showVideoOptions(context);
-              } else if (value == 'codec') {
-                showCodecStatsDialog(context, StatsRepository().stats);
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              return [
-                const PopupMenuItem<String>(
-                  value: 'Microphone',
-                  child: ListTile(
-                    leading: Icon(Icons.mic, color: Colors.black),
-                    title: Text(
-                      'Microphone',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
+
+          // Control buttons section
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Grid view selector - only show on desktop
+              if (!isMobile)
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.transparent),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: PopupMenuButton<int>(
+                    tooltip: 'Change grid layout',
+                    initialValue: _currentGridSize,
+                    // ignore: sort_child_properties_last
+                    child:  Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child:  Row(
+                        children: [
+                          const Icon(Icons.grid_view,
+                              color: Colors.white, size: 24),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_currentGridSize',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 4,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _currentGridSize == 4
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: _currentGridSize == 4
+                                  ? Colors.green
+                                  : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('4 Tiles Grid'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 8,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _currentGridSize == 8
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: _currentGridSize == 8
+                                  ? Colors.green
+                                  : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('8 Tiles Grid'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: _handleGridSizeChange,
                   ),
                 ),
-                const PopupMenuItem<String>(
-                  value: 'Camera',
-                  child: ListTile(
-                    leading: Icon(Icons.videocam, color: Colors.black),
-                    title: Text(
-                      'Camera',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
+
+              // Settings button - make smaller on mobile
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.settings,
+                  color: Colors.white,
+                  size: isMobile ? 24 : 30,
+                ),
+                tooltip: 'Settings',
+                onSelected: (String value) {
+                  if (value == 'Microphone') {
+                    _showMicrophoneOptions(context);
+                  } else if (value == 'Camera') {
+                    _showVideoOptions(context);
+                  } else if (value == 'codec') {
+                    showCodecStatsDialog(context, StatsRepository().stats);
+                  } else if (value == 'grid' && isMobile) {
+                    // Force grid to 4 on mobile
+                    _handleGridSizeChange(4);
+                  }
+                },
+                itemBuilder: (BuildContext context) {
+                  final menuItems = <PopupMenuItem<String>>[
+                    const PopupMenuItem<String>(
+                      value: 'Microphone',
+                      child: ListTile(
+                        leading: Icon(Icons.mic, color: Colors.black),
+                        title: Text(
+                          'Microphone',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'codec',
-                  child: ListTile(
-                    leading: Icon(Icons.info, color: Colors.black),
-                    title: Text(
-                      'Codec Stats',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
+                    const PopupMenuItem<String>(
+                      value: 'Camera',
+                      child: ListTile(
+                        leading: Icon(Icons.videocam, color: Colors.black),
+                        title: Text(
+                          'Camera',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ];
-            },
+                    const PopupMenuItem<String>(
+                      value: 'codec',
+                      child: ListTile(
+                        leading: Icon(Icons.info, color: Colors.black),
+                        title: Text(
+                          'Codec Stats',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ];
+
+                  // Add grid selection inside settings menu for mobile
+                  if (isMobile) {
+                    menuItems.add(
+                      PopupMenuItem<String>(
+                        value: 'grid',
+                        child: ListTile(
+                          leading: const Icon(Icons.grid_view,
+                              color: Colors.black),
+                          title: const Text(
+                            '4 Tiles Grid',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return menuItems;
+                },
+              ),
+            ],
           ),
         ],
       ),

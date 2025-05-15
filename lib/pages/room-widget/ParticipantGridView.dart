@@ -11,16 +11,19 @@ import 'dart:math' as math;
 
 class ParticipantGridView extends StatefulWidget {
   final bool isLocalHost;
-  //onParticipantsStatusChanged
   final Function(ParticipantStatus) onParticipantsStatusChanged;
   final List<SyncedParticipant>? syncedParticipant;
+  final List<ParticipantStatus> handRaisedList;
+  final int gridSize; // Add this parameter - either 4 or 8
 
   const ParticipantGridView({
     super.key,
     required this.syncedParticipant,
     required this.isLocalHost,
     required this.onParticipantsStatusChanged,
-  });
+    required this.handRaisedList,
+    this.gridSize = 4, // Default to 4 if not specified
+  }) : assert(gridSize == 4 || gridSize == 8, 'gridSize must be either 4 or 8');
 
   @override
   State<ParticipantGridView> createState() => _ParticipantGridViewState();
@@ -32,19 +35,13 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
   int? previousEndIndex;
   int? previousNumParticipants;
   int _pag = 0;
-  final int bufferSize = 4;
+  
   final List<ParticipantTrack> participantTracks = [];
   final List<ParticipantStatus> participantStatuses = [];
-    // Add subscription tracking
 
-  bool _isDisposed = false;
-
-
-// update state
   @override
   void initState() {
     super.initState();
-    _isDisposed = false;
     if (widget.syncedParticipant != null) {
       updateState(widget.syncedParticipant!);
     }
@@ -55,7 +52,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
     super.didUpdateWidget(oldWidget);
     if (widget.syncedParticipant != null &&
         widget.syncedParticipant != oldWidget.syncedParticipant) {
-      updateState(widget.syncedParticipant!);
+       updateState(widget.syncedParticipant!);
     }
   }
 
@@ -67,31 +64,25 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
         participantTracks.add(syncedParticipant.track!);
         participantStatuses.add(syncedParticipant.status!);
       }
-      int maxPage = (syncedParticipants.length / 4).ceil() - 1;
+      int maxPage = (syncedParticipants.length / widget.gridSize).ceil() - 1;
       _pag = _pag.clamp(0, maxPage);
-
 
       _handlePageChange(_pag);
     });
   }
 
   void subscribe(List<ParticipantTrack> pageParticipants) {
-    if (_isDisposed) return;
 
     for (var participantTrack in pageParticipants) {
       final participant = participantTrack.participant;
       if (participant is! RemoteParticipant) continue;
-      
- 
+
       for (var publication in participant.videoTrackPublications) {
         if (!publication.subscribed) {
-     
           publication.subscribe();
           publication.enable();
-        
         }
       }
-  
     }
   }
 
@@ -99,22 +90,18 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
     for (var participantTrack in pageParticipants) {
       final participant = participantTrack.participant;
       if (participant is! RemoteParticipant) continue;
-      
- 
+
       for (var publication in participant.videoTrackPublications) {
         if (publication.subscribed) {
           publication.unsubscribe();
           publication.disable();
-            
         }
       }
-   
     }
   }
 
   void _handlePageChange(int pageIndex) {
-    if (_isDisposed) return;
-    
+  
     setStateIfMounted(() {
       _pag = pageIndex;
     });
@@ -123,33 +110,27 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
   }
 
   void _updateSubscriptions(int pageIndex) {
-    const int itemsPerPage = 4;
-    const int bufferSize = 2;
+    final int itemsPerPage = widget.gridSize; // Use gridSize instead of hardcoded value
+    final int bufferSize =(itemsPerPage/2) as int;
     final int numParticipants = participantTracks.length;
 
-  // Clamp the pageIndex to a valid range
     int maxPage = (numParticipants / itemsPerPage).ceil() - 1;
     int safePageIndex = pageIndex.clamp(0, maxPage);
 
-    const int bufferBefore = (bufferSize ~/ 2) * itemsPerPage;
-    const int bufferAfter = (bufferSize - bufferSize ~/ 2) * itemsPerPage;
+    final int bufferBefore = (bufferSize ~/ 2) * itemsPerPage;
+    final int bufferAfter = (bufferSize - bufferSize ~/ 2) * itemsPerPage;
 
     final int startIndex =
         math.max(0, (safePageIndex * itemsPerPage) - bufferBefore);
     final int endIndex = math.min(numParticipants,
         (safePageIndex * itemsPerPage) + itemsPerPage + bufferAfter);
 
-
-    // Unsubscribe from out-of-view participants
     final toUnsubscribe = participantTracks.where((track) {
       int index = participantTracks.indexOf(track);
       return index < startIndex || index >= endIndex;
     }).toList();
 
-    // Subscribe to in-view participants
-    final toSubscribe = participantTracks
-        .sublist(startIndex, endIndex)
-        .toList();
+    final toSubscribe = participantTracks.sublist(startIndex, endIndex).toList();
 
     unsubscribe(toUnsubscribe);
     subscribe(toSubscribe);
@@ -157,16 +138,14 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
 
   @override
   void dispose() {
-    _isDisposed = true;
-    // Unsubscribe from all participants
+    
     unsubscribe(participantTracks);
     _pageController.dispose();
     super.dispose();
   }
 
-  // Helper method for safe setState
   void setStateIfMounted(VoidCallback fn) {
-    if (!_isDisposed && mounted) {
+    if ( mounted) {
       setState(fn);
     }
   }
@@ -174,35 +153,37 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(8.0), // Add padding here
+      padding: const EdgeInsets.all(8.0),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final double gridWidth = constraints.maxWidth;
           final double gridHeight = constraints.maxHeight;
           final int numParticipants = participantTracks.length;
 
-          final bool hasPagination = numParticipants > 4;
+          final bool hasPagination = numParticipants > widget.gridSize;
           final double paginationWidth =
-              hasPagination ? 50.0 : 0.0; // Adjust as needed
-          const double paginationHeight = 50.0; // Adjust as needed
+              hasPagination ? 50.0 : 0.0;
+          const double paginationHeight = 50.0;
 
           final double adjustedGridWidth =
-              gridWidth - 2 * paginationWidth - 16.0; // 16.0 for padding
+              gridWidth - 2 * paginationWidth - 16.0;
           final double adjustedGridHeight =
-              gridHeight - paginationHeight - 16.0; // 16.0 for padding
+              gridHeight - paginationHeight - 16.0;
 
-          if (numParticipants <= 4) {
+          if (numParticipants <= widget.gridSize) {
             subscribe(participantTracks);
             return ParticipantGrid(
               participantTracks: participantTracks,
+              handRaisedList: widget.handRaisedList,
               gridWidth: adjustedGridWidth,
               gridHeight: adjustedGridHeight,
               participantStatuses: participantStatuses,
               isLocalHost: widget.isLocalHost,
               onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
+              gridSize: widget.gridSize, // Pass the grid size
             );
           } else {
-            const int itemsPerPage = 4;
+            final int itemsPerPage = widget.gridSize;
             final int pageCount = (numParticipants / itemsPerPage).ceil();
 
             return Stack(
@@ -227,19 +208,20 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                           final double availableWidth = constraints.maxWidth;
                           final double availableHeight = constraints.maxHeight;
 
-                          // Calculate grid dimensions based on available space
                           final double gridWidth = availableWidth;
                           final double gridHeight = availableHeight;
 
                           return ParticipantGrid(
                             key: ValueKey(pageIndex),
                             participantTracks: pageParticipants,
+                            handRaisedList: widget.handRaisedList,
                             gridWidth: gridWidth,
                             gridHeight: gridHeight,
                             participantStatuses: participantStatuses,
                             isLocalHost: widget.isLocalHost,
                             onParticipantsStatusChanged:
                                 widget.onParticipantsStatusChanged,
+                            gridSize: widget.gridSize, // Pass the grid size
                           );
                         },
                       );
@@ -275,7 +257,7 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                   alignment: Alignment.center,
                   child: Padding(
                     padding: const EdgeInsets.all(0.0),
-                    child: pageCount > 4
+                    child: pageCount > widget.gridSize/2
                         ? Text(
                             'Page ${_pag + 1} of $pageCount',
                             style: const TextStyle(
@@ -299,7 +281,6 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
                 ),
               ],
             );
-            // add SmoothPageIndicator here
           }
         },
       ),
