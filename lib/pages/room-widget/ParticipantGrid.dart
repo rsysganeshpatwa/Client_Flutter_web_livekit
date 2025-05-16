@@ -282,35 +282,69 @@ class _ParticipantGridState extends State<ParticipantGrid> {
   @override
   Widget build(BuildContext context) {
     final numParticipants = widget.participantTracks.length;
-   
+    
     return Container(
       width: widget.gridWidth,
       height: widget.gridHeight,
       color: Colors.transparent,
       child: widget.gridSize == 4
-          ? (numParticipants <= 1
-              ? _buildSingleParticipant()
-              : numParticipants <= 2
-                  ? _buildTwoParticipants()
-                  : _buildFourParticipants())
-          : (numParticipants <= 1
-              ? _buildSingleParticipant()
-              : numParticipants <= 2
-                  ? _buildTwoParticipants()
-                  : numParticipants <= 4
-                      ? _buildFourParticipants()
-                      : numParticipants <= 6
-                          ? _buildSixParticipants()
-                          : _buildEightParticipants()),
+          ? _buildDynamicGrid(numParticipants, 4) // Use dynamic grid with max 4
+          : _buildDynamicGrid(numParticipants, 8), // Use dynamic grid with max 8
     );
   }
 
-  Widget _buildSingleParticipant() {
-    return _buildParticipantWidget(0, widget.gridWidth, widget.gridHeight);
+  // Add a new dynamic grid builder that handles odd numbers gracefully
+  Widget _buildDynamicGrid(int numParticipants, int maxTiles) {
+    if (numParticipants <= 0) {
+      return Container(); // Handle empty case
+    }
+    
+    if (numParticipants == 1) {
+      return _buildSingleParticipant();
+    }
+    
+    if (numParticipants == 2) {
+      return _buildTwoParticipants();
+    }
+    
+    if (numParticipants == 3) {
+      return _buildThreeParticipants();
+    }
+    
+    if (numParticipants == 4 || maxTiles == 4) {
+      return _buildFourParticipants(numParticipants);
+    }
+    
+    if (numParticipants == 5) {
+      return _buildFiveParticipants();
+    }
+    
+    if (numParticipants == 6 || (numParticipants <= 6 && maxTiles == 8)) {
+      return _buildSixParticipants(numParticipants);
+    }
+    
+    if (numParticipants == 7) {
+      return _buildSevenParticipants();
+    }
+    
+    // 8 or more participants with maxTiles == 8
+    return _buildEightParticipants(numParticipants);
   }
 
+  // Add special layout for 1 participant
+  Widget _buildSingleParticipant() {
+    return Center(
+      child: SizedBox(
+        width: widget.gridWidth,
+        height: widget.gridHeight,
+        child: _buildParticipantWidget(0, widget.gridWidth, widget.gridHeight),
+      ),
+    );
+  }
+  // Add special layout for 2 participants
   Widget _buildTwoParticipants() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         SizedBox(
           width: widget.gridWidth / 2,
@@ -326,7 +360,162 @@ class _ParticipantGridState extends State<ParticipantGrid> {
     );
   }
 
-  Widget _buildFourParticipants() {
+  // Update the layout for 3 participants to have 2 on top and 1 on bottom
+  Widget _buildThreeParticipants() {
+    return Column(
+      children: [
+        // First row with two participants
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 2,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(0, widget.gridWidth / 2, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 2,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(1, widget.gridWidth / 2, widget.gridHeight / 2),
+              ),
+            ],
+          ),
+        ),
+        // Second row with one participant centered
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Center(
+            child: SizedBox(
+              width: widget.gridWidth / 2,
+              height: widget.gridHeight / 2,
+              child: _buildParticipantWidget(2, widget.gridWidth / 2, widget.gridHeight / 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Update layout for 5 participants to have 3 on top and 2 on bottom
+  Widget _buildFiveParticipants() {
+    return Column(
+      children: [
+        // First row with three participants
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(0, widget.gridWidth / 3, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(1, widget.gridWidth / 3, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 3,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(2, widget.gridWidth / 3, widget.gridHeight / 2),
+              ),
+            ],
+          ),
+        ),
+        // Second row with two participants truly centered
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: widget.gridWidth / 3,
+                  height: widget.gridHeight / 2,
+                  child: _buildParticipantWidget(3, widget.gridWidth / 3, widget.gridHeight / 2),
+                ),
+                SizedBox(
+                  width: widget.gridWidth / 3,
+                  height: widget.gridHeight / 2,
+                  child: _buildParticipantWidget(4, widget.gridWidth / 3, widget.gridHeight / 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Update layout for 7 participants to have 4 on top and 3 on bottom
+  Widget _buildSevenParticipants() {
+    return Column(
+      children: [
+        // First row with four participants
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(0, widget.gridWidth / 4, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(1, widget.gridWidth / 4, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(2, widget.gridWidth / 4, widget.gridHeight / 2),
+              ),
+              SizedBox(
+                width: widget.gridWidth / 4,
+                height: widget.gridHeight / 2,
+                child: _buildParticipantWidget(3, widget.gridWidth / 4, widget.gridHeight / 2),
+              ),
+            ],
+          ),
+        ),
+        // Second row with three participants centered
+        SizedBox(
+          height: widget.gridHeight / 2,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: widget.gridWidth / 4,
+                  height: widget.gridHeight / 2,
+                  child: _buildParticipantWidget(4, widget.gridWidth / 4, widget.gridHeight / 2),
+                ),
+                SizedBox(
+                  width: widget.gridWidth / 4,
+                  height: widget.gridHeight / 2,
+                  child: _buildParticipantWidget(5, widget.gridWidth / 4, widget.gridHeight / 2),
+                ),
+                SizedBox(
+                  width: widget.gridWidth / 4,
+                  height: widget.gridHeight / 2,
+                  child: _buildParticipantWidget(6, widget.gridWidth / 4, widget.gridHeight / 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Update four participants to handle participant count check
+  Widget _buildFourParticipants(int numParticipants) {
     return Column(
       children: [
         SizedBox(
@@ -353,14 +542,14 @@ class _ParticipantGridState extends State<ParticipantGrid> {
               SizedBox(
                 width: widget.gridWidth / 2,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 2
+                child: numParticipants > 2
                     ? _buildParticipantWidget(2, widget.gridWidth / 2, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 2,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 3
+                child: numParticipants > 3
                     ? _buildParticipantWidget(3, widget.gridWidth / 2, widget.gridHeight / 2)
                     : Container(),
               ),
@@ -371,8 +560,8 @@ class _ParticipantGridState extends State<ParticipantGrid> {
     );
   }
 
-  // Add support for 6 participants (3x2 grid)
-  Widget _buildSixParticipants() {
+  // Update six participants layout to handle participant count check
+  Widget _buildSixParticipants(int numParticipants) {
     return Column(
       children: [
         SizedBox(
@@ -392,7 +581,7 @@ class _ParticipantGridState extends State<ParticipantGrid> {
               SizedBox(
                 width: widget.gridWidth / 3,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 2
+                child: numParticipants > 2
                     ? _buildParticipantWidget(2, widget.gridWidth / 3, widget.gridHeight / 2)
                     : Container(),
               ),
@@ -406,21 +595,21 @@ class _ParticipantGridState extends State<ParticipantGrid> {
               SizedBox(
                 width: widget.gridWidth / 3,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 3
+                child: numParticipants > 3
                     ? _buildParticipantWidget(3, widget.gridWidth / 3, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 3,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 4
+                child: numParticipants > 4
                     ? _buildParticipantWidget(4, widget.gridWidth / 3, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 3,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 5
+                child: numParticipants > 5
                     ? _buildParticipantWidget(5, widget.gridWidth / 3, widget.gridHeight / 2)
                     : Container(),
               ),
@@ -431,8 +620,8 @@ class _ParticipantGridState extends State<ParticipantGrid> {
     );
   }
 
-  // Add support for 8 participants (4x2 grid)
-  Widget _buildEightParticipants() {
+  // Update eight participants layout to handle participant count check
+  Widget _buildEightParticipants(int numParticipants) {
     return Column(
       children: [
         SizedBox(
@@ -452,14 +641,14 @@ class _ParticipantGridState extends State<ParticipantGrid> {
               SizedBox(
                 width: widget.gridWidth / 4,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 2
+                child: numParticipants > 2
                     ? _buildParticipantWidget(2, widget.gridWidth / 4, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 4,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 3
+                child: numParticipants > 3
                     ? _buildParticipantWidget(3, widget.gridWidth / 4, widget.gridHeight / 2)
                     : Container(),
               ),
@@ -473,28 +662,28 @@ class _ParticipantGridState extends State<ParticipantGrid> {
               SizedBox(
                 width: widget.gridWidth / 4,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 4
+                child: numParticipants > 4
                     ? _buildParticipantWidget(4, widget.gridWidth / 4, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 4,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 5
+                child: numParticipants > 5
                     ? _buildParticipantWidget(5, widget.gridWidth / 4, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 4,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 6
+                child: numParticipants > 6
                     ? _buildParticipantWidget(6, widget.gridWidth / 4, widget.gridHeight / 2)
                     : Container(),
               ),
               SizedBox(
                 width: widget.gridWidth / 4,
                 height: widget.gridHeight / 2,
-                child: widget.participantTracks.length > 7
+                child: numParticipants > 7
                     ? _buildParticipantWidget(7, widget.gridWidth / 4, widget.gridHeight / 2)
                     : Container(),
               ),

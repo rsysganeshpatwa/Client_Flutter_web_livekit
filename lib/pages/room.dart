@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
-import 'package:video_meeting_room/helper_widgets/TrianglePainter.dart';
+
 import 'package:video_meeting_room/method_channels/replay_kit_channel.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
@@ -447,8 +447,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         .where((p) =>
             p.track != null && p.identity != localIdentity) // exclude local
         .toList();
-
-    List<SyncedParticipant> currentVisible = allParticipants.take(_gridSize).toList();
+    final int maxVisible = _isSideBarShouldVisible ? 4 : _gridSize;
+    List<SyncedParticipant> currentVisible = allParticipants.take(maxVisible).toList();
     final currentVisibleIds = currentVisible.map((p) => p.identity).toSet();
 
     bool isSpeaking(SyncedParticipant p) =>
@@ -495,7 +495,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       return hasSpokenLongEnough && isLoudEnough;
     }).toList();
 
-    if (eligibleNewSpeakers.isEmpty || activeSpeakersInTop4 >= _gridSize) {
+    if (eligibleNewSpeakers.isEmpty || activeSpeakersInTop4 >= maxVisible) {
       final updatedOrder = allParticipants.toList()
         ..sort((a, b) {
           int rank(SyncedParticipant p) {
@@ -889,35 +889,44 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     }
   }
 
-  void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
-    if (!mounted) return;
-    final localParticipant = participant;
+ void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
+  if (!mounted) return;
+  final localParticipant = participant;
 
-    final participantStatus = _getParticipantStatus(localParticipant.identity);
-    if (participantStatus == null) {
-      return;
-    }
-    participantStatus.isHandRaised = isHandRaised;
-    participantStatus.handRaisedTimeStamp =
-        (isHandRaised ? DateTime.now().millisecondsSinceEpoch : 0);
+  final participantStatus = _getParticipantStatus(localParticipant.identity);
+  if (participantStatus == null) return;
 
-    participantsStatusList
-      ..removeWhere((status) => status.identity == localParticipant.identity)
-      ..add(participantStatus);
-
-    updateParticipantsStatus(participantsStatusList);
-
-    final handRaiseData = jsonEncode(
-        {'identity': participant.identity, 'handraise': isHandRaised});
-
-    await widget.room.localParticipant?.publishData(
-      utf8.encode(handRaiseData),
-    );
-
-    setState(() {
-      _isHandleRaiseHand = isHandRaised;
-    });
+  // ✅ Only set timestamp on first raise
+  if (isHandRaised && !participantStatus.isHandRaised) {
+    participantStatus.handRaisedTimeStamp = DateTime.now().millisecondsSinceEpoch;
   }
+
+  // ✅ Clear timestamp on unraise
+  if (!isHandRaised) {
+    participantStatus.handRaisedTimeStamp = 0;
+  }
+
+  // ✅ Update hand raise flag
+  participantStatus.isHandRaised = isHandRaised;
+
+  // ✅ Replace old entry with updated one
+  participantsStatusList
+    ..removeWhere((status) => status.identity == localParticipant.identity)
+    ..add(participantStatus);
+
+  updateParticipantsStatus(participantsStatusList);
+
+  final handRaiseData = jsonEncode({
+    'identity': participant.identity,
+    'handraise': isHandRaised,
+  });
+
+  await widget.room.localParticipant?.publishData(utf8.encode(handRaiseData));
+
+  setState(() {
+    _isHandleRaiseHand = isHandRaised;
+  });
+}
 
   void _handleToggleRaiseHand(bool isHandRaised) async {
     _toggleRaiseHand(widget.room.localParticipant as Participant, isHandRaised);
@@ -1073,45 +1082,45 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _toggleParticipantList() {
+    print('Toggling participant list');
     setState(() {
       isParticipantListVisible = !isParticipantListVisible;
     });
   }
-
-  Widget _buildSidebar(List<SyncedParticipant> sidebarTracks,
-      List<ParticipantStatus> statusList, bool isMobile) {
-    if (!_isSideBarShouldVisible ||
-        isMobile ||
-        widget.room.localParticipant == null) {
-      return const SizedBox.shrink();
-    }
-
-    return ValueListenableBuilder<bool>(
-      valueListenable: ValueNotifier<bool>(isParticipantListVisible),
-      builder: (context, isVisible, child) {
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: isVisible
-              ? SizedBox(
-                  width: 300,
-                  child: Container(
-                    color: const Color(0xFF404040),
-                    child: ParticipantListView(
-                      key: const ValueKey('sidebar'),
-                      syncedParticipant: sidebarTracks,
-                      handRaisedList: statusList,
-                      isLocalHost:
-                          localParticipantRole == Role.admin.toString(),
-                      onParticipantsStatusChanged:
-                          _handlePinAndSpotlightStatusChanged,
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(),
-        );
-      },
-    );
+Widget _buildSidebar(
+  List<SyncedParticipant> sidebarTracks,
+  List<ParticipantStatus> statusList,
+  bool isMobile,
+) {
+  if (!_isSideBarShouldVisible ||
+      isMobile ||
+      widget.room.localParticipant == null) {
+    return const SizedBox.shrink();
   }
+
+  return ValueListenableBuilder<bool>(
+    valueListenable: ValueNotifier<bool>(isParticipantListVisible),
+    builder: (context, isVisible, child) {
+      return isVisible
+          ? SizedBox(
+              width: 300,
+              child: Container(
+                color: const Color(0xFF404040),
+                child: ParticipantListView(
+                  key: const ValueKey('sidebar'),
+                  syncedParticipant: sidebarTracks,
+                  handRaisedList: statusList,
+                  isLocalHost:
+                      localParticipantRole == Role.admin.toString(),
+                  onParticipantsStatusChanged:
+                      _handlePinAndSpotlightStatusChanged,
+                ),
+              ),
+            )
+          : const SizedBox.shrink();
+    },
+  );
+}
 
   List<SyncedParticipant> getPrioritizedTracks(
     Map<String, SyncedParticipant> participants,
@@ -1314,6 +1323,9 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                         isHandRaisedStatusChanged: _isHandleRaiseHand,
                         isAdmin: localParticipantRole == Role.admin.toString(),
                         onGridSizeChanged: _handleGridSizeChange, // Add this
+                        onOpenSidebar: _toggleParticipantList,
+                        isSidebarOpen: isParticipantListVisible,
+                        isSideBarShouldVisible: _isSideBarShouldVisible,
                       ),
                       Expanded(
                         child: ParticipantGridView(
@@ -1344,28 +1356,28 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                 _buildSidebar(sidebarTracks, statusList, isMobile),
               ],
             ),
-            if (!isMobile && _isSideBarShouldVisible)
-              Positioned(
-                top: MediaQuery.of(context).size.height / 2 - 25,
-                right: isParticipantListVisible ? 270 : -20,
-                child: GestureDetector(
-                  onTap: _toggleParticipantList,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: 40,
-                    height: 49,
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.6),
-                        shape: BoxShape.circle),
-                    child: CustomPaint(
-                      painter: TrianglePainter(
-                        isRight: isParticipantListVisible,
-                      ),
-                      child: Container(),
-                    ),
-                  ),
-                ),
-              ),
+            // if (!isMobile && _isSideBarShouldVisible)
+            //   Positioned(
+            //     top: MediaQuery.of(context).size.height / 2 - 25,
+            //     right: isParticipantListVisible ? 270 : -20,
+            //     child: GestureDetector(
+            //       onTap: _toggleParticipantList,
+            //       child: AnimatedContainer(
+            //         duration: const Duration(milliseconds: 300),
+            //         width: 40,
+            //         height: 49,
+            //         decoration: BoxDecoration(
+            //             color: Colors.white.withOpacity(0.6),
+            //             shape: BoxShape.circle),
+            //         child: CustomPaint(
+            //           painter: TrianglePainter(
+            //             isRight: isParticipantListVisible,
+            //           ),
+            //           child: Container(),
+            //         ),
+            //       ),
+            //     ),
+            //   ),
             if (_isPiP)
               DraggableParticipantWidget(
                 localParticipantTrack: localParticipantTrack,

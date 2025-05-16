@@ -352,7 +352,7 @@ Widget _buildParticipantWidget(BuildContext ctx) {
         
         if (widget.participant.identity == "streamer") _buildLiveBadge(),
         
-        if (widget.participant is! LocalParticipant && 
+        if (
             widget.participantStatus.isHandRaised) _buildHandRaisedIndicator(),
         
         _buildConnectionInfo(),
@@ -561,33 +561,50 @@ Widget _buildParticipantWidget(BuildContext ctx) {
       ),
     );
   }
-
-  Widget _buildHandRaisedIndicator() {
-    return Positioned(
-      top: 8.0,
-      left: 8.0,
-      child: Row(
-        children: [
-          Text(
-            (widget.participantIndex  ).toString(),
-            style: const TextStyle(
-              fontSize: 20.0,
-              fontWeight: FontWeight.bold,
-              color: Colors.orange,
+Widget _buildHandRaisedIndicator() {
+  return Positioned(
+    top: 8.0,
+    left: 8.0,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(
+          Icons.pan_tool,
+          color: Colors.orange,
+          size: 36,
+        ),
+        // Badge in top-right corner
+        Positioned(
+          top: -4,
+          right: -4,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.redAccent,
+              shape: BoxShape.circle,
+            ),
+            constraints: const BoxConstraints(
+              minWidth: 20,
+              minHeight: 20,
+            ),
+            child: Center(
+              child: Text(
+                widget.participantIndex.toString(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 8.0),
-          const Icon(
-            Icons.pan_tool,
-            color: Colors.orange,
-            size: 30,
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
-  Widget _buildConnectionInfo() {
+ Widget _buildConnectionInfo() {
 
     
     return Positioned(

@@ -23,15 +23,22 @@ class RoomHeader extends StatefulWidget {
   final bool isHandRaisedStatusChanged;
   final bool isAdmin;
   final Function(int) onGridSizeChanged;
+  final VoidCallback onOpenSidebar;
+  final bool isSidebarOpen;
+  final bool isSideBarShouldVisible;
 
-  const RoomHeader(
-      {super.key,
-      required this.room,
-      required this.participantsStatusList,
-      required this.onToggleRaiseHand,
-      required this.isHandRaisedStatusChanged,
-      required this.onGridSizeChanged,
-      required this.isAdmin});
+  const RoomHeader({
+    super.key,
+    required this.room,
+    required this.participantsStatusList,
+    required this.onToggleRaiseHand,
+    required this.isHandRaisedStatusChanged,
+    required this.onGridSizeChanged,
+    required this.isAdmin,
+    required this.onOpenSidebar,
+    required this.isSidebarOpen,
+    required this.isSideBarShouldVisible,
+  });
 
   @override
   // ignore: library_private_types_in_public_api
@@ -313,228 +320,305 @@ class _RoomHeaderState extends State<RoomHeader> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       color: const Color(0xFF4A4A4A).withOpacity(0.8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Heading - make smaller on mobile
-          Expanded(
+          // Left side - Title
+          Padding(
+            padding: const EdgeInsets.only(top: 2.0),
             child: Text(
               'Leadership Conference',
               style: TextStyle(
-                fontSize: isMobile ? 18 : 24, // Smaller on mobile
+                fontSize: isMobile ? 18 : 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
 
-          // Show fewer stats on mobile
-          if (!isMobile && widget.isAdmin)
-            Text(
-              'Total : ${widget.room.remoteParticipants.values.length + 1}   ',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
+          // Center section - Stats (for desktop)
+          if (!isMobile)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.isAdmin)
+                  Text(
+                    'Total: ${widget.room.remoteParticipants.values.length + 1}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                if (widget.isAdmin)
+                  const SizedBox(width: 16),
+
+                if (widget.isAdmin)
+                  Text(
+                    'Participants: $totalParticipantCount',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                if (widget.isAdmin)
+                  const SizedBox(width: 16),
+
+                if (widget.isAdmin)
+                  Text(
+                    'Hosts: $totalHostCount',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+              ],
             ),
 
-          if (!isMobile && widget.isAdmin)
-            Text(
-              'Participants: $totalParticipantCount',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-
-          if (!isMobile && widget.isAdmin)
-            const SizedBox(width: 16),
-
-          if (!isMobile && widget.isAdmin)
-            Text(
-              'Hosts: $totalHostCount',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-
-          // Hand Raise Icon
-          if (!widget.isAdmin)
-            IconButton(
-              icon: Icon(
-                Icons.pan_tool,
-                color: _isHandRaised ? Colors.orange : Colors.white,
-                size: isMobile ? 24 : 30, // Smaller on mobile
-              ),
-              onPressed: _toggleHandRaise,
-            ),
-
-          // Control buttons section
+          // Right side - Controls
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Grid view selector - only show on desktop
-              if (!isMobile)
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.transparent),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: PopupMenuButton<int>(
-                    tooltip: 'Change grid layout',
-                    initialValue: _currentGridSize,
-                    // ignore: sort_child_properties_last
-                    child:  Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child:  Row(
-                        children: [
-                          const Icon(Icons.grid_view,
-                              color: Colors.white, size: 24),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$_currentGridSize',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 4,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _currentGridSize == 4
-                                  ? Icons.check_circle
-                                  : Icons.circle_outlined,
-                              color: _currentGridSize == 4
-                                  ? Colors.green
-                                  : Colors.grey,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('4 Tiles Grid'),
-                          ],
+              // Hand Raise Button
+              if (!widget.isAdmin)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.pan_tool,
+                          color: _isHandRaised ? Colors.orange : Colors.white,
+                          size: isMobile ? 24 : 30,
                         ),
+                        onPressed: _toggleHandRaise,
+                        tooltip: _isHandRaised ? 'Lower Hand' : 'Raise Hand',
                       ),
-                      PopupMenuItem(
-                        value: 8,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _currentGridSize == 8
-                                  ? Icons.check_circle
-                                  : Icons.circle_outlined,
-                              color: _currentGridSize == 8
-                                  ? Colors.green
-                                  : Colors.grey,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('8 Tiles Grid'),
-                          ],
+                      const SizedBox(height: 4), // Add spacing
+                      Text(
+                        _isHandRaised ? 'Lower Hand' : 'Raise Hand',
+                        style: TextStyle(
+                          color: _isHandRaised ? Colors.orange : Colors.white,
+                          fontSize: 12,
                         ),
                       ),
                     ],
-                    onSelected: _handleGridSizeChange,
                   ),
                 ),
 
-              // Settings button - make smaller on mobile
-              PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.settings,
-                  color: Colors.white,
-                  size: isMobile ? 24 : 30,
-                ),
-                tooltip: 'Settings',
-                onSelected: (String value) {
-                  if (value == 'Microphone') {
-                    _showMicrophoneOptions(context);
-                  } else if (value == 'Camera') {
-                    _showVideoOptions(context);
-                  } else if (value == 'codec') {
-                    showCodecStatsDialog(context, StatsRepository().stats);
-                  } else if (value == 'grid' && isMobile) {
-                    // Force grid to 4 on mobile
-                    _handleGridSizeChange(4);
-                  }
-                },
-                itemBuilder: (BuildContext context) {
-                  final menuItems = <PopupMenuItem<String>>[
-                    const PopupMenuItem<String>(
-                      value: 'Microphone',
-                      child: ListTile(
-                        leading: Icon(Icons.mic, color: Colors.black),
-                        title: Text(
-                          'Microphone',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                          ),
-                        ),
+              // Grid view selector - only show on desktop
+           // Replace the Grid Size button with this updated version
+// Grid view selector - only show on desktop
+if (!isMobile)
+  Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PopupMenuButton<int>(
+          tooltip: 'Change grid layout',
+          initialValue: _currentGridSize,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Icon(
+              Icons.grid_view,
+              color: Colors.white,
+              size: isMobile ? 24 : 30,
+            ),
+          ),
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 4,
+              child: Row(
+                children: [
+                  Icon(
+                    _currentGridSize == 4
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    color: _currentGridSize == 4
+                        ? Colors.green
+                        : Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('4 Tiles Grid'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 8,
+              child: Row(
+                children: [
+                  Icon(
+                    _currentGridSize == 8
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    color: _currentGridSize == 8
+                        ? Colors.green
+                        : Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('8 Tiles Grid'),
+                ],
+              ),
+            ),
+          ],
+          onSelected: _handleGridSizeChange,
+        ),
+        const SizedBox(height: 4), // Add spacing
+        Text(
+          '$_currentGridSize Tiles',  // Include the number in the label text
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    ),
+  ),
+              // Settings button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.settings,
+                        color: Colors.white,
+                        size: isMobile ? 24 : 30,
                       ),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'Camera',
-                      child: ListTile(
-                        leading: Icon(Icons.videocam, color: Colors.black),
-                        title: Text(
-                          'Camera',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'codec',
-                      child: ListTile(
-                        leading: Icon(Icons.info, color: Colors.black),
-                        title: Text(
-                          'Codec Stats',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ];
-
-                  // Add grid selection inside settings menu for mobile
-                  if (isMobile) {
-                    menuItems.add(
-                      PopupMenuItem<String>(
-                        value: 'grid',
-                        child: ListTile(
-                          leading: const Icon(Icons.grid_view,
-                              color: Colors.black),
-                          title: const Text(
-                            '4 Tiles Grid',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 16,
+                      tooltip: 'Settings',
+                      onSelected: (String value) {
+                        if (value == 'Microphone') {
+                          _showMicrophoneOptions(context);
+                        } else if (value == 'Camera') {
+                          _showVideoOptions(context);
+                        } else if (value == 'codec') {
+                          showCodecStatsDialog(
+                              context, StatsRepository().stats);
+                        } else if (value == 'grid' && isMobile) {
+                          // Force grid to 4 on mobile
+                          _handleGridSizeChange(4);
+                        }
+                      },
+                      itemBuilder: (BuildContext context) {
+                        final menuItems = <PopupMenuItem<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'Microphone',
+                            child: ListTile(
+                              leading: Icon(Icons.mic, color: Colors.black),
+                              title: Text(
+                                'Microphone',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
                           ),
-                          trailing: Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
+                          const PopupMenuItem<String>(
+                            value: 'Camera',
+                            child: ListTile(
+                              leading: Icon(Icons.videocam, color: Colors.black),
+                              title: Text(
+                                'Camera',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  }
+                          const PopupMenuItem<String>(
+                            value: 'codec',
+                            child: ListTile(
+                              leading: Icon(Icons.info, color: Colors.black),
+                              title: Text(
+                                'Codec Stats',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ];
 
-                  return menuItems;
-                },
+                        // Add grid selection inside settings menu for mobile
+                        if (isMobile) {
+                          menuItems.add(
+                            PopupMenuItem<String>(
+                              value: 'grid',
+                              child: ListTile(
+                                leading: const Icon(Icons.grid_view,
+                                    color: Colors.black),
+                                title: const Text(
+                                  '4 Tiles Grid',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                trailing: Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return menuItems;
+                      },
+                    ),
+                    const SizedBox(height: 4), // Add spacing
+                    const Text(
+                      'Settings',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Participants button
+              if (widget.isSideBarShouldVisible)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        widget.isSidebarOpen ? Icons.groups : Icons.groups,
+                        color: widget.isSidebarOpen
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.5),
+                        size: isMobile ? 24 : 30,
+                      ),
+                      tooltip: widget.isSidebarOpen
+                          ? 'Hide Participants'
+                          : 'View Participants',
+                      onPressed: widget.onOpenSidebar,
+                    ),
+                    const SizedBox(height: 4), // Add spacing
+                    Text(
+                     'Participants',
+                      style: TextStyle(
+                        color: widget.isSidebarOpen
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -152,138 +152,131 @@ class _ParticipantGridViewState extends State<ParticipantGridView> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double gridWidth = constraints.maxWidth;
-          final double gridHeight = constraints.maxHeight;
-          final int numParticipants = participantTracks.length;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double gridWidth = constraints.maxWidth;
+        final double gridHeight = constraints.maxHeight;
+        final int numParticipants = participantTracks.length;
 
-          final bool hasPagination = numParticipants > widget.gridSize;
-          final double paginationWidth =
-              hasPagination ? 50.0 : 0.0;
-          const double paginationHeight = 50.0;
-
-          final double adjustedGridWidth =
-              gridWidth - 2 * paginationWidth - 16.0;
-          final double adjustedGridHeight =
-              gridHeight - paginationHeight - 16.0;
-
-          if (numParticipants <= widget.gridSize) {
-            subscribe(participantTracks);
-            return ParticipantGrid(
+        if (numParticipants <= widget.gridSize) {
+          subscribe(participantTracks);
+          return SizedBox.expand(  // Use SizedBox.expand instead of explicitly setting dimensions
+            child: ParticipantGrid(
               participantTracks: participantTracks,
               handRaisedList: widget.handRaisedList,
-              gridWidth: adjustedGridWidth,
-              gridHeight: adjustedGridHeight,
+              gridWidth: gridWidth,  // Use full width
+              gridHeight: gridHeight,  // Use full height
               participantStatuses: participantStatuses,
               isLocalHost: widget.isLocalHost,
               onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
-              gridSize: widget.gridSize, // Pass the grid size
-            );
-          } else {
-            final int itemsPerPage = widget.gridSize;
-            final int pageCount = (numParticipants / itemsPerPage).ceil();
+              gridSize: widget.gridSize,
+            ),
+          );
+        } else {
+          final int itemsPerPage = widget.gridSize;
+          final int pageCount = (numParticipants / itemsPerPage).ceil();
 
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: PageView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    controller: _pageController,
-                    itemCount: pageCount,
-                    onPageChanged: (pageIndex) {
-                      _handlePageChange(pageIndex);
-                    },
-                    itemBuilder: (context, pageIndex) {
-                      final startIndex = pageIndex * itemsPerPage;
-                      final endIndex =
-                          math.min(startIndex + itemsPerPage, numParticipants);
+          return Stack(
+            fit: StackFit.expand,  // Make Stack fill the available space
+            children: [
+              Positioned.fill(  // Already using Positioned.fill
+                child: PageView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  controller: _pageController,
+                  itemCount: pageCount,
+                  onPageChanged: (pageIndex) {
+                    _handlePageChange(pageIndex);
+                  },
+                  itemBuilder: (context, pageIndex) {
+                    final startIndex = pageIndex * itemsPerPage;
+                    final endIndex =
+                        math.min(startIndex + itemsPerPage, numParticipants);
 
-                      final pageParticipants =
-                          participantTracks.sublist(startIndex, endIndex);
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final double availableWidth = constraints.maxWidth;
-                          final double availableHeight = constraints.maxHeight;
-
-                          final double gridWidth = availableWidth;
-                          final double gridHeight = availableHeight;
-
-                          return ParticipantGrid(
-                            key: ValueKey(pageIndex),
-                            participantTracks: pageParticipants,
-                            handRaisedList: widget.handRaisedList,
-                            gridWidth: gridWidth,
-                            gridHeight: gridHeight,
-                            participantStatuses: participantStatuses,
-                            isLocalHost: widget.isLocalHost,
-                            onParticipantsStatusChanged:
-                                widget.onParticipantsStatusChanged,
-                            gridSize: widget.gridSize, // Pass the grid size
-                          );
-                        },
-                      );
-                    },
+                    final pageParticipants =
+                        participantTracks.sublist(startIndex, endIndex);
+                        
+                    // No need for nested LayoutBuilder, use full size directly
+                    return ParticipantGrid(
+                      key: ValueKey(pageIndex),
+                      participantTracks: pageParticipants,
+                      handRaisedList: widget.handRaisedList,
+                      gridWidth: gridWidth,  // Use full width
+                      gridHeight: gridHeight,  // Use full height 
+                      participantStatuses: participantStatuses,
+                      isLocalHost: widget.isLocalHost,
+                      onParticipantsStatusChanged: widget.onParticipantsStatusChanged,
+                      gridSize: widget.gridSize,
+                    );
+                  },
+                ),
+              ),
+              
+              // Pagination controls - only show if needed, and place as overlays
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: PaginationControls(
+                    pageController: _pageController,
+                    pageCount: pageCount,
+                    position: PaginationPosition.left,
                   ),
                 ),
-                if (hasPagination)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 0),
-                      child: PaginationControls(
-                        pageController: _pageController,
-                        pageCount: pageCount,
-                        position: PaginationPosition.left,
-                      ),
-                    ),
+              ),
+              
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: PaginationControls(
+                    pageController: _pageController,
+                    pageCount: pageCount,
+                    position: PaginationPosition.right,
                   ),
-                if (hasPagination)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 0),
-                      child: PaginationControls(
-                        pageController: _pageController,
-                        pageCount: pageCount,
-                        position: PaginationPosition.right,
-                      ),
+                ),
+              ),
+              
+              // Page indicator
+              Positioned(
+                bottom: 10,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                  ),
-                if (hasPagination) const SizedBox(height: 30),
-                Align(
-                  alignment: Alignment.center,
-                  child: Padding(
-                    padding: const EdgeInsets.all(0.0),
                     child: pageCount > widget.gridSize/2
-                        ? Text(
-                            'Page ${_pag + 1} of $pageCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16.0,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : SmoothPageIndicator(
-                            controller: _pageController,
-                            count: pageCount,
-                            effect: const JumpingDotEffect(
-                              dotWidth: 10.0,
-                              dotHeight: 10.0,
-                              spacing: 10.0,
-                              dotColor: Colors.white,
-                              activeDotColor: Colors.black,
-                            ),
+                      ? Text(
+                          'Page ${_pag + 1} of $pageCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.bold,
                           ),
+                        )
+                      : SmoothPageIndicator(
+                          controller: _pageController,
+                          count: pageCount,
+                          effect: const JumpingDotEffect(
+                            dotWidth: 10.0,
+                            dotHeight: 10.0,
+                            spacing: 10.0,
+                            dotColor: Colors.white,
+                            activeDotColor: Colors.black,
+                          ),
+                        ),
                   ),
                 ),
-              ],
-            );
-          }
-        },
-      ),
+              ),
+            ],
+          );
+        }
+      },
     );
   }
 }

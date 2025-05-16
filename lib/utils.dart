@@ -109,10 +109,10 @@ List<ParticipantStatus> updateSpotlightStatus({
 
   // Step 1: Spotlight logic — only one can be spotlighted
   if (updatedStatus.isSpotlight) {
-    for (final status in participantList) {
-      if (status.identity == updatedStatus.identity) continue;
-      updatedList.add(status.copyWith(isSpotlight: false));
-    }
+    // for (final status in participantList) {
+    //   if (status.identity == updatedStatus.identity) continue;
+    //   updatedList.add(status.copyWith(isSpotlight: false));
+    // }
 
     // Auto-enable audio/video/talk-to-host if spotlighted
     updatedStatus = updatedStatus.copyWith(
