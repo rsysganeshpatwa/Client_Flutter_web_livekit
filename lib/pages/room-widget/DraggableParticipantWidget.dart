@@ -96,75 +96,137 @@ class _DraggableParticipantWidgetState extends State<DraggableParticipantWidget>
         width: _width,
         height: _height,
         decoration: BoxDecoration(
-          color: Colors.blueGrey,
+          color: Colors.black,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
+          border: Border.all(color: Colors.grey[800]!, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              // ignore: deprecated_member_use
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: Stack(
           children: [
-            Positioned.fill(
-              child: ParticipantWidget.widgetFor(
-                widget.localParticipantTrack,
-                widget.localParticipantStatus,
-                showStatsLayer: false,
-                participantIndex: 0,
-                handleExtractText: null,
-               onParticipantsStatusChanged: (ParticipantStatus status) {
-                  widget.updateParticipantsStatus(status);
-                },
-                isLocalHost:
-                    widget.localParticipantRole == Role.admin.toString(),
-              ),
-            ),
-            Positioned(
-              top: 0,
-              left: 8,
-              child: GestureDetector(
-                onPanStart: (_) {
-                  setState(() => _isDragging = true);
-                },
-                onPanUpdate: (details) {
-                  setState(() {
-                    _bottomPosition = (_bottomPosition - details.delta.dy)
-                        .clamp(0.0, screenHeight - _height);
-                    _rightPosition = (_rightPosition - details.delta.dx)
-                        .clamp(0.0, screenWidth - _width);
-                  });
-                },
-                onPanEnd: (_) {
-                  setState(() => _isDragging = false);
-                },
-                child: MouseRegion(
-                  cursor: _isDragging
-                      ? SystemMouseCursors.grabbing
-                      : SystemMouseCursors.grab,
-                child: !_isDragging
-    ? const Tooltip(
-        message: 'Drag to move',
-        child:  Icon(Icons.drag_handle, color: Colors.white),
-      )
-    : const Icon(Icons.drag_handle, color: Colors.white),
+            // Participant video content
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox.expand(
+                child: ParticipantWidget.widgetFor(
+                  widget.localParticipantTrack,
+                  widget.localParticipantStatus,
+                  showStatsLayer: false,
+                  participantIndex: 0,
+                  handleExtractText: null,
+                  onParticipantsStatusChanged: (ParticipantStatus status) {
+                    widget.updateParticipantsStatus(status);
+                  },
+                  isLocalHost:
+                      widget.localParticipantRole == Role.admin.toString(),
                 ),
               ),
             ),
+
+            // Semi-transparent control overlay
             Positioned(
               top: 0,
+              left: 0,
               right: 0,
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isExpanded = !_isExpanded;
-                    _height = _isExpanded ? _maxHeight : _minHeight;
-                    _width = _isExpanded ? _maxWidth : _minWidth;
-                    _adjustPositionForBounds(screenWidth, screenHeight);
-                  });
-                },
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: Tooltip(
-                    message: _isExpanded ? 'Minimize View' : 'Expand View',
-                    child: const Icon(Icons.open_in_full, color: Colors.white),
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      
+                      // ignore: deprecated_member_use
+                      Colors.black.withOpacity(0.6),
+                      Colors.transparent,
+                    ],
                   ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Drag handle
+                    GestureDetector(
+                      onPanStart: (_) {
+                        setState(() => _isDragging = true);
+                      },
+                      onPanUpdate: (details) {
+                        setState(() {
+                          _bottomPosition = (_bottomPosition - details.delta.dy)
+                              .clamp(0.0, screenHeight - _height);
+                          _rightPosition = (_rightPosition - details.delta.dx)
+                              .clamp(0.0, screenWidth - _width);
+                        });
+                      },
+                      onPanEnd: (_) {
+                        setState(() => _isDragging = false);
+                      },
+                      child: MouseRegion(
+                        cursor: _isDragging
+                            ? SystemMouseCursors.grabbing
+                            : SystemMouseCursors.grab,
+                        child: Container(
+                          padding: const EdgeInsets.all(8.0),
+                          child: !_isDragging
+                              ? const Tooltip(
+                                  message: 'Drag to move',
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.drag_indicator,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                        ),
+                      ),
+                    ),
+                    
+                    // Window control buttons
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Expand/Minimize button
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isExpanded = !_isExpanded;
+                              _height = _isExpanded ? _maxHeight : _minHeight;
+                              _width = _isExpanded ? _maxWidth : _minWidth;
+                              _adjustPositionForBounds(screenWidth, screenHeight);
+                            });
+                          },
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Container(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Tooltip(
+                                message: _isExpanded ? 'Minimize View' : 'Expand View',
+                                child: Icon(
+                                  _isExpanded ? Icons.close_fullscreen : Icons.open_in_full,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),

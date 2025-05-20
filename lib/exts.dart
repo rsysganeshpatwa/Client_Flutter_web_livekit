@@ -132,50 +132,84 @@ extension LKExampleExt on BuildContext {
 
 Future<bool?> showDisconnectDialog() => showDialog<bool>(
       context: this,
+      barrierColor: Colors.black.withOpacity(0.6), // Darker backdrop for focus
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12), // Rounded corners
+          borderRadius: BorderRadius.circular(8), // Slightly less rounded for professional look
         ),
-        backgroundColor: Colors.grey[200], // Light grey background
-        title: const Text(
-          'Disconnect',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black, // Text color
-          ),
+        backgroundColor: const Color(0xFF2C2C2C), // Dark grey background
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        title: Row(
+          children: [
+            Icon(
+              Icons.logout, // Disconnect icon
+              color: Colors.red[300],
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Disconnect Session',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500, // Medium weight looks more professional
+                color: Colors.white, // White text for contrast
+                letterSpacing: 0.25, // Subtle letter spacing for readability
+              ),
+            ),
+          ],
         ),
         content: const Text(
-          'Are you sure to disconnect?',
+          'Are you sure you want to disconnect from this meeting?',
           style: TextStyle(
-            fontSize: 16,
-            color: Colors.black, // Content text color
+            fontSize: 15,
+            color: Color(0xFFDDDDDD), // Light grey for body text
+            height: 1.5, // Line height for better readability
           ),
         ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          // Cancel button
+          // Cancel button - more subtle
           TextButton(
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              backgroundColor: Colors.indigo[900], // Button text color
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              backgroundColor: const Color(0xFF3A3A3A), // Slightly lighter than background
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'CANCEL',
+              style: TextStyle(
+                color: Colors.white70, // Slightly transparent white
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
           ),
-          // Disconnect button
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo[900], // Button background color
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+          // Disconnect button - more emphasis
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              backgroundColor: const Color(0xFFE53935), // Red color for warning action
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Disconnect'),
+            child: const Text(
+              'DISCONNECT',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
     );
-
 
   Future<bool?> showReconnectDialog() => showDialog<bool>(
         context: this,

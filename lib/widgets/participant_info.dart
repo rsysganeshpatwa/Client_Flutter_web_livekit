@@ -44,71 +44,99 @@ class ParticipantInfoWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-  padding: const EdgeInsets.symmetric(
-    vertical: 7,
-    horizontal: 10,
-  ),
-  child: Row(
-    mainAxisAlignment: MainAxisAlignment.end,
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      if (isScreenShare)
-        const Padding(
-          padding: EdgeInsets.only(left: 5),
-          child: Icon(
-            Icons.monitor,
-            color: Colors.white,
-            size: 25,
-          ),
-        ),
-
-      Padding(
-        padding: const EdgeInsets.only(left: 5),
-        child: Icon(
-          audioAvailable ? Icons.mic : Icons.mic_off,
-          color: audioAvailable ? Colors.white : Colors.red,
-          size: 25,
-        ),
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: 2,
+        horizontal: 4,
       ),
+      decoration: BoxDecoration(
+        // ignore: deprecated_member_use
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Screen share indicator
+          if (isScreenShare)
+            const Padding(
+              padding: EdgeInsets.only(right: 6),
+              child: Tooltip(
+                message: 'Screen sharing',
+                child: Icon(
+                  Icons.monitor,
+                  color: Colors.white,
+                  size: 18, 
+                ),
+              ),
+              
+            ),
 
-      if (publicAudioDisabled)
-        const Padding(
-          padding: EdgeInsets.only(left: 5),
-          child: Icon(
-            Icons.volume_off,
-            color: Colors.red,
-            size: 25,
+          // Microphone status
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Tooltip(
+              message: audioAvailable ? 'Microphone on' : 'Microphone off',
+              child: Icon(
+                audioAvailable ? Icons.mic : Icons.mic_off,
+                color: audioAvailable ? Colors.green : Colors.red,
+                size: 18,
+              ),
+            ),
           ),
-        ),
 
-      // if (connectionQuality != ConnectionQuality.unknown)
-      //   Padding(
-      //     padding: const EdgeInsets.only(left: 5),
-      //     child: Icon(
-      //       connectionQuality == ConnectionQuality.poor
-      //           ? Icons.wifi_off_outlined
-      //           : Icons.wifi,
-      //       color: {
-      //         ConnectionQuality.excellent: Colors.green,
-      //         ConnectionQuality.good: Colors.orange,
-      //         ConnectionQuality.poor: Colors.red,
-      //       }[connectionQuality],
-      //       size: 25,
-      //     ),
-      //   ),
+          // Public audio disabled (volume off)
+          if (publicAudioDisabled)
+            const Padding(
+              padding: EdgeInsets.only(left: 6),
+              child: Tooltip(
+                message: 'Muted by host',
+                child: Icon(
+                  Icons.volume_off,
+                  color: Colors.red,
+                  size: 18,
+                ),
+              ),
+            ),
 
-      // if (enabledE2EE)
-      //   Padding(
-      //     padding: const EdgeInsets.only(left: 5),
-      //     child: Icon(
-      //       enabledE2EE ? Icons.lock : Icons.lock_open,
-      //       color: enabledE2EE ? Colors.green : Colors.red,
-      //       size: 16,
-      //     ),
-      //   ),
-    ],
-  ),
-);
+          // Connection quality indicator
+          // if (connectionQuality != ConnectionQuality.unknown)
+          //   Padding(
+          //     padding: const EdgeInsets.only(left: 6),
+          //     child: Tooltip(
+          //       message: 'Connection: ${connectionQuality.name}',
+          //       child: Icon(
+          //         connectionQuality == ConnectionQuality.poor
+          //             ? Icons.signal_wifi_statusbar_connected_no_internet_4
+          //             : Icons.network_wifi,
+          //         color: {
+          //           ConnectionQuality.excellent: Colors.green,
+          //           ConnectionQuality.good: Colors.orange,
+          //           ConnectionQuality.poor: Colors.red,
+          //         }[connectionQuality],
+          //         size: 16,
+          //       ),
+          //     ),
+          //   ),
 
+          // // End-to-end encryption indicator
+          // if (enabledE2EE)
+          //   Padding(
+          //     padding: const EdgeInsets.only(left: 6),
+          //     child: Tooltip(
+          //       message: 'End-to-end encrypted',
+          //       child: Icon(
+          //         Icons.lock,
+          //         color: Colors.white,
+          //         size: 14,
+          //       ),
+          //     ),
+          //   ),
+        ],
+      ),
+    );
+  }
 }

@@ -190,10 +190,9 @@ abstract class _ParticipantWidgetState<T extends ParticipantWidget>
   bool get isScreenShare => widget.type == ParticipantTrackType.kScreenShare;
   EventsListener<ParticipantEvent>? _listener;
   double _scaleFactor = 1.0;
-  double _baseScaleFactor = 1.0;
+
   Offset _offset = Offset.zero;
-  Offset _baseOffset = Offset.zero;
-  Offset _initialFocalPoint = Offset.zero;
+
   
   final double _minScale = 1.0;
   final double _maxScale = 3.0;
@@ -320,295 +319,113 @@ Widget _buildParticipantWidget(BuildContext ctx) {
   );
 }
 
-  Widget _buildStackContent(BuildContext ctx, bool isPinned, bool isSpotlight) {
-    // Get cached video track for better performance
-    final videoTrack = getCachedVideoTrack(
-      '${widget.participant.identity}_${widget.type}',
-      activeVideoTrack,
-    );
+// Updated _buildStackContent method to fix nesting issues
+Widget _buildStackContent(BuildContext ctx, bool isPinned, bool isSpotlight) {
+  // Get cached video track for better performance
+  final videoTrack = getCachedVideoTrack(
+    '${widget.participant.identity}_${widget.type}',
+    activeVideoTrack,
+  );
+  
+  final hasVideo = videoTrack != null && !videoTrack.muted;
+  final isAudioMuted = audioPublication?.subscribed == false;
     
-    final hasVideo = videoTrack != null && !videoTrack.muted;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      // Main content (NO Positioned for main content!)
+      ClipRect(
+        child: Align(
+          alignment: Alignment.center,
+          child: GestureDetector(
+            onScaleStart: (details) {
+              _offset = details.localFocalPoint;
+            },
+            onScaleUpdate: (details) {
+              setState(() {
+                _scaleFactor = (_scaleFactor * details.scale).clamp(_minScale, _maxScale);
+                _offset = details.localFocalPoint;
+              });
+            },
+            child: hasVideo
+              ? _buildVideoRenderer(videoTrack)
+              : NoVideoWidget(name: widget.participant.name.isNotEmpty
+                  ? widget.participant.name
+                  : widget.participant.identity),
+          ),
+        ),
+      ),
+
+      // Top gradient overlay - now correctly in Stack
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 45,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.2),
+                Colors.black.withOpacity(0.1),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        ),
+      ),
+
+      // Bottom gradient overlay - more subtle and shorter
+      Positioned(
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 45,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withOpacity(0.3),
+                Colors.black.withOpacity(0.1),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        ),
+      ),
+
+      // Top-left indicators
+      if (widget.participantStatus.isHandRaised)
+        _buildHandRaisedIndicator(),
+        
+      // Top-right indicators
+      _buildConnectionInfo(),
       
-    return Stack(
-      children: [
-        // Optimize video renderer with conditional rendering
-        GestureDetector(
-          onScaleStart: _handleScaleStart,
-          onScaleUpdate: _handleScaleUpdate,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.center,
-              child: hasVideo
-                ? _buildVideoRenderer(videoTrack!)
-                : const NoVideoWidget(),
-            ),
-          ),
-        ),
-
-        // Optimize conditionally rendered UI elements
-        if (widget.handleExtractText != null) _buildControlButtons(),
+      // Bottom section with participant info
+      _buildParticipantInfo(isPinned, isSpotlight, isAudioMuted),
+      
+      // Controls (zoom and OCR)
+      if (widget.handleExtractText != null || _scaleFactor > _minScale)
+        _buildControlButtons(),
         
-        _buildParticipantInfo(isPinned, isSpotlight),
-        
-        if (widget.participant.identity == "streamer") _buildLiveBadge(),
-        
-        if (
-            widget.participantStatus.isHandRaised) _buildHandRaisedIndicator(),
-        
-        _buildConnectionInfo(),
-      ],
-    );
-  }
-
-  // Extract methods to improve readability and reusability
-  void _handleScaleStart(ScaleStartDetails details) {
-    _baseScaleFactor = _scaleFactor;
-    _baseOffset = _offset;
-    _initialFocalPoint = details.focalPoint;
-  }
-
-  void _handleScaleUpdate(ScaleUpdateDetails details) {
-    setState(() {
-      _scaleFactor = (_baseScaleFactor * details.scale)
-          .clamp(_minScale, _maxScale);
-
-      if (_scaleFactor > _minScale) {
-        final newFocalPoint = details.focalPoint;
-        _offset = _baseOffset + (newFocalPoint - _initialFocalPoint);
-      }
-    });
-  }
-
-  // Optimize video renderer with transform caching
-  Widget _buildVideoRenderer(VideoTrack track) {
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()
-        ..translate(_offset.dx, _offset.dy)
-        ..scale(_scaleFactor),
-      child: RepaintBoundary(
-        child: VideoTrackRenderer(
-          track,
-          autoDisposeRenderer: true,
-          mirrorMode: VideoViewMirrorMode.off,
-        ),
-      ),
-    );
-  }
-
-  // Extract UI components to separate methods
-  Widget _buildControlButtons() {
-    return Positioned(
-      top: 8.0,
-      left: 8.0,
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.camera_alt, color: Colors.black),
-            onPressed: widget.handleExtractText,
-            tooltip: 'Perform OCR',
-          ),
-          IconButton(
-            icon: const Icon(Icons.zoom_in, color: Colors.black),
-            onPressed: () => setState(() {
-              _scaleFactor = (_scaleFactor + 0.1).clamp(_minScale, _maxScale);
-            }),
-            tooltip: 'Zoom In',
-          ),
-          IconButton(
-            icon: const Icon(Icons.zoom_out, color: Colors.black),
-            onPressed: () => setState(() {
-              _scaleFactor = (_scaleFactor - 0.1).clamp(_minScale, _maxScale);
-            }),
-            tooltip: 'Zoom Out',
-          ),
-          if (_scaleFactor > _zoomThreshold || _offset != Offset.zero)
-            IconButton(
-              icon: const Icon(Icons.reset_tv, color: Colors.black),
-              onPressed: _resetZoomAndPan,
-              tooltip: 'Reset Zoom',
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildParticipantInfo(bool isPinned, bool isSpotlight) {
-    return Positioned(
-      bottom: 8.0,
-      left: 8.0,
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            decoration: BoxDecoration(
-              color: const Color(0xFF000000).withOpacity(0.5),
-              borderRadius: BorderRadius.circular(4.0),
-            ),
-            child: Text(
-              widget.participant.name.isNotEmpty
-                  ? _formatName(widget.participant.name)
-                  : widget.participant.identity,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          
-          const SizedBox(width: 2),
-          if (widget.isLocalHost) _buildPopupMenu(),
-          if (isSpotlight) _buildSpotlightBadge(),
-          if (isPinned) _buildPinnedBadge(),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildPopupMenu() {
-    return Consumer<PinnedParticipantProvider>(
-      builder: (context, pinnedProvider, _) {
-        final isPinned = pinnedProvider.isPinned(widget.participantStatus.identity);
-        final isSpotlight = widget.participantStatus.isSpotlight;
-        
-        return PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: Colors.white, size: 18),
-          color: Colors.grey[900],
-          onSelected: (value) {
-            switch (value) {
-              case 'pin':
-              case 'unpin':
-                pinnedProvider.togglePin(widget.participantStatus.identity);
-                break;
-              case 'spotlight':
-                updateSpotLightStatus(widget.participantStatus, true);
-                break;
-              case 'unspotlight':
-                updateSpotLightStatus(widget.participantStatus, false);
-                break;
-            }
-          },
-          itemBuilder: (BuildContext context) => [
-            PopupMenuItem<String>(
-              value: isPinned ? 'unpin' : 'pin',
-              child: Text(
-                isPinned ? 'Unpin' : 'Pin for Me',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            PopupMenuItem<String>(
-              value: isSpotlight ? 'unspotlight' : 'spotlight',
-              child: Text(
-                isSpotlight ? 'Remove Spotlight' : 'Spotlight for Everyone',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-  Widget _buildSpotlightBadge() {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Text(
-        'Spotlighted',
-        style: TextStyle(color: Colors.white, fontSize: 12),
-      ),
-    );
-  }
-  
-  Widget _buildPinnedBadge() {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Text(
-        'Pinned',
-        style: TextStyle(color: Colors.white, fontSize: 12),
-      ),
-    );
-  }
-
-  Widget _buildLiveBadge() {
-    return Positioned(
-      bottom: 8.0,
-      right: 8.0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(4.0),
-        ),
-        child: const Text(
-          'LIVE',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14.0,
-          ),
-        ),
-      ),
-    );
-  }
-Widget _buildHandRaisedIndicator() {
-  return Positioned(
-    top: 8.0,
-    left: 8.0,
-    child: Stack(
-      clipBehavior: Clip.none,
-      children: [
-        const Icon(
-          Icons.pan_tool,
-          color: Colors.orange,
-          size: 36,
-        ),
-        // Badge in top-right corner
-        Positioned(
-          top: -4,
-          right: -4,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.redAccent,
-              shape: BoxShape.circle,
-            ),
-            constraints: const BoxConstraints(
-              minWidth: 20,
-              minHeight: 20,
-            ),
-            child: Center(
-              child: Text(
-                widget.participantIndex.toString(),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
+      // LIVE badge
+      if (widget.participant.identity == "streamer")
+        _buildLiveBadge(),
+    ],
   );
 }
 
- Widget _buildConnectionInfo() {
+Widget _buildConnectionInfo() {
 
     
     return Positioned(
-      top: 0,
+      top: 8.0,
       right: 8.0,
       child: ParticipantInfoWidget(
         title: widget.participant.name.isNotEmpty
@@ -623,6 +440,369 @@ Widget _buildHandRaisedIndicator() {
     );
   }
 
+// Updated control buttons
+Widget _buildControlButtons() {
+  return Positioned(
+    top: 8.0,
+    left: widget.participantStatus.isHandRaised ? 48.0 : 8.0,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.handleExtractText != null)
+            IconButton(
+              icon: const Icon(Icons.camera_alt, color: Colors.white),
+              onPressed: widget.handleExtractText,
+              tooltip: 'Perform OCR',
+              iconSize: 18.0,
+              padding: const EdgeInsets.all(4.0),
+              constraints: const BoxConstraints(
+                minWidth: 28.0,
+                minHeight: 28.0,
+              ),
+              splashRadius: 16.0,
+            ),
+          IconButton(
+            icon: const Icon(Icons.zoom_in, color: Colors.white),
+            onPressed: () => setState(() {
+              _scaleFactor = (_scaleFactor + 0.1).clamp(_minScale, _maxScale);
+            }),
+            tooltip: 'Zoom In',
+            iconSize: 18.0,
+            padding: const EdgeInsets.all(4.0),
+            constraints: const BoxConstraints(
+              minWidth: 28.0,
+              minHeight: 28.0,
+            ),
+            splashRadius: 16.0,
+          ),
+          IconButton(
+            icon: const Icon(Icons.zoom_out, color: Colors.white),
+            onPressed: () => setState(() {
+              _scaleFactor = (_scaleFactor - 0.1).clamp(_minScale, _maxScale);
+            }),
+            tooltip: 'Zoom Out',
+            iconSize: 18.0,
+            padding: const EdgeInsets.all(4.0),
+            constraints: const BoxConstraints(
+              minWidth: 28.0,
+              minHeight: 28.0,
+            ),
+            splashRadius: 16.0,
+          ),
+          if (_scaleFactor > _zoomThreshold || _offset != Offset.zero)
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: _resetZoomAndPan,
+              tooltip: 'Reset Zoom',
+              iconSize: 18.0,
+              padding: const EdgeInsets.all(4.0),
+              constraints: const BoxConstraints(
+                minWidth: 28.0,
+                minHeight: 28.0,
+              ),
+              splashRadius: 16.0,
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Updated participant info
+Widget _buildParticipantInfo(bool isPinned, bool isSpotlight, bool isAudioMuted) {
+  return Positioned(
+    bottom: 8.0,
+    left: 8.0,
+    right: 8.0,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Name with container
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Name container
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(4.0),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Name text
+                      Flexible(
+                        child: Text(
+                          widget.participant.name.isNotEmpty
+                              ? _formatName(widget.participant.name)
+                              : widget.participant.identity,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Spotlight badge after name
+              if (isSpotlight)
+                Container(
+                  margin: const EdgeInsets.only(left: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9800).withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Spotlighted',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        
+        // Right side badges and menu
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Pin badge
+            if (isPinned)
+              Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2196F3).withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Pinned',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            
+            // Menu for admins
+            if (widget.isLocalHost)
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white, size: 18),
+                  color: const Color(0xFF353535),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: EdgeInsets.zero,
+                  iconSize: 18,
+                  tooltip: 'More options',
+                  splashRadius: 16,
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'pin':
+                      case 'unpin':
+                        Provider.of<PinnedParticipantProvider>(context, listen: false)
+                            .togglePin(widget.participantStatus.identity);
+                        break;
+                      case 'spotlight':
+                        updateSpotLightStatus(widget.participantStatus, true);
+                        break;
+                      case 'unspotlight':
+                        updateSpotLightStatus(widget.participantStatus, false);
+                        break;
+                      case 'mute':
+                        if (audioPublication != null) {
+                          updateIsAbleToTalkStatus(
+                            widget.participantStatus,
+                            !widget.participantStatus.isTalkToHostEnable,
+                          );
+                        }
+                        break;
+                      default:
+                        break;
+                    }
+                  },
+                  itemBuilder: (BuildContext context) {
+                    final isPinnedLocal = Provider.of<PinnedParticipantProvider>(context, listen: false)
+                        .isPinned(widget.participantStatus.identity);
+                    final isSpotlightLocal = widget.participantStatus.isSpotlight;
+                    
+                    return [
+                      PopupMenuItem<String>(
+                        value: isPinnedLocal ? 'unpin' : 'pin',
+                        height: 36,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isPinnedLocal ? Icons.push_pin : Icons.push_pin_outlined,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isPinnedLocal ? 'Unpin' : 'Pin for Me',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: isSpotlightLocal ? 'unspotlight' : 'spotlight',
+                        height: 36,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSpotlightLocal ? Icons.highlight_off : Icons.highlight,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isSpotlightLocal ? 'Remove Spotlight' : 'Spotlight for Everyone',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // PopupMenuItem<String>(
+                      //   value: 'mute',
+                      //   height: 36,
+                      //   child: Row(
+                      //     children: [
+                      //       Icon(
+                      //         isAudioMuted ? Icons.mic_off : Icons.mic,
+                      //         color: Colors.white,
+                      //         size: 16,
+                      //       ),
+                      //       const SizedBox(width: 8),
+                      //       Text(
+                      //         isAudioMuted ? 'Unmute' : 'Mute',
+                      //         style: const TextStyle(color: Colors.white),
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
+                    ];
+                  },
+                ),
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// Updated hand raised indicator with cleaner design
+Widget _buildHandRaisedIndicator() {
+  return Positioned(
+    top: 8.0,
+    left: 8.0,
+    child: Container(
+      padding: const EdgeInsets.all(4.0),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(
+            Icons.pan_tool,
+            color: Color(0xFFFF9800),
+            size: 24,
+          ),
+          if (widget.participantIndex > 0)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF44336),
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Center(
+                  child: Text(
+                    widget.participantIndex.toString(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Updated LIVE badge
+Widget _buildLiveBadge() {
+  return Positioned(
+    top: 8.0,
+    left: 0,
+    right: 0,
+    child: Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF44336),
+          borderRadius: BorderRadius.circular(4.0),
+        ),
+        child: const Text(
+          'LIVE',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12.0,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildVideoRenderer(VideoTrack track) {
+  return ClipRect(
+    child: Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..translate(_offset.dx, _offset.dy)
+        ..scale(_scaleFactor),
+      child: RepaintBoundary(
+        child: VideoTrackRenderer(
+          track,
+          autoDisposeRenderer: true,
+          mirrorMode: VideoViewMirrorMode.off,
+        ),
+      ),
+    ),
+  );
+}
+
   String _formatName(String name) {
     if (name.isEmpty) return name;
     return name
@@ -636,6 +816,17 @@ Widget _buildHandRaisedIndicator() {
   void updateSpotLightStatus(ParticipantStatus participantStatus, bool isSpotlight) {
     final updatedStatus = participantStatus.copyWith(
       isSpotlight: isSpotlight,
+    );
+    widget.onParticipantsStatusChanged(updatedStatus);
+  }
+
+  // update is able to talk host 
+  void updateIsAbleToTalkStatus(ParticipantStatus participantStatus, bool isAbleToTalk) {
+    final updatedStatus = participantStatus.copyWith(
+      isTalkToHostEnable: isAbleToTalk,
+      isAudioEnable: participantStatus.isAudioEnable ?
+          isAbleToTalk
+          : participantStatus.isAudioEnable,
     );
     widget.onParticipantsStatusChanged(updatedStatus);
   }

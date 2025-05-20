@@ -74,6 +74,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   bool _isPiP = false;
   bool _isSideBarShouldVisible = false;
   int _gridSize = 4; // Add this property
+  bool _isFocusModeOn = false; // Add this property
 
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
@@ -85,6 +86,14 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   EventsListener<RoomEvent> get _listener => widget.listener;
   bool get fastConnection => widget.room.engine.fastConnectOptions != null;
+
+  // Add these properties
+  bool _showControls = true;
+  Timer? _hideControlsTimer;
+
+  double? headerHeight = 64;
+  double? controlsHeight = 72;
+  String? _roomName = '';
 
   // ==================== Lifecycle Methods ====================
   @override
@@ -119,6 +128,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
             duration: const Duration(seconds: 5));
       };
     }
+    _isFocusModeOn =false;
+     _roomName =widget.room.name;
+   
+
+   
   }
 
   @override
@@ -172,8 +186,36 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
     onWindowShouldClose = null;
     print('RoomPage fully disposed');
+    _hideControlsTimer?.cancel();
     super.dispose();
   }
+
+  // Method to reset the timer
+  void _resetHideControlsTimer() {
+    setState(() {
+      _showControls = true;
+    });
+
+   // Only start the hide timer if we're in focus mode
+  if (_isFocusModeOn) {
+    _startHideControlsTimer();
+  }
+  }
+
+// Finally, modify the _startHideControlsTimer method to check for focus mode
+void _startHideControlsTimer() {
+  // Only proceed if focus mode is on
+  if (!_isFocusModeOn) return;
+  
+  _hideControlsTimer?.cancel();
+  _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+    if (mounted && _isFocusModeOn) {  // Double-check focus mode is still on
+      setState(() {
+        _showControls = false;
+      });
+    }
+  });
+}
 
   // ==================== Room Management Methods ====================
   void _onRoomDidUpdate() {
@@ -263,6 +305,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         } catch (_) {}
       })
       ..on<ParticipantConnectedEvent>((event) async {
+       
         await _updateParticipantmanagerFromDB();
         _sortParticipants('TrackSubscribedEvent');
       })
@@ -270,6 +313,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         await _updateParticipantmanagerFromDB();
         _sortParticipants('ParticipantDisconnectedEvent');
       })
+     
       ..on<AudioPlaybackStatusChanged>((event) async {
         if (!widget.room.canPlaybackAudio) {
           bool? yesno = await context.showPlayAudioManuallyDialog();
@@ -720,7 +764,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   Future<void> _updateParticipantmanagerFromDB() async {
     if (!mounted) return;
     final roomId = await widget.room.getSid();
-    final roomName = widget.room.name!;
+    String? roomName = widget.room.name ?? _roomName; 
+    if (roomName == null) {
+      print('Room name is null');
+      return;
+    }
 
     final data = await _roomDataManageService.getLatestData(roomId, roomName);
     if (data != null) {
@@ -1023,7 +1071,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
   void _closeAllDialogs() {
     for (var context in _dialogContexts.values) {
-      if (context != null && context.mounted) {
+      if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
     }
@@ -1087,40 +1135,61 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       isParticipantListVisible = !isParticipantListVisible;
     });
   }
-Widget _buildSidebar(
-  List<SyncedParticipant> sidebarTracks,
-  List<ParticipantStatus> statusList,
-  bool isMobile,
-) {
-  if (!_isSideBarShouldVisible ||
-      isMobile ||
-      widget.room.localParticipant == null) {
-    return const SizedBox.shrink();
-  }
+void _handleToggleFocusMode(bool value) {
+  setState(() {
+    _isFocusModeOn = value;
 
-  return ValueListenableBuilder<bool>(
-    valueListenable: ValueNotifier<bool>(isParticipantListVisible),
-    builder: (context, isVisible, child) {
-      return isVisible
-          ? SizedBox(
-              width: 300,
-              child: Container(
-                color: const Color(0xFF404040),
-                child: ParticipantListView(
-                  key: const ValueKey('sidebar'),
-                  syncedParticipant: sidebarTracks,
-                  handRaisedList: statusList,
-                  isLocalHost:
-                      localParticipantRole == Role.admin.toString(),
-                  onParticipantsStatusChanged:
-                      _handlePinAndSpotlightStatusChanged,
-                ),
-              ),
-            )
-          : const SizedBox.shrink();
-    },
-  );
+    // When focus mode is turned ON:
+    if (value) {
+      // 1. Show controls initially to confirm the mode change
+      _showControls = true;
+      // 2. Start the auto-hide timer
+      _startHideControlsTimer();
+    } 
+    // When focus mode is turned OFF:
+    else {
+      // 1. Keep controls showing permanently
+      _showControls = true;
+      // 2. Cancel the auto-hide timer
+      _hideControlsTimer?.cancel();
+    }
+  });
 }
+
+  Widget _buildSidebar(
+    List<SyncedParticipant> sidebarTracks,
+    List<ParticipantStatus> statusList,
+    bool isMobile,
+  ) {
+    if (!_isSideBarShouldVisible ||
+        isMobile ||
+        widget.room.localParticipant == null) {
+      return const SizedBox.shrink();
+    }
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: ValueNotifier<bool>(isParticipantListVisible),
+      builder: (context, isVisible, child) {
+        return isVisible
+            ? SizedBox(
+                width: 300,
+                child: Container(
+                  color: const Color(0xFF404040),
+                  child: ParticipantListView(
+                    key: const ValueKey('sidebar'),
+                    syncedParticipant: sidebarTracks,
+                    handRaisedList: statusList,
+                    isLocalHost:
+                        localParticipantRole == Role.admin.toString(),
+                    onParticipantsStatusChanged:
+                        _handlePinAndSpotlightStatusChanged,
+                  ),
+                ),
+              )
+            : const SizedBox.shrink();
+      },
+    );
+  }
 
   List<SyncedParticipant> getPrioritizedTracks(
     Map<String, SyncedParticipant> participants,
@@ -1308,84 +1377,94 @@ Widget _buildSidebar(
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF353535),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Row(
+      body: MouseRegion(
+        onHover: (_) => _resetHideControlsTimer(),
+        child: GestureDetector(
+          onTap: _resetHideControlsTimer,
+          behavior: HitTestBehavior.translucent,
+          child: SafeArea(
+            child: Stack(
               children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      RoomHeader(
-                        room: widget.room,
-                        participantsStatusList: statusList,
-                        onToggleRaiseHand: _handleToggleRaiseHand,
-                        isHandRaisedStatusChanged: _isHandleRaiseHand,
-                        isAdmin: localParticipantRole == Role.admin.toString(),
-                        onGridSizeChanged: _handleGridSizeChange, // Add this
-                        onOpenSidebar: _toggleParticipantList,
-                        isSidebarOpen: isParticipantListVisible,
-                        isSideBarShouldVisible: _isSideBarShouldVisible,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          // Header with calculated height or zero
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: _showControls ? (headerHeight ?? 64) : 0,
+                            child: AnimatedOpacity(
+                              opacity: _showControls ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 300),
+                              child: RoomHeader(
+                                room: widget.room,
+                                participantsStatusList: statusList,
+                                onToggleRaiseHand: _handleToggleRaiseHand,
+                                isHandRaisedStatusChanged: _isHandleRaiseHand,
+                                isAdmin: localParticipantRole == Role.admin.toString(),
+                                onGridSizeChanged: _handleGridSizeChange,
+                                onOpenSidebar: _toggleParticipantList,
+                                isSidebarOpen: isParticipantListVisible,
+                                isSideBarShouldVisible: _isSideBarShouldVisible,
+                                onToggleFocusMode: _handleToggleFocusMode,
+                                isFocusModeOn: _isFocusModeOn,
+                              ),
+                            ),
+                          ),
+                          
+                          // Grid with flex factor that grows when headers are hidden
+                          Flexible(
+                            flex: _showControls ? 1 : 10, // Increase flex when controls are hidden
+                            child: ParticipantGridView(
+                              syncedParticipant: prioritizedTracks,
+                              handRaisedList: statusList,
+                              isLocalHost: localParticipantRole == Role.admin.toString(),
+                              onParticipantsStatusChanged: _handlePinAndSpotlightStatusChanged,
+                              gridSize: _gridSize,
+                            ),
+                          ),
+                          
+                          // Footer with calculated height or zero
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: _showControls ? (controlsHeight ?? 72) : 0,
+                            child: AnimatedOpacity(
+                              opacity: _showControls ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 300),
+                              child: ControlsWidget(
+                                _toggleMuteAll,
+                                _handleToggleRaiseHand,
+                                _openEndDrawer,
+                                () => _copyInviteLinkToClipboard(context),
+                                _muteAll,
+                                _isHandleRaiseHand,
+                                localParticipantRole,
+                                widget.room,
+                                widget.room.localParticipant!,
+                                statusList,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      Expanded(
-                        child: ParticipantGridView(
-                          syncedParticipant: prioritizedTracks,
-                          handRaisedList: statusList,
-                          isLocalHost:
-                              localParticipantRole == Role.admin.toString(),
-                          onParticipantsStatusChanged:
-                              _handlePinAndSpotlightStatusChanged,
-                          gridSize: _gridSize, // Use the state variable instead of screenWidth check
-                        ),
-                      ),
-                      ControlsWidget(
-                        _toggleMuteAll,
-                        _handleToggleRaiseHand,
-                        _openEndDrawer,
-                        () => _copyInviteLinkToClipboard(context),
-                        _muteAll,
-                        _isHandleRaiseHand,
-                        localParticipantRole,
-                        widget.room,
-                        widget.room.localParticipant!,
-                        statusList,
-                      ),
-                    ],
-                  ),
+                    ),
+                    // Sidebar
+                    _buildSidebar(sidebarTracks, statusList, isMobile),
+                  ],
                 ),
-                _buildSidebar(sidebarTracks, statusList, isMobile),
+                
+                // Rest of your UI...
+                if (_isPiP)
+                  DraggableParticipantWidget(
+                    localParticipantTrack: localParticipantTrack,
+                    localParticipantStatus: localParticipantStatus,
+                    localParticipantRole: localParticipantRole!,
+                    updateParticipantsStatus: _handlePinAndSpotlightStatusChanged,
+                  ),
               ],
             ),
-            // if (!isMobile && _isSideBarShouldVisible)
-            //   Positioned(
-            //     top: MediaQuery.of(context).size.height / 2 - 25,
-            //     right: isParticipantListVisible ? 270 : -20,
-            //     child: GestureDetector(
-            //       onTap: _toggleParticipantList,
-            //       child: AnimatedContainer(
-            //         duration: const Duration(milliseconds: 300),
-            //         width: 40,
-            //         height: 49,
-            //         decoration: BoxDecoration(
-            //             color: Colors.white.withOpacity(0.6),
-            //             shape: BoxShape.circle),
-            //         child: CustomPaint(
-            //           painter: TrianglePainter(
-            //             isRight: isParticipantListVisible,
-            //           ),
-            //           child: Container(),
-            //         ),
-            //       ),
-            //     ),
-            //   ),
-            if (_isPiP)
-              DraggableParticipantWidget(
-                localParticipantTrack: localParticipantTrack,
-                localParticipantStatus: localParticipantStatus,
-                localParticipantRole: localParticipantRole!,
-                updateParticipantsStatus: _handlePinAndSpotlightStatusChanged,
-              ),
-          ],
+          ),
         ),
       ),
       endDrawer: ParticipantDrawer(
