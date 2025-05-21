@@ -275,10 +275,11 @@ void _startHideControlsTimer() {
       ..on<RoomDisconnectedEvent>((event) async {
         if (event.reason != null) {
           print('Room disconnected reason: ${event.reason}');
-        }
-        if (mounted) {
+        
+        if (mounted && context.mounted ) {
           WidgetsBinding.instance
               .addPostFrameCallback((_) => handleRoomDisconnected(context));
+        }
         }
       })
       ..on<ParticipantEvent>((event) {

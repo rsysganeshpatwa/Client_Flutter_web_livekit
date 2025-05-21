@@ -132,6 +132,7 @@ extension LKExampleExt on BuildContext {
 
 Future<bool?> showDisconnectDialog() => showDialog<bool>(
       context: this,
+      // ignore: deprecated_member_use
       barrierColor: Colors.black.withOpacity(0.6), // Darker backdrop for focus
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
