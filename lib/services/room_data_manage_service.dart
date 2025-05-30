@@ -10,6 +10,7 @@ class RoomDataManageService {
 
   // Method to set the latest data for a room
   Future<void> setLatestData(String roomId, String roomName, dynamic data) async {
+    try{
     final url = Uri.parse('$apiServiceUrl/room-data-manage/set-latest-data/$roomId?roomName=$roomName');
     final response = await http.post(
       url,
@@ -18,7 +19,12 @@ class RoomDataManageService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to set latest data: ${response.body}');
+      print('Failed to set latest data: ${response.body}');
+    } else {
+      print('Latest data set successfully for room $roomName');
+    }
+    } catch (e) {
+      print('Error setting latest data: $e');
     }
   }
 
@@ -44,6 +50,7 @@ class RoomDataManageService {
   }
   // Method to get the latest data for a room
   Future<dynamic> getLatestData(String roomId, String roomName) async {
+    try{
     final url = Uri.parse('$apiServiceUrl/room-data-manage/latest-data/$roomId?roomName=$roomName');
 
     final response = await http.get(url);
@@ -53,5 +60,10 @@ class RoomDataManageService {
     } else {
       return null;
     }
+    } catch (e) {
+      print('Error fetching latest data: $e');
+      return null;
+    }
   }
+
 }

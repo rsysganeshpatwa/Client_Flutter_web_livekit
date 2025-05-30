@@ -75,12 +75,7 @@ class LiveKitTheme {
             return Colors.white.withOpacity(0.3);
           }),
         ),
-        dialogTheme: DialogTheme(
-          backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
+     
         textTheme: GoogleFonts.montserratTextTheme(
           Theme.of(ctx).textTheme,
         ).apply(

@@ -338,15 +338,15 @@ Widget _buildStackContent(BuildContext ctx, bool isPinned, bool isSpotlight) {
         child: Align(
           alignment: Alignment.center,
           child: GestureDetector(
-            onScaleStart: (details) {
-              _offset = details.localFocalPoint;
-            },
-            onScaleUpdate: (details) {
-              setState(() {
-                _scaleFactor = (_scaleFactor * details.scale).clamp(_minScale, _maxScale);
-                _offset = details.localFocalPoint;
-              });
-            },
+            // onScaleStart: (details) {
+            //   _offset = details.localFocalPoint;
+            // },
+            // onScaleUpdate: (details) {
+            //   setState(() {
+            //     _scaleFactor = (_scaleFactor * details.scale).clamp(_minScale, _maxScale);
+            //     _offset = details.localFocalPoint;
+            //   });
+            // },
             child: hasVideo
               ? _buildVideoRenderer(videoTrack)
               : NoVideoWidget(name: widget.participant.name.isNotEmpty

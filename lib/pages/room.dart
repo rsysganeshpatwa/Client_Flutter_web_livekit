@@ -19,6 +19,7 @@ import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantListView.dart';
 import 'package:video_meeting_room/pages/room-widget/NewParticipantDialog.dart';
+
 import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
@@ -75,6 +76,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   bool _isSideBarShouldVisible = false;
   int _gridSize = 4; // Add this property
   bool _isFocusModeOn = false; // Add this property
+  ParticipantStatus? localParticipantStatus;
 
   final ApprovalService _approvalService = GetIt.instance<ApprovalService>();
   final RoomDataManageService _roomDataManageService =
@@ -102,7 +104,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
     _initializeLocalParticipantRole();
-    _pinnedProvider = Provider.of<PinnedParticipantProvider>(context, listen: false);
+    _pinnedProvider =
+        Provider.of<PinnedParticipantProvider>(context, listen: false);
     _pinnedProvider.addListener(_onPinnedChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -128,11 +131,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
             duration: const Duration(seconds: 5));
       };
     }
-    _isFocusModeOn =false;
-     _roomName =widget.room.name;
-   
-
-   
+    _isFocusModeOn = false;
+    _roomName = widget.room.name;
   }
 
   @override
@@ -196,26 +196,27 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       _showControls = true;
     });
 
-   // Only start the hide timer if we're in focus mode
-  if (_isFocusModeOn) {
-    _startHideControlsTimer();
-  }
+    // Only start the hide timer if we're in focus mode
+    if (_isFocusModeOn) {
+      _startHideControlsTimer();
+    }
   }
 
 // Finally, modify the _startHideControlsTimer method to check for focus mode
-void _startHideControlsTimer() {
-  // Only proceed if focus mode is on
-  if (!_isFocusModeOn) return;
-  
-  _hideControlsTimer?.cancel();
-  _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-    if (mounted && _isFocusModeOn) {  // Double-check focus mode is still on
-      setState(() {
-        _showControls = false;
-      });
-    }
-  });
-}
+  void _startHideControlsTimer() {
+    // Only proceed if focus mode is on
+    if (!_isFocusModeOn) return;
+
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _isFocusModeOn) {
+        // Double-check focus mode is still on
+        setState(() {
+          _showControls = false;
+        });
+      }
+    });
+  }
 
   // ==================== Room Management Methods ====================
   void _onRoomDidUpdate() {
@@ -275,46 +276,70 @@ void _startHideControlsTimer() {
       ..on<RoomDisconnectedEvent>((event) async {
         if (event.reason != null) {
           print('Room disconnected reason: ${event.reason}');
-        
-        if (mounted && context.mounted ) {
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => handleRoomDisconnected(context));
-        }
+
+          if (mounted && context.mounted) {
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => handleRoomDisconnected(context));
+          }
         }
       })
       ..on<ParticipantEvent>((event) {
         _sortParticipants('ParticipantEvent');
       })
       ..on<RoomRecordingStatusChanged>((event) {
-        context.showRecordingStatusChangedDialog(event.activeRecording);
+        //ontext.showRecordingStatusChangedDialog(event.activeRecording);
       })
-      ..on<RoomAttemptReconnectEvent>((event) {})
-      ..on<LocalTrackPublishedEvent>(
-          (_) => _sortParticipants('LocalTrackPublishedEvent'))
+      ..on<RoomAttemptReconnectEvent>((event) {
+        print(
+            'Attempting to reconnect ${event.attempt}/${event.maxAttemptsRetry}, '
+            '(${event.nextRetryDelaysInMs}ms delay until next attempt)');
+        // Show reconnection dialog
+      //  _showReconnectDialog();
+      })
+     
+      ..on<RoomReconnectedEvent>((event) {
+        print('Reconnected to room: ${widget.room.name}');
+
+        //  ReconnectDialog.closeActiveDialog(context);
+        _initializeParticipantStatuses();
+
+        // _sortParticipants('RoomReconnectedEvent');
+      })
+      ..on<LocalTrackPublishedEvent>((_) {
+        print('Local track published');
+        ;
+        _sortParticipants('LocalTrackPublishedEvent');
+      })
       ..on<LocalTrackUnpublishedEvent>(
           (_) => _sortParticipants('LocalTrackUnpublishedEvent'))
       ..on<TrackSubscribedEvent>((event) {
         _sortParticipants('TrackSubscribedEvent');
       })
       ..on<TrackUnsubscribedEvent>((event) {
+        print('Track unsubscribed: ${event.track.sid}');
         _sortParticipants('TrackUnsubscribedEvent');
       })
       ..on<DataReceivedEvent>((event) async {
         try {
+          print('Data received: ${event.data}');
           _receivedHandRaiseRequest(utf8.decode(event.data));
           updateParticipantStatusFromMetadata(utf8.decode(event.data));
         } catch (_) {}
       })
+      ..on<ParticipantNameUpdatedEvent>((event) {
+        print(
+            'Participant name updated: ${event.participant.identity}, name => ${event.name}');
+        _sortParticipants('');
+      })
       ..on<ParticipantConnectedEvent>((event) async {
-       
         await _updateParticipantmanagerFromDB();
         _sortParticipants('TrackSubscribedEvent');
       })
       ..on<ParticipantDisconnectedEvent>((event) async {
+        print('Participant disconnected: ${event.participant.identity}');
         await _updateParticipantmanagerFromDB();
         _sortParticipants('ParticipantDisconnectedEvent');
       })
-     
       ..on<AudioPlaybackStatusChanged>((event) async {
         if (!widget.room.canPlaybackAudio) {
           bool? yesno = await context.showPlayAudioManuallyDialog();
@@ -407,7 +432,7 @@ void _startHideControlsTimer() {
       final identity = participant.identity;
       final participantStatus = _getParticipantStatus(identity);
       if (participantStatus == null) continue;
-     
+
       final isRemoteParticipantHost =
           _getRoleFromMetadata(participant.metadata) == Role.admin.toString();
 
@@ -474,7 +499,6 @@ void _startHideControlsTimer() {
       ..clear()
       ..addAll(sortedSynced);
 
-    
     _sortUserMediaTracks();
 
     setState(() {});
@@ -485,7 +509,7 @@ void _startHideControlsTimer() {
     final recentSpeechCutoff = now - recentSpeechWindowMs;
 
     final pinnedSet = _pinnedProvider.pinnedIdentities;
-  
+
     final localIdentity = widget.room.localParticipant?.identity;
 
     List<SyncedParticipant> allParticipants = syncedParticipants.values
@@ -493,7 +517,8 @@ void _startHideControlsTimer() {
             p.track != null && p.identity != localIdentity) // exclude local
         .toList();
     final int maxVisible = _isSideBarShouldVisible ? 4 : _gridSize;
-    List<SyncedParticipant> currentVisible = allParticipants.take(maxVisible).toList();
+    List<SyncedParticipant> currentVisible =
+        allParticipants.take(maxVisible).toList();
     final currentVisibleIds = currentVisible.map((p) => p.identity).toSet();
 
     bool isSpeaking(SyncedParticipant p) =>
@@ -741,8 +766,7 @@ void _startHideControlsTimer() {
     if (!mounted) return;
     final localParticipant = widget.room.localParticipant;
     if (localParticipant != null) {
-      await _updateParticipantmanagerFromDB();
-      final localStatus = ParticipantStatus(
+      ParticipantStatus localStatus = ParticipantStatus(
         identity: localParticipant.identity,
         isAudioEnable:
             localParticipantRole == Role.admin.toString() || widget.enableAudio,
@@ -752,12 +776,20 @@ void _startHideControlsTimer() {
             !widget.muteByDefault,
         role: localParticipantRole!,
       );
-
+      final localParicipantStatus =
+          _getParticipantStatus(localParticipant.identity);
+      await _updateParticipantmanagerFromDB();
+      if (localParicipantStatus != null) {
+        localStatus = localParicipantStatus;
+      }
+      print('Local participant status: ${localStatus.identity}');
       setState(() {
         participantsStatusList.add(localStatus);
 
-        _updateRoomData(participantsStatusList);
-        sendParticipantsStatus();
+        _updateRoomData(participantsStatusList).then((_) {
+          sendParticipantsStatus();
+        });
+    
       });
     }
   }
@@ -765,7 +797,7 @@ void _startHideControlsTimer() {
   Future<void> _updateParticipantmanagerFromDB() async {
     if (!mounted) return;
     final roomId = await widget.room.getSid();
-    String? roomName = widget.room.name ?? _roomName; 
+    String? roomName = widget.room.name ?? _roomName;
     if (roomName == null) {
       print('Room name is null');
       return;
@@ -799,6 +831,10 @@ void _startHideControlsTimer() {
     // Parse the received metadata
     final decodedMetadata = jsonDecode(metadata);
 
+     for(var element in decodedMetadata['participants']) {
+      print('Local participant metadata: ${element['identity']}');
+      
+     }
     if (decodedMetadata['type'] == 'participantsStatusUpdate') {
       // Extract the list of participant status data from the 'participants' key
       final participantsStatusDataList =
@@ -884,7 +920,6 @@ void _startHideControlsTimer() {
   }
 
   void _onPinnedChanged() {
-  
     _sortUserMediaTracks();
   }
 
@@ -938,44 +973,45 @@ void _startHideControlsTimer() {
     }
   }
 
- void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
-  if (!mounted) return;
-  final localParticipant = participant;
+  void _toggleRaiseHand(Participant participant, bool isHandRaised) async {
+    if (!mounted) return;
+    final localParticipant = participant;
 
-  final participantStatus = _getParticipantStatus(localParticipant.identity);
-  if (participantStatus == null) return;
+    final participantStatus = _getParticipantStatus(localParticipant.identity);
+    if (participantStatus == null) return;
 
-  // ✅ Only set timestamp on first raise
-  if (isHandRaised && !participantStatus.isHandRaised) {
-    participantStatus.handRaisedTimeStamp = DateTime.now().millisecondsSinceEpoch;
+    // ✅ Only set timestamp on first raise
+    if (isHandRaised && !participantStatus.isHandRaised) {
+      participantStatus.handRaisedTimeStamp =
+          DateTime.now().millisecondsSinceEpoch;
+    }
+
+    // ✅ Clear timestamp on unraise
+    if (!isHandRaised) {
+      participantStatus.handRaisedTimeStamp = 0;
+    }
+
+    // ✅ Update hand raise flag
+    participantStatus.isHandRaised = isHandRaised;
+
+    // ✅ Replace old entry with updated one
+    participantsStatusList
+      ..removeWhere((status) => status.identity == localParticipant.identity)
+      ..add(participantStatus);
+
+    updateParticipantsStatus(participantsStatusList);
+
+    final handRaiseData = jsonEncode({
+      'identity': participant.identity,
+      'handraise': isHandRaised,
+    });
+
+    await widget.room.localParticipant?.publishData(utf8.encode(handRaiseData));
+
+    setState(() {
+      _isHandleRaiseHand = isHandRaised;
+    });
   }
-
-  // ✅ Clear timestamp on unraise
-  if (!isHandRaised) {
-    participantStatus.handRaisedTimeStamp = 0;
-  }
-
-  // ✅ Update hand raise flag
-  participantStatus.isHandRaised = isHandRaised;
-
-  // ✅ Replace old entry with updated one
-  participantsStatusList
-    ..removeWhere((status) => status.identity == localParticipant.identity)
-    ..add(participantStatus);
-
-  updateParticipantsStatus(participantsStatusList);
-
-  final handRaiseData = jsonEncode({
-    'identity': participant.identity,
-    'handraise': isHandRaised,
-  });
-
-  await widget.room.localParticipant?.publishData(utf8.encode(handRaiseData));
-
-  setState(() {
-    _isHandleRaiseHand = isHandRaised;
-  });
-}
 
   void _handleToggleRaiseHand(bool isHandRaised) async {
     _toggleRaiseHand(widget.room.localParticipant as Participant, isHandRaised);
@@ -1131,31 +1167,32 @@ void _startHideControlsTimer() {
   }
 
   void _toggleParticipantList() {
-    print('Toggling participant list');
+  
     setState(() {
       isParticipantListVisible = !isParticipantListVisible;
     });
   }
-void _handleToggleFocusMode(bool value) {
-  setState(() {
-    _isFocusModeOn = value;
 
-    // When focus mode is turned ON:
-    if (value) {
-      // 1. Show controls initially to confirm the mode change
-      _showControls = true;
-      // 2. Start the auto-hide timer
-      _startHideControlsTimer();
-    } 
-    // When focus mode is turned OFF:
-    else {
-      // 1. Keep controls showing permanently
-      _showControls = true;
-      // 2. Cancel the auto-hide timer
-      _hideControlsTimer?.cancel();
-    }
-  });
-}
+  void _handleToggleFocusMode(bool value) {
+    setState(() {
+      _isFocusModeOn = value;
+
+      // When focus mode is turned ON:
+      if (value) {
+        // 1. Show controls initially to confirm the mode change
+        _showControls = true;
+        // 2. Start the auto-hide timer
+        _startHideControlsTimer();
+      }
+      // When focus mode is turned OFF:
+      else {
+        // 1. Keep controls showing permanently
+        _showControls = true;
+        // 2. Cancel the auto-hide timer
+        _hideControlsTimer?.cancel();
+      }
+    });
+  }
 
   Widget _buildSidebar(
     List<SyncedParticipant> sidebarTracks,
@@ -1180,8 +1217,7 @@ void _handleToggleFocusMode(bool value) {
                     key: const ValueKey('sidebar'),
                     syncedParticipant: sidebarTracks,
                     handRaisedList: statusList,
-                    isLocalHost:
-                        localParticipantRole == Role.admin.toString(),
+                    isLocalHost: localParticipantRole == Role.admin.toString(),
                     onParticipantsStatusChanged:
                         _handlePinAndSpotlightStatusChanged,
                   ),
@@ -1311,6 +1347,7 @@ void _handleToggleFocusMode(bool value) {
     });
   }
 
+
   @override
   Widget build(BuildContext context) {
     final localIdentity = widget.room.localParticipant?.identity;
@@ -1369,7 +1406,6 @@ void _handleToggleFocusMode(bool value) {
       localIdentity,
     );
 
-   
     final statusList = syncedParticipants.values
         .map((e) => e.status)
         .whereType<ParticipantStatus>()
@@ -1403,7 +1439,8 @@ void _handleToggleFocusMode(bool value) {
                                 participantsStatusList: statusList,
                                 onToggleRaiseHand: _handleToggleRaiseHand,
                                 isHandRaisedStatusChanged: _isHandleRaiseHand,
-                                isAdmin: localParticipantRole == Role.admin.toString(),
+                                isAdmin: localParticipantRole ==
+                                    Role.admin.toString(),
                                 onGridSizeChanged: _handleGridSizeChange,
                                 onOpenSidebar: _toggleParticipantList,
                                 isSidebarOpen: isParticipantListVisible,
@@ -1413,19 +1450,23 @@ void _handleToggleFocusMode(bool value) {
                               ),
                             ),
                           ),
-                          
+
                           // Grid with flex factor that grows when headers are hidden
                           Flexible(
-                            flex: _showControls ? 1 : 10, // Increase flex when controls are hidden
+                            flex: _showControls
+                                ? 1
+                                : 10, // Increase flex when controls are hidden
                             child: ParticipantGridView(
                               syncedParticipant: prioritizedTracks,
                               handRaisedList: statusList,
-                              isLocalHost: localParticipantRole == Role.admin.toString(),
-                              onParticipantsStatusChanged: _handlePinAndSpotlightStatusChanged,
+                              isLocalHost:
+                                  localParticipantRole == Role.admin.toString(),
+                              onParticipantsStatusChanged:
+                                  _handlePinAndSpotlightStatusChanged,
                               gridSize: _gridSize,
                             ),
                           ),
-                          
+
                           // Footer with calculated height or zero
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 300),
@@ -1454,14 +1495,15 @@ void _handleToggleFocusMode(bool value) {
                     _buildSidebar(sidebarTracks, statusList, isMobile),
                   ],
                 ),
-                
+
                 // Rest of your UI...
                 if (_isPiP)
                   DraggableParticipantWidget(
                     localParticipantTrack: localParticipantTrack,
                     localParticipantStatus: localParticipantStatus,
                     localParticipantRole: localParticipantRole!,
-                    updateParticipantsStatus: _handlePinAndSpotlightStatusChanged,
+                    updateParticipantsStatus:
+                        _handlePinAndSpotlightStatusChanged,
                   ),
               ],
             ),

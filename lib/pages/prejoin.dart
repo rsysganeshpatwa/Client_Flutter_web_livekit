@@ -315,7 +315,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
       // Create a Listener before connecting
       final listener = room.createListener();
-
+    
       // Try to connect to the room
       // This will throw an Exception if it fails for any reason.
       await room
