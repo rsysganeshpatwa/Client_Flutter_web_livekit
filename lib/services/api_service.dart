@@ -6,20 +6,20 @@ class ApiService {
 
   ApiService(this.tokenServiceUrl);
 
-  Future<String> getToken(String identity, String roomName, String role,String adminWelcomeMessage) async {
-    final response = await http.post(
-      Uri.parse('$tokenServiceUrl/token'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'identity': identity, 'roomName': roomName, 'role': role, 'adminWelcomeMessage':adminWelcomeMessage}),
-    );
+    Future<String> getToken(String identity, String roomName, String role,String adminWelcomeMessage) async {
+      final response = await http.post(
+        Uri.parse('$tokenServiceUrl/token'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'identity': identity, 'roomName': roomName, 'role': role, 'adminWelcomeMessage':adminWelcomeMessage}),
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['token'];
-    } else {
-      throw Exception('Failed to generate token');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['token'];
+      } else {
+        throw Exception('Failed to generate token');
+      }
     }
-  }
 
    Future<String> getWelcomeMessage(String roomName) async {
     final response = await http.post(

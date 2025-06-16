@@ -19,7 +19,7 @@ import 'package:video_meeting_room/pages/room-widget/ParticipantDrawer.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantGridView.dart';
 import 'package:video_meeting_room/pages/room-widget/ParticipantListView.dart';
 import 'package:video_meeting_room/pages/room-widget/NewParticipantDialog.dart';
-
+import 'package:video_meeting_room/pages/room-widget/ReconnectDialog.dart';
 import 'package:video_meeting_room/providers/PinnedParticipantProvider.dart';
 import 'package:video_meeting_room/services/approval_service.dart';
 import 'package:video_meeting_room/services/room_data_manage_service.dart';
@@ -96,6 +96,8 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   double? headerHeight = 64;
   double? controlsHeight = 72;
   String? _roomName = '';
+  // Add this property to your _RoomPageState class properties
+  bool _isMomAgentActive = false;
 
   // ==================== Lifecycle Methods ====================
   @override
@@ -107,12 +109,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     _pinnedProvider =
         Provider.of<PinnedParticipantProvider>(context, listen: false);
     _pinnedProvider.addListener(_onPinnedChanged);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!fastConnection) {
-        _askPublish();
-      }
-    });
 
     _sortParticipants('initState');
 
@@ -294,9 +290,14 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
             'Attempting to reconnect ${event.attempt}/${event.maxAttemptsRetry}, '
             '(${event.nextRetryDelaysInMs}ms delay until next attempt)');
         // Show reconnection dialog
-      //  _showReconnectDialog();
+        //  _showReconnectDialog();
       })
-     
+      ..on<TranscriptionEvent>((event) {
+        for (final segment in event.segments) {
+          print(
+              "New transcription from ${event.participant.identity}: ${segment.text}");
+        }
+      })
       ..on<RoomReconnectedEvent>((event) {
         print('Reconnected to room: ${widget.room.name}');
 
@@ -321,7 +322,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
       })
       ..on<DataReceivedEvent>((event) async {
         try {
-          print('Data received: ${event.data}');
+        
           _receivedHandRaiseRequest(utf8.decode(event.data));
           updateParticipantStatusFromMetadata(utf8.decode(event.data));
         } catch (_) {}
@@ -332,11 +333,28 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         _sortParticipants('');
       })
       ..on<ParticipantConnectedEvent>((event) async {
+        if (localParticipantRole == Role.admin.toString()) {
+          final identity = event.participant.identity;
+          print('Participant connected: $identity');
+          // Check if the participant is a mom agent
+          if (identity.toLowerCase().contains('mom-bot')) {
+            _notifyMomAgentActive(true);
+          }
+        }
+
         await _updateParticipantmanagerFromDB();
         _sortParticipants('TrackSubscribedEvent');
       })
       ..on<ParticipantDisconnectedEvent>((event) async {
         print('Participant disconnected: ${event.participant.identity}');
+        if (localParticipantRole == Role.admin.toString()) {
+          final identity = event.participant.identity;
+          print('Participant connected: $identity');
+          // Check if the participant is a mom agent
+          if (identity.toLowerCase().contains('mom-bot')) {
+            _notifyMomAgentActive(false);
+          }
+        }
         await _updateParticipantmanagerFromDB();
         _sortParticipants('ParticipantDisconnectedEvent');
       })
@@ -348,27 +366,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
           }
         }
       });
-  }
-
-  void _askPublish() async {
-    if (!mounted) return;
-
-    final result = await context.showPublishDialog();
-    if (result != true) return;
-    // Capture the context's mounted state
-
-    try {
-      await widget.room.localParticipant?.setCameraEnabled(true);
-    } catch (error) {
-      if (!mounted || !context.mounted) return;
-      await context.showErrorDialog(error);
-    }
-    try {
-      await widget.room.localParticipant?.setMicrophoneEnabled(true);
-    } catch (error) {
-      if (!mounted || !context.mounted) return;
-      await context.showErrorDialog(error);
-    }
   }
 
   Future<void> removeParticipantFromDB() async {
@@ -390,6 +387,12 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         _initializeParticipantStatuses();
         if (localParticipantRole == Role.admin.toString()) {
           _checkForPendingRequests();
+          final isMomBot = widget.room.remoteParticipants.values.any(
+            (p) => p.identity.toLowerCase().contains('mom-bot'),
+          );
+          if (isMomBot) {
+            _notifyMomAgentActive(true);
+          }
         }
       });
       if (localParticipantRole == Role.participant.toString() &&
@@ -430,6 +433,10 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
 
     for (var participant in widget.room.remoteParticipants.values) {
       final identity = participant.identity;
+      if (identity.toLowerCase().contains('mom-bot')) {
+        // Skip mom bot participants
+        continue;
+      }
       final participantStatus = _getParticipantStatus(identity);
       if (participantStatus == null) continue;
 
@@ -789,7 +796,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
         _updateRoomData(participantsStatusList).then((_) {
           sendParticipantsStatus();
         });
-    
       });
     }
   }
@@ -831,10 +837,9 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     // Parse the received metadata
     final decodedMetadata = jsonDecode(metadata);
 
-     for(var element in decodedMetadata['participants']) {
+    for (var element in decodedMetadata['participants']) {
       print('Local participant metadata: ${element['identity']}');
-      
-     }
+    }
     if (decodedMetadata['type'] == 'participantsStatusUpdate') {
       // Extract the list of participant status data from the 'participants' key
       final participantsStatusDataList =
@@ -905,6 +910,33 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     // Sync after state updated
     _updateRoomData(newList).then((_) {
       sendParticipantsStatus();
+    });
+  }
+
+  void _notifyMomAgentActive(bool isActive) {
+    if (!mounted) return;
+    // Update the state to reflect the mom agent's active status
+
+    //show nofification
+    if (isActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mom Agent recording is now active'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mom Agent recording is now inactive'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    setState(() {
+      // This will trigger a rebuild of RoomHeader with updated status
+      _isMomAgentActive = isActive;
     });
   }
 
@@ -1167,7 +1199,6 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
   }
 
   void _toggleParticipantList() {
-  
     setState(() {
       isParticipantListVisible = !isParticipantListVisible;
     });
@@ -1347,6 +1378,27 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     });
   }
 
+  // Add this method to your _RoomPageState class
+  Future<void> _showReconnectDialog() async {
+    // Check if a dialog is already showing
+    final isDialogShowing = ModalRoute.of(context)?.isCurrent != true;
+    if (isDialogShowing || !mounted) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return ReconnectDialog(
+          roomName: widget.room.name ?? 'Meeting Room',
+        );
+      },
+    );
+
+    // If user pressed Leave Meeting button (result == true), disconnect from room
+    if (result == true && mounted) {
+      handleRoomDisconnected(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1447,6 +1499,7 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                                 isSideBarShouldVisible: _isSideBarShouldVisible,
                                 onToggleFocusMode: _handleToggleFocusMode,
                                 isFocusModeOn: _isFocusModeOn,
+                                isMomAgentActive: _isMomAgentActive,
                               ),
                             ),
                           ),

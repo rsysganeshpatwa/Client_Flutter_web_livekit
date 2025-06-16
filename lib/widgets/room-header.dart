@@ -3,9 +3,13 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:video_meeting_room/helper_widgets/BlinkingIndicator.dart';
+import 'package:video_meeting_room/helper_widgets/MomScriptDialog.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
+import 'package:video_meeting_room/services/mom_agent_service.dart';
 import 'package:video_meeting_room/widgets/codec_stats.dart';
 import 'dart:async';
 import '../stats_repo.dart';
@@ -22,6 +26,7 @@ class RoomHeader extends StatefulWidget {
   final bool isSideBarShouldVisible;
   final Function(bool) onToggleFocusMode;
   final bool isFocusModeOn;
+  final bool isMomAgentActive;
 
   const RoomHeader({
     super.key,
@@ -36,6 +41,7 @@ class RoomHeader extends StatefulWidget {
     required this.isSideBarShouldVisible,
     required this.onToggleFocusMode,
     required this.isFocusModeOn,
+    this.isMomAgentActive =false,
   });
 
   @override
@@ -47,6 +53,11 @@ class _RoomHeaderState extends State<RoomHeader> {
   List<MediaDevice>? _videoInputs;
   bool _isHandRaised = false;
   LocalParticipant get participant => widget.room.localParticipant!;
+  final MomService _momAgentService = GetIt.instance<MomService>();
+  bool _isMomAgentActive = false;
+  bool _isProcessing = false;
+  Timer? _blinkTimer;
+  double _blinkOpacity = 1.0;
 
   int _currentGridSize = 4;
 
@@ -67,6 +78,20 @@ class _RoomHeaderState extends State<RoomHeader> {
         });
       }
     }
+    if (widget.isMomAgentActive != oldWidget.isMomAgentActive) {
+      _isMomAgentActive = widget.isMomAgentActive;
+      if (_isMomAgentActive) {
+        _startBlinkEffect();
+      } else {
+        _stopBlinkEffect();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _blinkTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadDevices() async {
@@ -391,6 +416,115 @@ class _RoomHeaderState extends State<RoomHeader> {
     );
   }
 
+// Toggle Mom Agent recording
+// Modify your _toggleMomAgent method in room-header.dart
+Future<void> _toggleMomAgent() async {
+  if (_isProcessing) return;
+
+  setState(() {
+    _isProcessing = true;
+  });
+
+  try {
+    if (_isMomAgentActive) {
+      // Stopping the agent - get the script
+      final response = await _momAgentService.stopMeeting(widget.room.name);
+      
+      setState(() {
+        _isMomAgentActive = false;
+        _stopBlinkEffect();
+      });
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mom Agent stopped successfully.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Extract and display the script
+      if (response.isNotEmpty) {
+        
+        // Use the new component to show the dialog
+        MomScriptDialog.show(
+          context, 
+          response,
+          meetingTitle: widget.room.name,
+        );
+      } else {
+        // Show error for missing script
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No meeting transcript was generated.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      // Start Mom Agent code...
+      final success = await _momAgentService.startMeeting(widget.room.name);
+
+      if (success) {
+        setState(() {
+          _isMomAgentActive = true;
+          _startBlinkEffect();
+        });
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mom Agent started successfully.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to start Mom Agent.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+      }
+    }
+  } catch (e) {
+    // Error handling...
+  } finally {
+    _stopBlinkEffect();
+    setState(() {
+      _isProcessing = false;
+    });
+  }
+}
+// Start the blinking effect when active
+  void _startBlinkEffect() {
+    // Cancel existing timer if any
+    _blinkTimer?.cancel();
+
+    // Create a timer that toggles opacity every 800ms
+    _blinkTimer = Timer.periodic(const Duration(milliseconds: 800), (timer) {
+      if (mounted) {
+        setState(() {
+          _blinkOpacity = _blinkOpacity == 1.0 ? 0.4 : 1.0;
+        });
+      }
+    });
+  }
+
+// Stop the blinking effect
+  void _stopBlinkEffect() {
+    _blinkTimer?.cancel();
+    _blinkTimer = null;
+
+    if (mounted) {
+      setState(() {
+        _blinkOpacity = 1.0;
+      });
+    }
+  }
+
   void _toggleHandRaise() {
     setState(() {
       _isHandRaised = !_isHandRaised;
@@ -410,68 +544,141 @@ class _RoomHeaderState extends State<RoomHeader> {
     widget.onToggleFocusMode(!widget.isFocusModeOn);
   }
 
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onPressed,
-    required bool isMobile,
-    Color activeColor = Colors.white,
-    Color inactiveColor = Colors.white,
-    String? tooltip,
-  }) {
-    final String effectiveTooltip =
-        tooltip ?? (isActive ? 'Disable $label' : 'Enable $label');
+// Modify the _buildControlButton method to include a loading state
+Widget _buildControlButton({
+  required IconData icon,
+  required String label,
+  required bool isActive,
+  required VoidCallback onPressed,
+  required bool isMobile,
+  Color activeColor = Colors.white,
+  Color inactiveColor = Colors.white,
+  String? tooltip,
+  bool isLoading = false,
+}) {
+  final String effectiveTooltip =
+      tooltip ?? (isActive ? 'Disable $label' : 'Enable $label');
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            height: 36,
-            width: 36,
-            alignment: Alignment.center,
-            child: Tooltip(
-              message: effectiveTooltip,
-              preferBelow: true,
-              verticalOffset: 20,
-              showDuration: const Duration(seconds: 2),
-              child: IconButton(
-                icon: Icon(
-                  icon,
-                  color: isActive ? activeColor : inactiveColor,
-                  size: isMobile ? 20 : 24,
-                ),
-                onPressed: onPressed,
-                padding: EdgeInsets.zero,
-                constraints: BoxConstraints.tight(const Size(36, 36)),
-                visualDensity: VisualDensity.compact,
-                splashRadius: 18,
-                tooltip: null,
-              ),
-            ),
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          height: 36,
+          width: 36,
+          alignment: Alignment.center,
+          child: Tooltip(
+            message: effectiveTooltip,
+            preferBelow: true,
+            verticalOffset: 20,
+            showDuration: const Duration(seconds: 2),
+            child: isLoading 
+                ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(isActive ? activeColor : inactiveColor),
+                    ),
+                  )
+                : IconButton(
+                    icon: Icon(
+                      icon,
+                      color: isActive ? activeColor : inactiveColor,
+                      size: isMobile ? 20 : 24,
+                    ),
+                    onPressed: onPressed,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints.tight(const Size(36, 36)),
+                    visualDensity: VisualDensity.compact,
+                    splashRadius: 18,
+                    tooltip: null,
+                  ),
           ),
-          const SizedBox(height: 4),
-          Container(
-            height: 16,
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isActive ? activeColor : inactiveColor,
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
-              ),
-              textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 16,
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isActive ? activeColor : inactiveColor,
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
             ),
+            textAlign: TextAlign.center,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+  // Widget _buildControlButton({
+  //   required IconData icon,
+  //   required String label,
+  //   required bool isActive,
+  //   required VoidCallback onPressed,
+  //   required bool isMobile,
+  //   Color activeColor = Colors.white,
+  //   Color inactiveColor = Colors.white,
+  //   String? tooltip,
+  // }) {
+  //   final String effectiveTooltip =
+  //       tooltip ?? (isActive ? 'Disable $label' : 'Enable $label');
+
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(horizontal: 8.0),
+  //     child: Column(
+  //       mainAxisSize: MainAxisSize.min,
+  //       mainAxisAlignment: MainAxisAlignment.center,
+  //       crossAxisAlignment: CrossAxisAlignment.center,
+  //       children: [
+  //         Container(
+  //           height: 36,
+  //           width: 36,
+  //           alignment: Alignment.center,
+  //           child: Tooltip(
+  //             message: effectiveTooltip,
+  //             preferBelow: true,
+  //             verticalOffset: 20,
+  //             showDuration: const Duration(seconds: 2),
+  //             child: IconButton(
+  //               icon: Icon(
+  //                 icon,
+  //                 color: isActive ? activeColor : inactiveColor,
+  //                 size: isMobile ? 20 : 24,
+  //               ),
+  //               onPressed: onPressed,
+  //               padding: EdgeInsets.zero,
+  //               constraints: BoxConstraints.tight(const Size(36, 36)),
+  //               visualDensity: VisualDensity.compact,
+  //               splashRadius: 18,
+  //               tooltip: null,
+  //             ),
+  //           ),
+  //         ),
+  //         const SizedBox(height: 4),
+  //         Container(
+  //           height: 16,
+  //           alignment: Alignment.center,
+  //           child: Text(
+  //             label,
+  //             style: TextStyle(
+  //               color: isActive ? activeColor : inactiveColor,
+  //               fontSize: 12,
+  //               fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+  //             ),
+  //             textAlign: TextAlign.center,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildPopupMenuButton<T>({
     required IconData icon,
@@ -615,7 +822,8 @@ class _RoomHeaderState extends State<RoomHeader> {
           Flexible(
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.end, // Align to end for better spacing
+              mainAxisAlignment:
+                  MainAxisAlignment.end, // Align to end for better spacing
               children: [
                 if (!widget.isAdmin)
                   _buildControlButton(
@@ -625,8 +833,36 @@ class _RoomHeaderState extends State<RoomHeader> {
                     activeColor: Colors.orange,
                     onPressed: _toggleHandRaise,
                     isMobile: isMobile,
-                    tooltip: _isHandRaised ? 'Lower your hand' : 'Raise your hand to get attention',
+                    tooltip: _isHandRaised
+                        ? 'Lower your hand'
+                        : 'Raise your hand to get attention',
                   ),
+if (widget.isAdmin )
+Stack(
+  alignment: Alignment.center,
+  children: [
+    // Pulsating background ring when active
+// Replace the problematic TweenAnimationBuilder with a corrected version
+// filepath: /home/ganesh/Documents/poc/Client_Flutter_web_livekit/lib/widgets/room-header.dart
+if (_isMomAgentActive)
+BlinkingIndicator(isActive: _isMomAgentActive),
+    // The actual button
+
+    _buildControlButton(
+      icon: _isMomAgentActive ? Icons.record_voice_over : Icons.voice_over_off,
+      label: _isMomAgentActive ? 'Mom Active' : 'Mom Agent',
+      isActive: _isMomAgentActive,
+      activeColor: Colors.red,
+      onPressed: _isProcessing ? () {} : _toggleMomAgent,
+      isMobile: isMobile,
+      tooltip: _isMomAgentActive 
+          ? 'Stop Mom Agent recording' 
+          : 'Start Mom Agent recording',
+      isLoading: _isProcessing,
+    ),
+  ],
+),
+                  
                 _buildControlButton(
                   icon: widget.isFocusModeOn
                       ? Icons.center_focus_strong
@@ -636,8 +872,8 @@ class _RoomHeaderState extends State<RoomHeader> {
                   activeColor: Colors.green,
                   onPressed: _toggleFocusMode,
                   isMobile: isMobile,
-                  tooltip: widget.isFocusModeOn 
-                      ? 'Turn off focus mode (controls will remain visible)' 
+                  tooltip: widget.isFocusModeOn
+                      ? 'Turn off focus mode (controls will remain visible)'
                       : 'Turn on focus mode (controls will auto-hide)',
                 ),
                 if (!isMobile)
@@ -737,8 +973,7 @@ class _RoomHeaderState extends State<RoomHeader> {
                         const PopupMenuItem<String>(
                           value: 'grid',
                           child: ListTile(
-                            leading: Icon(Icons.grid_view,
-                                color: Colors.black),
+                            leading: Icon(Icons.grid_view, color: Colors.black),
                             title: Text(
                               '4 Tiles Grid',
                               style: TextStyle(
@@ -778,8 +1013,8 @@ class _RoomHeaderState extends State<RoomHeader> {
                     inactiveColor: Colors.white.withOpacity(0.5),
                     onPressed: widget.onOpenSidebar,
                     isMobile: isMobile,
-                    tooltip: widget.isSidebarOpen 
-                        ? 'Close participants panel' 
+                    tooltip: widget.isSidebarOpen
+                        ? 'Close participants panel'
                         : 'Show participants panel',
                   ),
               ],

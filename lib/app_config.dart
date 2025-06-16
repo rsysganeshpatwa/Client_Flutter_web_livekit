@@ -4,4 +4,5 @@ class AppConfig {
   static const String apiLiveKitHttpsUrl = 'https://embedded-poc.rsystems.com/livekit';
   static const String apiNodeUrl = 'https://embedded-poc.rsystems.com/api';
   static const String apiLocalNodeUrl = 'http://localhost:3000';
+  static const String apiMomAgent = 'http://10.101.70.120:8000';
 }
