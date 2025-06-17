@@ -406,6 +406,11 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> onToggleVoiceAgentCallback(bool isActive) async {
+   await _updateParticipantmanagerFromDB();
+        _sortParticipants('TrackSubscribedEvent');
+  }
+
   void _sortParticipants(String from) {
     if (!mounted) return;
     final localParticipant = widget.room.localParticipant;
@@ -1500,6 +1505,9 @@ class _RoomPageState extends State<RoomPage> with WidgetsBindingObserver {
                                 onToggleFocusMode: _handleToggleFocusMode,
                                 isFocusModeOn: _isFocusModeOn,
                                 isMomAgentActive: _isMomAgentActive,
+                                onToggleVoiceAgentCallback: (isActive) => {
+                                  onToggleVoiceAgentCallback(isActive)
+                                } ,
                               ),
                             ),
                           ),

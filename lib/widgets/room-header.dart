@@ -9,6 +9,7 @@ import 'package:video_meeting_room/helper_widgets/BlinkingIndicator.dart';
 import 'package:video_meeting_room/helper_widgets/MomScriptDialog.dart';
 import 'package:video_meeting_room/models/role.dart';
 import 'package:video_meeting_room/models/room_models.dart';
+import 'package:video_meeting_room/services/ai_voice_agent_service.dart';
 import 'package:video_meeting_room/services/mom_agent_service.dart';
 import 'package:video_meeting_room/widgets/codec_stats.dart';
 import 'dart:async';
@@ -27,6 +28,7 @@ class RoomHeader extends StatefulWidget {
   final Function(bool) onToggleFocusMode;
   final bool isFocusModeOn;
   final bool isMomAgentActive;
+  final Function(bool) onToggleVoiceAgentCallback;
 
   const RoomHeader({
     super.key,
@@ -41,7 +43,8 @@ class RoomHeader extends StatefulWidget {
     required this.isSideBarShouldVisible,
     required this.onToggleFocusMode,
     required this.isFocusModeOn,
-    this.isMomAgentActive =false,
+    this.isMomAgentActive = false,
+    required this.onToggleVoiceAgentCallback,
   });
 
   @override
@@ -54,8 +57,14 @@ class _RoomHeaderState extends State<RoomHeader> {
   bool _isHandRaised = false;
   LocalParticipant get participant => widget.room.localParticipant!;
   final MomService _momAgentService = GetIt.instance<MomService>();
+  final AIVoiceAgentService _aiVoiceAgentService =
+      GetIt.instance<AIVoiceAgentService>();
   bool _isMomAgentActive = false;
   bool _isProcessing = false;
+  // Add these state variables to your _RoomHeaderState class
+  bool _isVoiceAgentActive = false;
+  bool _isVoiceAgentProcessing = false;
+
   Timer? _blinkTimer;
   double _blinkOpacity = 1.0;
 
@@ -418,86 +427,170 @@ class _RoomHeaderState extends State<RoomHeader> {
 
 // Toggle Mom Agent recording
 // Modify your _toggleMomAgent method in room-header.dart
-Future<void> _toggleMomAgent() async {
-  if (_isProcessing) return;
+  Future<void> _toggleMomAgent() async {
+    if (_isProcessing) return;
 
-  setState(() {
-    _isProcessing = true;
-  });
+    setState(() {
+      _isProcessing = true;
+    });
 
-  try {
-    if (_isMomAgentActive) {
-      // Stopping the agent - get the script
-      final response = await _momAgentService.stopMeeting(widget.room.name);
-      
-      setState(() {
-        _isMomAgentActive = false;
-        _stopBlinkEffect();
-      });
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Mom Agent stopped successfully.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      
-      // Extract and display the script
-      if (response.isNotEmpty) {
-        
-        // Use the new component to show the dialog
-        MomScriptDialog.show(
-          context, 
-          response,
-          meetingTitle: widget.room.name,
-        );
-      } else {
-        // Show error for missing script
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No meeting transcript was generated.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } else {
-      // Start Mom Agent code...
-      final success = await _momAgentService.startMeeting(widget.room.name);
+    try {
+      if (_isMomAgentActive) {
+        // Stopping the agent - get the script
+        final response = await _momAgentService.stopMeeting(widget.room.name);
 
-      if (success) {
         setState(() {
-          _isMomAgentActive = true;
-          _startBlinkEffect();
+          _isMomAgentActive = false;
+          _stopBlinkEffect();
         });
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Mom Agent started successfully.'),
+            content: Text('Mom Agent stopped successfully.'),
             duration: Duration(seconds: 2),
           ),
         );
+
+        // Extract and display the script
+        if (response.isNotEmpty) {
+          // Use the new component to show the dialog
+          MomScriptDialog.show(
+            context,
+            response,
+            meetingTitle: widget.room.name,
+          );
+        } else {
+          // Show error for missing script
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No meeting transcript was generated.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       } else {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to start Mom Agent.'),
-            duration: Duration(seconds: 3),
-          ),
+        // Start Mom Agent code...
+        final success = await _momAgentService.startMeeting(widget.room.name);
+
+        if (success) {
+          setState(() {
+            _isMomAgentActive = true;
+            _startBlinkEffect();
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Mom Agent started successfully.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to start Mom Agent.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Error handling...
+    } finally {
+      _stopBlinkEffect();
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+// Add this method to the _RoomHeaderState class
+  Future<void> _toggleVoiceAgent() async {
+    if (_isVoiceAgentProcessing) return;
+
+    setState(() {
+      _isVoiceAgentProcessing = true;
+    });
+
+    try {
+      if (_isVoiceAgentActive) {
+        // Stop the Voice Agent
+        final success = await _aiVoiceAgentService.stopAgent(widget.room.name);
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Voice Agent stopped successfully.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to stop Voice Agent.'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+         setState(() {
+            _isVoiceAgentActive = false;
+             widget.onToggleVoiceAgentCallback(false);
+          });
+
+      } else {
+        // Start the Voice Agent
+        final success = await _aiVoiceAgentService.startAgent(
+          widget.room.name,
+          participant.identity,
         );
 
+        if (success) {
+          setState(() {
+            _isVoiceAgentActive = true;
+            widget.onToggleVoiceAgentCallback(true);
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Voice Agent started. You can now talk to the AI.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else {
+
+          setState(() { 
+            _isVoiceAgentActive = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to start Voice Agent.'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
+    } catch (e) {
+      print('Error toggling Voice Agent: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isVoiceAgentProcessing = false;
+
+        
+      });
     }
-  } catch (e) {
-    // Error handling...
-  } finally {
-    _stopBlinkEffect();
-    setState(() {
-      _isProcessing = false;
-    });
   }
-}
+
 // Start the blinking effect when active
   void _startBlinkEffect() {
     // Cancel existing timer if any
@@ -545,78 +638,79 @@ Future<void> _toggleMomAgent() async {
   }
 
 // Modify the _buildControlButton method to include a loading state
-Widget _buildControlButton({
-  required IconData icon,
-  required String label,
-  required bool isActive,
-  required VoidCallback onPressed,
-  required bool isMobile,
-  Color activeColor = Colors.white,
-  Color inactiveColor = Colors.white,
-  String? tooltip,
-  bool isLoading = false,
-}) {
-  final String effectiveTooltip =
-      tooltip ?? (isActive ? 'Disable $label' : 'Enable $label');
+  Widget _buildControlButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onPressed,
+    required bool isMobile,
+    Color activeColor = Colors.white,
+    Color inactiveColor = Colors.white,
+    String? tooltip,
+    bool isLoading = false,
+  }) {
+    final String effectiveTooltip =
+        tooltip ?? (isActive ? 'Disable $label' : 'Enable $label');
 
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          height: 36,
-          width: 36,
-          alignment: Alignment.center,
-          child: Tooltip(
-            message: effectiveTooltip,
-            preferBelow: true,
-            verticalOffset: 20,
-            showDuration: const Duration(seconds: 2),
-            child: isLoading 
-                ? SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(isActive ? activeColor : inactiveColor),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            height: 36,
+            width: 36,
+            alignment: Alignment.center,
+            child: Tooltip(
+              message: effectiveTooltip,
+              preferBelow: true,
+              verticalOffset: 20,
+              showDuration: const Duration(seconds: 2),
+              child: isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            isActive ? activeColor : inactiveColor),
+                      ),
+                    )
+                  : IconButton(
+                      icon: Icon(
+                        icon,
+                        color: isActive ? activeColor : inactiveColor,
+                        size: isMobile ? 20 : 24,
+                      ),
+                      onPressed: onPressed,
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints.tight(const Size(36, 36)),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 18,
+                      tooltip: null,
                     ),
-                  )
-                : IconButton(
-                    icon: Icon(
-                      icon,
-                      color: isActive ? activeColor : inactiveColor,
-                      size: isMobile ? 20 : 24,
-                    ),
-                    onPressed: onPressed,
-                    padding: EdgeInsets.zero,
-                    constraints: BoxConstraints.tight(const Size(36, 36)),
-                    visualDensity: VisualDensity.compact,
-                    splashRadius: 18,
-                    tooltip: null,
-                  ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          height: 16,
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isActive ? activeColor : inactiveColor,
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
             ),
-            textAlign: TextAlign.center,
           ),
-        ),
-      ],
-    ),
-  );
-}
+          const SizedBox(height: 4),
+          Container(
+            height: 16,
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isActive ? activeColor : inactiveColor,
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   // Widget _buildControlButton({
   //   required IconData icon,
   //   required String label,
@@ -837,32 +931,49 @@ Widget _buildControlButton({
                         ? 'Lower your hand'
                         : 'Raise your hand to get attention',
                   ),
-if (widget.isAdmin )
-Stack(
-  alignment: Alignment.center,
-  children: [
-    // Pulsating background ring when active
-// Replace the problematic TweenAnimationBuilder with a corrected version
-// filepath: /home/ganesh/Documents/poc/Client_Flutter_web_livekit/lib/widgets/room-header.dart
-if (_isMomAgentActive)
-BlinkingIndicator(isActive: _isMomAgentActive),
-    // The actual button
+                  if (widget.isAdmin)
+  Stack(
+    alignment: Alignment.center,
+    children: [
+      // The Voice Agent button
+      _buildControlButton(
+        icon: _isVoiceAgentActive ? Icons.smart_toy : Icons.smart_toy_outlined,
+        label: _isVoiceAgentActive ? 'Stop AI' : 'Voice AI',
+        isActive: _isVoiceAgentActive,
+        activeColor: Colors.blue,  // Different color than Mom Agent (which is red)
+        onPressed: _isVoiceAgentProcessing ? () {} : _toggleVoiceAgent,
+        isMobile: isMobile,
+        tooltip: _isVoiceAgentActive 
+            ? 'Stop Voice Agent' 
+            : 'Talk to Voice Agent',
+        isLoading: _isVoiceAgentProcessing,
+      ),
+    ],
+  ),
+                if (widget.isAdmin)
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (_isMomAgentActive)
+                        BlinkingIndicator(isActive: _isMomAgentActive),
+                      // The actual button
 
-    _buildControlButton(
-      icon: _isMomAgentActive ? Icons.record_voice_over : Icons.voice_over_off,
-      label: _isMomAgentActive ? 'Mom Active' : 'Mom Agent',
-      isActive: _isMomAgentActive,
-      activeColor: Colors.red,
-      onPressed: _isProcessing ? () {} : _toggleMomAgent,
-      isMobile: isMobile,
-      tooltip: _isMomAgentActive 
-          ? 'Stop Mom Agent recording' 
-          : 'Start Mom Agent recording',
-      isLoading: _isProcessing,
-    ),
-  ],
-),
-                  
+                      _buildControlButton(
+                        icon: _isMomAgentActive
+                            ? Icons.record_voice_over
+                            : Icons.voice_over_off,
+                        label: _isMomAgentActive ? 'Mom Active' : 'Mom Agent',
+                        isActive: _isMomAgentActive,
+                        activeColor: Colors.red,
+                        onPressed: _isProcessing ? () {} : _toggleMomAgent,
+                        isMobile: isMobile,
+                        tooltip: _isMomAgentActive
+                            ? 'Stop Mom Agent recording'
+                            : 'Start Mom Agent recording',
+                        isLoading: _isProcessing,
+                      ),
+                    ],
+                  ),
                 _buildControlButton(
                   icon: widget.isFocusModeOn
                       ? Icons.center_focus_strong
